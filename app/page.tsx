@@ -1,6 +1,8 @@
 import { Suspense } from "react"
 import ShareHandler from "@/components/share-handler"
 
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
   return (
     <main className="w-full h-screen p-0 m-0 overflow-hidden bg-black">
