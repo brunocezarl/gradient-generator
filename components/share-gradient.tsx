@@ -10,7 +10,7 @@ import { Share, Copy, Check, QrCode } from "lucide-react"
 import { useGradientStore } from "@/lib/store"
 import { createShareableURL } from "@/lib/share-utils"
 import { useToast } from "@/components/ui/use-toast"
-import QRCode from "qrcode.react"
+import { QRCodeSVG } from "qrcode.react"
 
 export function ShareGradient() {
   const [open, setOpen] = useState(false)
@@ -113,8 +113,8 @@ export function ShareGradient() {
                   </Button>
                 </div>
               </div>
-              
-              {navigator.share && (
+
+              {typeof navigator !== 'undefined' && 'share' in navigator && (
                 <Button
                   onClick={shareViaWebShare}
                   className="w-full bg-blue-600 hover:bg-blue-700"
@@ -127,7 +127,7 @@ export function ShareGradient() {
             
             <TabsContent value="qrcode" className="mt-4 space-y-4">
               <div className="flex justify-center p-4 bg-white rounded-md">
-                <QRCode value={shareableURL} size={200} />
+                <QRCodeSVG value={shareableURL} size={200} />
               </div>
               <p className="text-sm text-gray-400 text-center">
                 Escaneie o código QR com a câmera do seu dispositivo para abrir este gradiente.

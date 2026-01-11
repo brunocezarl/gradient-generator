@@ -1,6 +1,20 @@
 "use client"
 
 import { GradientStore } from "@/lib/store"
+import { z } from "zod"
+
+// Zod schema for shareable gradient validation
+const ShareableGradientSchema = z.object({
+  speed: z.number().min(0.1).max(3.0),
+  complexity: z.number().int().min(1).max(10),
+  noiseScale: z.number().min(0.5).max(5.0),
+  colorScheme: z.string().max(100),
+  isCustomMode: z.boolean(),
+  customColors: z.object({
+    color1: z.array(z.number().min(0).max(1)).length(3),
+    color2: z.array(z.number().min(0).max(1)).length(3),
+  }),
+})
 
 // Define the shape of shareable data
 export interface ShareableGradient {
@@ -45,14 +59,23 @@ export function parseShareableURL(url: string): ShareableGradient | null {
     // Extract the query parameters
     const urlObj = new URL(url)
     const encodedData = urlObj.searchParams.get("gradient")
-    
+
     if (!encodedData) return null
-    
+
+    // Add size limit (10KB) to prevent extremely large payloads
+    if (encodedData.length > 10240) {
+      console.error("Gradient data exceeds size limit")
+      return null
+    }
+
     // Decode and parse the data
     const decodedData = decodeURIComponent(encodedData)
-    const parsedData = JSON.parse(decodedData) as ShareableGradient
-    
-    return parsedData
+    const parsedData = JSON.parse(decodedData)
+
+    // Validate with Zod schema
+    const validatedData = ShareableGradientSchema.parse(parsedData)
+
+    return validatedData
   } catch (error) {
     console.error("Error parsing shareable URL:", error)
     return null

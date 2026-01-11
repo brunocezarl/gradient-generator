@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware"
 import { ShareableGradient } from "@/lib/share-utils"
 import { AnimationPreset, animationPresets } from "@/lib/animation-presets"
 import { GradientLayer, createDefaultLayer, generateLayerId } from "@/lib/layer-utils"
+import { z } from "zod"
 
 // Define color type
 type GradientColor = [number, number, number]
@@ -13,6 +14,25 @@ type ColorScheme = {
   color2: GradientColor
   name?: string
 }
+
+// Zod schema for persisted state validation
+const PersistedStateSchema = z.object({
+  speed: z.number().min(0.1).max(3.0),
+  complexity: z.number().int().min(1).max(10),
+  noiseScale: z.number().min(0.5).max(5.0),
+  colorScheme: z.string().max(100),
+  isCustomMode: z.boolean(),
+  customColors: z.object({
+    color1: z.tuple([z.number(), z.number(), z.number()]),
+    color2: z.tuple([z.number(), z.number(), z.number()]),
+  }),
+  colorSchemes: z.record(z.object({
+    color1: z.tuple([z.number(), z.number(), z.number()]),
+    color2: z.tuple([z.number(), z.number(), z.number()]),
+    name: z.string().optional(),
+  })),
+  grainScale: z.number().min(1).max(2000),
+}).partial()
 
 // Define the store type
 export type GradientStore = {
@@ -306,9 +326,19 @@ export const useGradientStore = create<GradientStore>()( // Added () to correctl
           customColors: state.customColors,
           colorSchemes: state.colorSchemes,
           // Persist grainScale as well
-          grainScale: state.grainScale, 
-        } 
-      } 
+          grainScale: state.grainScale,
+        }
+      },
+      merge: (persistedState, currentState) => {
+        try {
+          // Validate persisted state with Zod
+          const validatedState = PersistedStateSchema.parse(persistedState)
+          return { ...currentState, ...validatedState }
+        } catch (error) {
+          console.error("Invalid persisted state, using defaults:", error)
+          return currentState
+        }
+      }
     } 
   ) // Closing parenthesis for persist
 ) // Closing parenthesis for create
