@@ -168,22 +168,20 @@ const fragmentShader = `
 
 // Shader component
 function GradientShader() {
-  // Get parameters from store
-  const {
-    isPlaying,
-    speed,
-    complexity,
-    noiseScale,
-    colorScheme,
-    colorSchemes,
-    isCustomMode,
-    customColors,
-    flowIntensity,
-    grainAmount,
-    grainScale, // Get grainScale from store
-    thresholdMin,
-    thresholdMax
-  } = useGradientStore()
+  // Get parameters from store using selectors to prevent unnecessary re-renders
+  const isPlaying = useGradientStore(state => state.isPlaying)
+  const speed = useGradientStore(state => state.speed)
+  const complexity = useGradientStore(state => state.complexity)
+  const noiseScale = useGradientStore(state => state.noiseScale)
+  const colorScheme = useGradientStore(state => state.colorScheme)
+  const colorSchemes = useGradientStore(state => state.colorSchemes)
+  const isCustomMode = useGradientStore(state => state.isCustomMode)
+  const customColors = useGradientStore(state => state.customColors)
+  const flowIntensity = useGradientStore(state => state.flowIntensity)
+  const grainAmount = useGradientStore(state => state.grainAmount)
+  const grainScale = useGradientStore(state => state.grainScale)
+  const thresholdMin = useGradientStore(state => state.thresholdMin)
+  const thresholdMax = useGradientStore(state => state.thresholdMax)
 
   // Refs
   const meshRef = useRef<THREE.Mesh>(null)
@@ -270,6 +268,9 @@ function GradientShader() {
 
 // Main scene component
 export function GradientScene() {
+  const [contextLost, setContextLost] = useState(false)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
   // Device optimizations
   const { quality, pixelRatio, antialias } = useDeviceOptimizations()
 
@@ -284,8 +285,42 @@ export function GradientScene() {
     }
   }, [quality, antialias])
 
+  // Handle WebGL context loss
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const handleContextLost = (event: WebGLContextEvent) => {
+      event.preventDefault()
+      setContextLost(true)
+    }
+
+    const handleContextRestored = () => {
+      setContextLost(false)
+    }
+
+    canvas.addEventListener('webglcontextlost', handleContextLost as EventListener)
+    canvas.addEventListener('webglcontextrestored', handleContextRestored as EventListener)
+
+    return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost as EventListener)
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored as EventListener)
+    }
+  }, [])
+
+  if (contextLost) {
+    return (
+      <div className="flex items-center justify-center h-full bg-black text-white">
+        <div className="text-center">
+          <p className="text-lg mb-2">WebGL context lost</p>
+          <p className="text-sm text-gray-400">Reloading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <Canvas gl={glConfig} camera={{ position: [0, 0, 5] }} dpr={[1, pixelRatio]}>
+    <Canvas ref={canvasRef} gl={glConfig} camera={{ position: [0, 0, 5] }} dpr={[1, pixelRatio]}>
       <GradientShader />
     </Canvas>
   )

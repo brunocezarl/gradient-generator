@@ -1,10 +1,7 @@
 import type React from "react"
 import "./globals.css"
-import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/toaster"
-
-const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
   title: "Organic Gradient Generator",
@@ -19,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className="font-sans">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
@@ -28,6 +25,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-import './globals.css'

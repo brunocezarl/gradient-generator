@@ -29,43 +29,40 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   const { toast } = useToast()
   const isMobile = useMediaQuery('(max-width: 768px)')
 
-  // Get state and actions from store
-  const {
-    isPlaying,
-    speed,
-    complexity,
-    noiseScale,
-    colorScheme,
-    menuOpen,
-    isCustomMode,
-    customColors,
-    colorSchemes,
-    // Import advanced state and setters
-    flowIntensity,
-    grainAmount,
-    thresholdMin,
-    thresholdMax,
-    multiLayerMode, // Import multiLayerMode
-    setIsPlaying,
-    setSpeed,
-    setComplexity,
-    setNoiseScale,
-    setColorScheme,
-    toggleMenu,
-    setCustomMode,
-    setCustomColor1,
-    setCustomColor2,
-    saveCustomScheme,
-    resetToDefaults,
-    // Import advanced setters
-    setFlowIntensity,
-    setGrainAmount,
-    setThresholdMin,
-    setThresholdMax,
-    // Get grainScale state and setter
-    grainScale,
-    setGrainScale
-  } = useGradientStore()
+  // Get state and actions from store using selectors to prevent unnecessary re-renders
+  const isPlaying = useGradientStore(state => state.isPlaying)
+  const speed = useGradientStore(state => state.speed)
+  const complexity = useGradientStore(state => state.complexity)
+  const noiseScale = useGradientStore(state => state.noiseScale)
+  const colorScheme = useGradientStore(state => state.colorScheme)
+  const menuOpen = useGradientStore(state => state.menuOpen)
+  const isCustomMode = useGradientStore(state => state.isCustomMode)
+  const customColors = useGradientStore(state => state.customColors)
+  const colorSchemes = useGradientStore(state => state.colorSchemes)
+  const flowIntensity = useGradientStore(state => state.flowIntensity)
+  const grainAmount = useGradientStore(state => state.grainAmount)
+  const thresholdMin = useGradientStore(state => state.thresholdMin)
+  const thresholdMax = useGradientStore(state => state.thresholdMax)
+  const multiLayerMode = useGradientStore(state => state.multiLayerMode)
+  const grainScale = useGradientStore(state => state.grainScale)
+
+  // Get actions from store
+  const setIsPlaying = useGradientStore(state => state.setIsPlaying)
+  const setSpeed = useGradientStore(state => state.setSpeed)
+  const setComplexity = useGradientStore(state => state.setComplexity)
+  const setNoiseScale = useGradientStore(state => state.setNoiseScale)
+  const setColorScheme = useGradientStore(state => state.setColorScheme)
+  const toggleMenu = useGradientStore(state => state.toggleMenu)
+  const setCustomMode = useGradientStore(state => state.setCustomMode)
+  const setCustomColor1 = useGradientStore(state => state.setCustomColor1)
+  const setCustomColor2 = useGradientStore(state => state.setCustomColor2)
+  const saveCustomScheme = useGradientStore(state => state.saveCustomScheme)
+  const resetToDefaults = useGradientStore(state => state.resetToDefaults)
+  const setFlowIntensity = useGradientStore(state => state.setFlowIntensity)
+  const setGrainAmount = useGradientStore(state => state.setGrainAmount)
+  const setThresholdMin = useGradientStore(state => state.setThresholdMin)
+  const setThresholdMax = useGradientStore(state => state.setThresholdMax)
+  const setGrainScale = useGradientStore(state => state.setGrainScale)
 
   return (
     <>
@@ -76,6 +73,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           size="icon"
           className="bg-black/50 border-gray-700 hover:bg-black/70 text-white"
           onClick={toggleMenu}
+          aria-label="Abrir menu de controles"
         >
           <Settings className="h-5 w-5" />
         </Button>
@@ -86,7 +84,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         <div className="absolute top-16 left-4 z-50 w-72 md:w-80 lg:w-96 bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl overflow-hidden">
           <div className="p-4 border-b border-gray-800 flex justify-between items-center">
             <h3 className="text-white font-medium">Gradient Controls</h3>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={toggleMenu}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={toggleMenu} aria-label="Fechar menu de controles">
               <ChevronUp className="h-4 w-4" />
             </Button>
           </div>

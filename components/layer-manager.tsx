@@ -13,18 +13,17 @@ import { TooltipHelp } from "@/components/tooltip-help"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 export function LayerManager() {
-  const {
-    multiLayerMode,
-    setMultiLayerMode,
-    layers,
-    activeLayerId,
-    setActiveLayer,
-    addLayer,
-    removeLayer,
-    updateLayer,
-    moveLayer,
-    colorSchemes
-  } = useGradientStore()
+  // Use selectors to prevent unnecessary re-renders
+  const multiLayerMode = useGradientStore(state => state.multiLayerMode)
+  const layers = useGradientStore(state => state.layers)
+  const activeLayerId = useGradientStore(state => state.activeLayerId)
+  const colorSchemes = useGradientStore(state => state.colorSchemes)
+  const setMultiLayerMode = useGradientStore(state => state.setMultiLayerMode)
+  const setActiveLayer = useGradientStore(state => state.setActiveLayer)
+  const addLayer = useGradientStore(state => state.addLayer)
+  const removeLayer = useGradientStore(state => state.removeLayer)
+  const updateLayer = useGradientStore(state => state.updateLayer)
+  const moveLayer = useGradientStore(state => state.moveLayer)
   
   if (!multiLayerMode) {
     return (
@@ -72,6 +71,7 @@ export function LayerManager() {
               className="h-6 w-6 text-gray-400 hover:text-white"
               onClick={addLayer}
               title="Adicionar camada"
+              aria-label="Adicionar camada"
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -94,6 +94,7 @@ export function LayerManager() {
                       updateLayer(layer.id, { visible: !layer.visible })
                     }}
                     title={layer.visible ? "Ocultar camada" : "Mostrar camada"}
+                    aria-label={layer.visible ? "Ocultar camada" : "Mostrar camada"}
                   >
                     {layer.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                   </Button>
@@ -115,6 +116,7 @@ export function LayerManager() {
                       }}
                       disabled={index === 0}
                       title="Mover para cima"
+                      aria-label="Mover camada para cima"
                     >
                       <ChevronUp className="h-3 w-3" />
                     </Button>
@@ -129,6 +131,7 @@ export function LayerManager() {
                       }}
                       disabled={index === layers.length - 1}
                       title="Mover para baixo"
+                      aria-label="Mover camada para baixo"
                     >
                       <ChevronDown className="h-3 w-3" />
                     </Button>
@@ -143,6 +146,7 @@ export function LayerManager() {
                       }}
                       disabled={layers.length <= 1}
                       title="Remover camada"
+                      aria-label="Remover camada"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>

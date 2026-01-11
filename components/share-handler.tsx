@@ -21,7 +21,6 @@ export default function ShareHandler() {
 
         if (sharedSettings) {
           importSettings(sharedSettings)
-          console.log("Imported shared gradient settings", sharedSettings)
         }
       } catch (error) {
         console.error("Error processing shared gradient:", error)

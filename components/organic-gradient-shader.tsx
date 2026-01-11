@@ -4,6 +4,7 @@ import { useRef, useMemo, useEffect } from "react"
 import { useFrame, useThree } from "@react-three/fiber"
 import { Vector2 } from "three"
 import type * as THREE from "three"
+import { useGradientStore } from "@/lib/store"
 
 // Shader code for organic gradients
 const vertexShader = `
@@ -140,19 +141,25 @@ export function OrganicGradientShader({
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
   const timeRef = useRef(0)
+  const colorSchemes = useGradientStore(state => state.colorSchemes)
+  const customColors = useGradientStore(state => state.customColors)
 
   // Handle string colorScheme (from layer manager)
   const colors = useMemo(() => {
     if (typeof colorScheme === 'string') {
-      // This is a placeholder - in a real implementation, you would
-      // look up the color scheme from your store
-      return {
-        color1: [0.9, 0.1, 0.1],
-        color2: [0.0, 0.0, 0.9]
+      // Look up the color scheme from the store
+      const scheme = colorSchemes[colorScheme]
+      if (scheme) {
+        return {
+          color1: scheme.color1,
+          color2: scheme.color2
+        }
       }
+      // Fallback to custom colors if scheme not found
+      return customColors
     }
     return colorScheme
-  }, [colorScheme])
+  }, [colorScheme, colorSchemes, customColors])
 
   // Create uniforms for the shader
   const uniforms = useMemo(
