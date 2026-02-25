@@ -23,6 +23,7 @@ const fragmentShader = `
   uniform float uNoiseScale;
   uniform vec3 uColor1;
   uniform vec3 uColor2;
+  uniform vec3 uColor3;
   uniform float uFlowIntensity;
   uniform float uGrainAmount; // Intensity of the grain
   uniform float uGrainScale;  // Scale/size of the grain pattern
@@ -144,8 +145,10 @@ const fragmentShader = `
     // Criar formas orgânicas aplicando limiar ajustável
     float shape = smoothstep(uThresholdMin, uThresholdMax, noise);
 
-    // Misturar cores com base no valor da forma
-    vec3 color = mix(uColor1, uColor2, shape);
+    // Misturar 3 cores com base no valor da forma
+    vec3 colorAB = mix(uColor1, uColor2, clamp(shape * 2.0, 0.0, 1.0));
+    vec3 colorBC = mix(uColor2, uColor3, clamp(shape * 2.0 - 1.0, 0.0, 1.0));
+    vec3 color = mix(colorAB, colorBC, step(0.5, shape));
 
     // Aplicar vibrância para cores mais vivas
     color = applyVibrance(color, 0.2);
@@ -210,6 +213,7 @@ function GradientShader() {
           uNoiseScale: { value: noiseScale },
           uColor1: { value: currentColorScheme.color1 },
           uColor2: { value: currentColorScheme.color2 },
+          uColor3: { value: currentColorScheme.color3 ?? [0.5, 0.0, 0.5] },
           uFlowIntensity: { value: flowIntensity },
           uGrainAmount: { value: grainAmount },
           uGrainScale: { value: 500.0 }, // Add initial value for new uniform
@@ -231,6 +235,7 @@ function GradientShader() {
       materialRef.current.uniforms.uNoiseScale.value = noiseScale
       materialRef.current.uniforms.uColor1.value = currentColorScheme.color1
       materialRef.current.uniforms.uColor2.value = currentColorScheme.color2
+      materialRef.current.uniforms.uColor3.value = currentColorScheme.color3 ?? [0.5, 0.0, 0.5]
       materialRef.current.uniforms.uFlowIntensity.value = flowIntensity
       materialRef.current.uniforms.uGrainAmount.value = grainAmount
       materialRef.current.uniforms.uGrainScale.value = grainScale // Update grainScale uniform

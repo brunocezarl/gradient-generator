@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Play, Pause, ImageIcon, ChevronUp, Settings, RefreshCw, Save, Palette } from "lucide-react"
+import { Play, Pause, ImageIcon, ChevronUp, Settings, RefreshCw, Save, Palette, Shuffle } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
@@ -55,8 +55,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     setCustomMode,
     setCustomColor1,
     setCustomColor2,
+    setCustomColor3,
     saveCustomScheme,
     resetToDefaults,
+    randomize,
     // Import advanced setters
     setFlowIntensity,
     setGrainAmount,
@@ -166,6 +168,21 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
 
                   <Button
                     onClick={() => {
+                      randomize()
+                      toast({
+                        title: "Randomizado!",
+                        description: "Cores e parâmetros gerados aleatoriamente."
+                      })
+                    }}
+                    variant="outline"
+                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+                  >
+                    <Shuffle className="mr-2 h-4 w-4" />
+                    Randomizar
+                  </Button>
+
+                  <Button
+                    onClick={() => {
                       resetToDefaults()
                       toast({
                         title: "Configurações Resetadas",
@@ -208,6 +225,12 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                         label="Cor 2"
                         color={customColors.color2}
                         onChange={setCustomColor2}
+                      />
+
+                      <ColorPicker
+                        label="Cor 3"
+                        color={customColors.color3}
+                        onChange={setCustomColor3}
                       />
 
                       <Button

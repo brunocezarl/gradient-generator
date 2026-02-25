@@ -1,16 +1,119 @@
 "use client"
 
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Layers, Plus, Trash2, ChevronUp, ChevronDown, Eye, EyeOff } from "lucide-react"
+import { Layers, Plus, Trash2, Eye, EyeOff, GripVertical } from "lucide-react"
 import { useGradientStore } from "@/lib/store"
-import { blendModes, blendModeToCSS } from "@/lib/layer-utils"
+import { blendModes } from "@/lib/layer-utils"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GradientLayer } from "@/lib/layer-utils"
+
+// ─── Item de camada arrastável ─────────────────────────────────────────────
+
+interface SortableLayerItemProps {
+  layer: GradientLayer
+  index: number
+  isActive: boolean
+  onSelect: () => void
+  onToggleVisibility: () => void
+  onRemove: () => void
+  canRemove: boolean
+}
+
+function SortableLayerItem({
+  layer,
+  index,
+  isActive,
+  onSelect,
+  onToggleVisibility,
+  onRemove,
+  canRemove,
+}: SortableLayerItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: layer.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center p-2 rounded ${
+        isActive ? "bg-gray-700" : "bg-gray-900 hover:bg-gray-800"
+      }`}
+      onClick={onSelect}
+    >
+      {/* Handle de arraste */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 mr-1 touch-none"
+        onClick={(e) => e.stopPropagation()}
+        title="Arrastar para reordenar"
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+
+      {/* Botão visibilidade */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-gray-400 hover:text-white"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleVisibility()
+        }}
+        title={layer.visible ? "Ocultar camada" : "Mostrar camada"}
+      >
+        {layer.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+      </Button>
+
+      <div className="flex-1 mx-2 truncate">
+        <span className="text-sm text-white">Camada {index + 1}</span>
+      </div>
+
+      {/* Remover */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-gray-400 hover:text-red-500"
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
+        disabled={!canRemove}
+        title="Remover camada"
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </div>
+  )
+}
+
+// ─── Componente principal ──────────────────────────────────────────────────
 
 export function LayerManager() {
   const {
@@ -22,10 +125,22 @@ export function LayerManager() {
     addLayer,
     removeLayer,
     updateLayer,
-    moveLayer,
-    colorSchemes
+    reorderLayers,
+    colorSchemes,
   } = useGradientStore()
-  
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = layers.findIndex((l) => l.id === active.id)
+    const newIndex = layers.findIndex((l) => l.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const newOrder = arrayMove(layers, oldIndex, newIndex).map((l) => l.id)
+    reorderLayers(newOrder)
+  }
+
   if (!multiLayerMode) {
     return (
       <div className="mt-4 pt-4 border-t border-gray-800">
@@ -35,18 +150,14 @@ export function LayerManager() {
             <Label className="text-white">Modo Multi-Camadas</Label>
             <TooltipHelp content="Ative para criar e gerenciar múltiplas camadas de gradiente." />
           </div>
-          <Switch 
-            checked={multiLayerMode} 
-            onCheckedChange={setMultiLayerMode} 
-          />
+          <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} />
         </div>
       </div>
     )
   }
-  
-  // Get the active layer
-  const activeLayer = layers.find(layer => layer.id === activeLayerId) || layers[0]
-  
+
+  const activeLayer = layers.find((layer) => layer.id === activeLayerId) || layers[0]
+
   return (
     <div className="mt-4 pt-4 border-t border-gray-800">
       <div className="flex items-center justify-between mb-4">
@@ -55,14 +166,11 @@ export function LayerManager() {
           <Label className="text-white">Modo Multi-Camadas</Label>
           <TooltipHelp content="Desative para voltar ao modo de camada única." />
         </div>
-        <Switch 
-          checked={multiLayerMode} 
-          onCheckedChange={setMultiLayerMode} 
-        />
+        <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} />
       </div>
-      
+
       <div className="space-y-4">
-        {/* Layer List */}
+        {/* Lista de camadas com DnD */}
         <div className="bg-gray-800 rounded-md p-2">
           <div className="flex justify-between items-center mb-2">
             <Label className="text-white">Camadas</Label>
@@ -76,92 +184,48 @@ export function LayerManager() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          
+
           <ScrollArea className="h-40 pr-4">
-            <div className="space-y-1">
-              {layers.map((layer, index) => (
-                <div 
-                  key={layer.id}
-                  className={`flex items-center p-2 rounded ${layer.id === activeLayerId ? 'bg-gray-700' : 'bg-gray-900 hover:bg-gray-800'}`}
-                  onClick={() => setActiveLayer(layer.id)}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-gray-400 hover:text-white"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      updateLayer(layer.id, { visible: !layer.visible })
-                    }}
-                    title={layer.visible ? "Ocultar camada" : "Mostrar camada"}
-                  >
-                    {layer.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                  </Button>
-                  
-                  <div className="flex-1 mx-2 truncate">
-                    <span className="text-sm text-white">
-                      Camada {index + 1}
-                    </span>
-                  </div>
-                  
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-gray-400 hover:text-white"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        moveLayer(layer.id, 'up')
-                      }}
-                      disabled={index === 0}
-                      title="Mover para cima"
-                    >
-                      <ChevronUp className="h-3 w-3" />
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-gray-400 hover:text-white"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        moveLayer(layer.id, 'down')
-                      }}
-                      disabled={index === layers.length - 1}
-                      title="Mover para baixo"
-                    >
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-gray-400 hover:text-white hover:text-red-500"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeLayer(layer.id)
-                      }}
-                      disabled={layers.length <= 1}
-                      title="Remover camada"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={layers.map((l) => l.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-1">
+                  {layers.map((layer, index) => (
+                    <SortableLayerItem
+                      key={layer.id}
+                      layer={layer}
+                      index={index}
+                      isActive={layer.id === activeLayerId}
+                      onSelect={() => setActiveLayer(layer.id)}
+                      onToggleVisibility={() =>
+                        updateLayer(layer.id, { visible: !layer.visible })
+                      }
+                      onRemove={() => removeLayer(layer.id)}
+                      canRemove={layers.length > 1}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           </ScrollArea>
         </div>
-        
-        {/* Active Layer Settings */}
+
+        {/* Configurações da camada ativa */}
         {activeLayer && (
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-white">Configurações da Camada</h4>
-            
-            {/* Opacity */}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-white">Opacidade: {Math.round(activeLayer.opacity * 100)}%</Label>
+                <Label className="text-white">
+                  Opacidade: {Math.round(activeLayer.opacity * 100)}%
+                </Label>
               </div>
               <Slider
                 value={[activeLayer.opacity]}
@@ -171,12 +235,11 @@ export function LayerManager() {
                 onValueChange={(value) => updateLayer(activeLayer.id, { opacity: value[0] })}
               />
             </div>
-            
-            {/* Blend Mode */}
+
             <div className="space-y-2">
               <Label className="text-white">Modo de Mesclagem</Label>
-              <Select 
-                value={activeLayer.blendMode} 
+              <Select
+                value={activeLayer.blendMode}
                 onValueChange={(value) => updateLayer(activeLayer.id, { blendMode: value })}
               >
                 <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
@@ -184,21 +247,21 @@ export function LayerManager() {
                 </SelectTrigger>
                 <SelectContent className="bg-gray-900 border-gray-700 text-white">
                   {Object.entries(blendModes).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            {/* Color Scheme */}
+
             <div className="space-y-2">
               <Label className="text-white">Esquema de Cores</Label>
-              <Select 
-                value={activeLayer.colorScheme} 
-                onValueChange={(value) => updateLayer(activeLayer.id, { 
-                  colorScheme: value,
-                  isCustomMode: false
-                })}
+              <Select
+                value={activeLayer.colorScheme}
+                onValueChange={(value) =>
+                  updateLayer(activeLayer.id, { colorScheme: value, isCustomMode: false })
+                }
               >
                 <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
                   <SelectValue placeholder="Selecione o esquema de cores" />
@@ -208,16 +271,22 @@ export function LayerManager() {
                     <SelectItem key={key} value={key}>
                       <div className="flex items-center">
                         <div className="flex mr-2">
-                          <div 
-                            className="w-3 h-3 rounded-full mr-1" 
+                          <div
+                            className="w-3 h-3 rounded-full mr-1"
                             style={{
-                              backgroundColor: `rgb(${Math.round(scheme.color1[0] * 255)}, ${Math.round(scheme.color1[1] * 255)}, ${Math.round(scheme.color1[2] * 255)})`
+                              backgroundColor: `rgb(${Math.round(scheme.color1[0] * 255)}, ${Math.round(scheme.color1[1] * 255)}, ${Math.round(scheme.color1[2] * 255)})`,
                             }}
                           />
-                          <div 
-                            className="w-3 h-3 rounded-full" 
+                          <div
+                            className="w-3 h-3 rounded-full mr-1"
                             style={{
-                              backgroundColor: `rgb(${Math.round(scheme.color2[0] * 255)}, ${Math.round(scheme.color2[1] * 255)}, ${Math.round(scheme.color2[2] * 255)})`
+                              backgroundColor: `rgb(${Math.round(scheme.color2[0] * 255)}, ${Math.round(scheme.color2[1] * 255)}, ${Math.round(scheme.color2[2] * 255)})`,
+                            }}
+                          />
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: `rgb(${Math.round(scheme.color3[0] * 255)}, ${Math.round(scheme.color3[1] * 255)}, ${Math.round(scheme.color3[2] * 255)})`,
                             }}
                           />
                         </div>
@@ -228,11 +297,12 @@ export function LayerManager() {
                 </SelectContent>
               </Select>
             </div>
-            
-            {/* Noise Scale */}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-white">Escala de Ruído: {activeLayer.noiseScale.toFixed(1)}</Label>
+                <Label className="text-white">
+                  Escala de Ruído: {activeLayer.noiseScale.toFixed(1)}
+                </Label>
               </div>
               <Slider
                 value={[activeLayer.noiseScale]}
@@ -242,18 +312,21 @@ export function LayerManager() {
                 onValueChange={(value) => updateLayer(activeLayer.id, { noiseScale: value[0] })}
               />
             </div>
-            
-            {/* Flow Intensity */}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-white">Intensidade do Fluxo: {activeLayer.flowIntensity.toFixed(2)}</Label>
+                <Label className="text-white">
+                  Intensidade do Fluxo: {activeLayer.flowIntensity.toFixed(2)}
+                </Label>
               </div>
               <Slider
                 value={[activeLayer.flowIntensity]}
                 min={0.1}
                 max={1.0}
                 step={0.01}
-                onValueChange={(value) => updateLayer(activeLayer.id, { flowIntensity: value[0] })}
+                onValueChange={(value) =>
+                  updateLayer(activeLayer.id, { flowIntensity: value[0] })
+                }
               />
             </div>
           </div>
