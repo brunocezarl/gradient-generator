@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { rgbToHex, hexToRgb, rgbToHsl, hslToRgb } from "@/lib/utils"
 
 interface ColorPickerProps {
   label: string
@@ -11,91 +12,213 @@ interface ColorPickerProps {
   onChange: (color: [number, number, number]) => void
 }
 
+type Mode = "rgb" | "hsl"
+
 export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
-  const [r, setR] = useState(Math.round(color[0] * 255))
-  const [g, setG] = useState(Math.round(color[1] * 255))
-  const [b, setB] = useState(Math.round(color[2] * 255))
-  
-  // Update local state when color prop changes
+  const toR = () => Math.round(color[0] * 255)
+  const toG = () => Math.round(color[1] * 255)
+  const toB = () => Math.round(color[2] * 255)
+
+  const [r, setR] = useState(toR)
+  const [g, setG] = useState(toG)
+  const [b, setB] = useState(toB)
+  const [mode, setMode] = useState<Mode>("rgb")
+  const [hexInput, setHexInput] = useState(() => rgbToHex(toR(), toG(), toB()))
+  const [hexError, setHexError] = useState(false)
+
+  // Sincronizar com prop externa
   useEffect(() => {
-    setR(Math.round(color[0] * 255))
-    setG(Math.round(color[1] * 255))
-    setB(Math.round(color[2] * 255))
+    const nr = toR()
+    const ng = toG()
+    const nb = toB()
+    setR(nr)
+    setG(ng)
+    setB(nb)
+    setHexInput(rgbToHex(nr, ng, nb))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color])
-  
-  // Convert RGB to hex for preview
-  const hexColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-  
-  // Update parent component when sliders change
-  const updateColor = (red: number, green: number, blue: number) => {
-    onChange([red / 255, green / 255, blue / 255])
+
+  const emitRgb = useCallback(
+    (red: number, green: number, blue: number) => {
+      onChange([red / 255, green / 255, blue / 255])
+    },
+    [onChange]
+  )
+
+  // ─── Handlers RGB ─────────────────────────────────────────────────────────
+
+  const handleRgbChange = (red: number, green: number, blue: number) => {
+    setR(red)
+    setG(green)
+    setB(blue)
+    setHexInput(rgbToHex(red, green, blue))
+    setHexError(false)
+    emitRgb(red, green, blue)
   }
-  
+
+  // ─── Handlers HSL ─────────────────────────────────────────────────────────
+
+  const [hsl, setHsl] = useState<[number, number, number]>(() =>
+    rgbToHsl(toR(), toG(), toB())
+  )
+
+  useEffect(() => {
+    setHsl(rgbToHsl(toR(), toG(), toB()))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [color])
+
+  const handleHslChange = (h: number, s: number, l: number) => {
+    const [nr, ng, nb] = hslToRgb(h, s, l)
+    setHsl([h, s, l])
+    setR(nr)
+    setG(ng)
+    setB(nb)
+    setHexInput(rgbToHex(nr, ng, nb))
+    setHexError(false)
+    emitRgb(nr, ng, nb)
+  }
+
+  // ─── Handler HEX ──────────────────────────────────────────────────────────
+
+  const handleHexChange = (value: string) => {
+    setHexInput(value)
+    const parsed = hexToRgb(value)
+    if (parsed) {
+      const [nr, ng, nb] = parsed
+      setR(nr)
+      setG(ng)
+      setB(nb)
+      setHsl(rgbToHsl(nr, ng, nb))
+      setHexError(false)
+      emitRgb(nr, ng, nb)
+    } else {
+      setHexError(true)
+    }
+  }
+
+  const hexColor = rgbToHex(r, g, b)
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* Cabeçalho: label + preview + mode toggle */}
       <div className="flex items-center justify-between">
         <Label className="text-white">{label}</Label>
-        <div 
-          className="w-8 h-8 rounded-full border border-gray-600" 
-          style={{ backgroundColor: hexColor }}
+        <div className="flex items-center gap-2">
+          {/* Toggle RGB / HSL */}
+          <div className="flex rounded-md overflow-hidden border border-gray-700 text-xs">
+            <button
+              className={`px-2 py-0.5 transition-colors ${
+                mode === "rgb" ? "bg-gray-600 text-white" : "bg-gray-900 text-gray-400 hover:bg-gray-800"
+              }`}
+              onClick={() => setMode("rgb")}
+            >
+              RGB
+            </button>
+            <button
+              className={`px-2 py-0.5 transition-colors ${
+                mode === "hsl" ? "bg-gray-600 text-white" : "bg-gray-900 text-gray-400 hover:bg-gray-800"
+              }`}
+              onClick={() => setMode("hsl")}
+            >
+              HSL
+            </button>
+          </div>
+          {/* Preview */}
+          <div
+            className="w-7 h-7 rounded-full border border-gray-600 flex-shrink-0"
+            style={{ backgroundColor: hexColor }}
+          />
+        </div>
+      </div>
+
+      {/* Input HEX */}
+      <div>
+        <Input
+          value={hexInput}
+          onChange={(e) => handleHexChange(e.target.value)}
+          placeholder="#rrggbb"
+          className={`bg-gray-900 border-gray-700 text-white font-mono text-sm h-8 ${
+            hexError ? "border-red-500" : ""
+          }`}
+          maxLength={7}
         />
       </div>
-      
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <Label className="text-xs text-gray-400">R</Label>
-            <span className="text-xs text-gray-400">{r}</span>
-          </div>
-          <Slider 
-            value={[r]} 
-            min={0} 
-            max={255} 
-            step={1} 
-            onValueChange={(value) => {
-              setR(value[0])
-              updateColor(value[0], g, b)
-            }}
-            className="h-2"
-          />
+
+      {/* Sliders RGB */}
+      {mode === "rgb" && (
+        <div className="space-y-3">
+          {(
+            [
+              { label: "R", value: r, onChange: (v: number) => handleRgbChange(v, g, b), color: "rgb(220,50,50)" },
+              { label: "G", value: g, onChange: (v: number) => handleRgbChange(r, v, b), color: "rgb(50,200,50)" },
+              { label: "B", value: b, onChange: (v: number) => handleRgbChange(r, g, v), color: "rgb(50,100,220)" },
+            ] as const
+          ).map(({ label: ch, value, onChange: onCh }) => (
+            <div key={ch} className="space-y-1">
+              <div className="flex justify-between">
+                <Label className="text-xs text-gray-400">{ch}</Label>
+                <span className="text-xs text-gray-400">{value}</span>
+              </div>
+              <Slider
+                value={[value]}
+                min={0}
+                max={255}
+                step={1}
+                onValueChange={(val) => onCh(val[0])}
+                className="h-2"
+              />
+            </div>
+          ))}
         </div>
-        
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <Label className="text-xs text-gray-400">G</Label>
-            <span className="text-xs text-gray-400">{g}</span>
+      )}
+
+      {/* Sliders HSL */}
+      {mode === "hsl" && (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <Label className="text-xs text-gray-400">H (Matiz)</Label>
+              <span className="text-xs text-gray-400">{hsl[0]}°</span>
+            </div>
+            <Slider
+              value={[hsl[0]]}
+              min={0}
+              max={360}
+              step={1}
+              onValueChange={(val) => handleHslChange(val[0], hsl[1], hsl[2])}
+              className="h-2"
+            />
           </div>
-          <Slider 
-            value={[g]} 
-            min={0} 
-            max={255} 
-            step={1} 
-            onValueChange={(value) => {
-              setG(value[0])
-              updateColor(r, value[0], b)
-            }}
-            className="h-2"
-          />
-        </div>
-        
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <Label className="text-xs text-gray-400">B</Label>
-            <span className="text-xs text-gray-400">{b}</span>
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <Label className="text-xs text-gray-400">S (Saturação)</Label>
+              <span className="text-xs text-gray-400">{hsl[1]}%</span>
+            </div>
+            <Slider
+              value={[hsl[1]]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={(val) => handleHslChange(hsl[0], val[0], hsl[2])}
+              className="h-2"
+            />
           </div>
-          <Slider 
-            value={[b]} 
-            min={0} 
-            max={255} 
-            step={1} 
-            onValueChange={(value) => {
-              setB(value[0])
-              updateColor(r, g, value[0])
-            }}
-            className="h-2"
-          />
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <Label className="text-xs text-gray-400">L (Luminosidade)</Label>
+              <span className="text-xs text-gray-400">{hsl[2]}%</span>
+            </div>
+            <Slider
+              value={[hsl[2]]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={(val) => handleHslChange(hsl[0], hsl[1], val[0])}
+              className="h-2"
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
