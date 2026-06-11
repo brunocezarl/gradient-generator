@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VideoIcon, Loader2, StopCircle, Info } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
+import { overrideRenderSize, getLayerCompositing, recommendBitrateMbps } from "@/lib/capture"
 
 type VideoFormat = "webm" | "mp4"
 
@@ -49,6 +50,8 @@ export function VideoExport({ containerRef }: VideoExportProps) {
   const chunksRef = useRef<Blob[]>([])
   const animationFrameRef = useRef<number | null>(null)
   const scaleFrameRef = useRef<number | null>(null)
+  const restoreRenderersRef = useRef<(() => void)[]>([])
+  const bitrateTouchedRef = useRef(false)
   const startTimeRef = useRef<number>(0)
   const { toast } = useToast()
 
@@ -84,19 +87,17 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     }
   }, [supportedFormats, format, hasMediaRecorderSupport])
 
-  // Calcular o bitrate com base na qualidade e resolução
-  const calculateBitrate = (): number => {
-    // Valores base em Mbps
-    const qualityMultiplier = quality === "high" ? 1.0 : quality === "medium" ? 0.6 : 0.3
-    return bitrate * 1000000 * qualityMultiplier
-  }
-
   // Obter dimensões de saída com base na resolução selecionada,
   // preservando a proporção do canvas (largura arredondada para par,
   // exigido por alguns encoders)
   const getOutputDimensions = (canvas: HTMLCanvasElement): { width: number, height: number } => {
     const targetHeight =
-      resolution === "480p" ? 480 : resolution === "720p" ? 720 : resolution === "1080p" ? 1080 : null
+      resolution === "480p" ? 480
+        : resolution === "720p" ? 720
+        : resolution === "1080p" ? 1080
+        : resolution === "1440p" ? 1440
+        : resolution === "2160p" ? 2160
+        : null
 
     if (targetHeight === null || targetHeight === canvas.height) {
       return { width: canvas.width, height: canvas.height }
@@ -106,6 +107,18 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     const width = Math.round((targetHeight * aspectRatio) / 2) * 2
     return { width, height: targetHeight }
   }
+
+  // Sugerir bitrate adequado à resolução/FPS/qualidade escolhidos, enquanto o
+  // usuário não ajustar o slider manualmente
+  useEffect(() => {
+    if (bitrateTouchedRef.current) return
+    const canvas = containerRef.current?.querySelector("canvas")
+    const { width, height } = canvas
+      ? getOutputDimensions(canvas)
+      : { width: 1920, height: 1080 }
+    setBitrate(recommendBitrateMbps(width, height, fps, quality))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolution, fps, quality])
 
   const startRecording = async () => {
     if (!containerRef.current) {
@@ -133,32 +146,54 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       setProgress(0)
       chunksRef.current = []
 
-      // Obter o elemento canvas
-      const canvas = containerRef.current.querySelector("canvas")
+      // Obter os canvases (no modo multi-camadas há um por camada)
+      const container = containerRef.current
+      const canvases = Array.from(container.querySelectorAll("canvas"))
+      const canvas = canvases[0]
       if (!canvas) {
         throw new Error("Canvas element not found")
       }
 
-      // Gravar na resolução selecionada: se for diferente da original,
-      // copiar cada frame para um canvas redimensionado e gravar a partir dele
+      // Renderizar cada camada nativamente na resolução de saída, em vez de
+      // redimensionar os pixels da tela (que gera borrão)
       const { width, height } = getOutputDimensions(canvas)
+      restoreRenderersRef.current = canvases
+        .map((c) => overrideRenderSize(c, width, height))
+        .filter((restore): restore is () => void => restore !== null)
+
       let sourceCanvas: HTMLCanvasElement = canvas
 
-      if (width !== canvas.width || height !== canvas.height) {
-        const scaledCanvas = document.createElement("canvas")
-        scaledCanvas.width = width
-        scaledCanvas.height = height
-        const ctx = scaledCanvas.getContext("2d")
-        if (!ctx) throw new Error("Could not get 2D context for scaled recording")
+      // Compor camadas (opacidade + blend modes) ou redimensionar quando a
+      // renderização nativa não está disponível
+      const needsComposite =
+        canvases.length > 1 || canvas.width !== width || canvas.height !== height
+
+      if (needsComposite) {
+        const recordCanvas = document.createElement("canvas")
+        recordCanvas.width = width
+        recordCanvas.height = height
+        const ctx = recordCanvas.getContext("2d")
+        if (!ctx) throw new Error("Could not get 2D context for recording")
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = "high"
 
+        // Estilos das camadas não mudam durante a gravação
+        const layerStyles = canvases.map((c) => getLayerCompositing(c, container))
+
         const copyFrame = () => {
-          ctx.drawImage(canvas, 0, 0, width, height)
+          ctx.globalAlpha = 1
+          ctx.globalCompositeOperation = "source-over"
+          ctx.fillStyle = "#000000"
+          ctx.fillRect(0, 0, width, height)
+          canvases.forEach((c, i) => {
+            ctx.globalAlpha = layerStyles[i].opacity
+            ctx.globalCompositeOperation = layerStyles[i].blend
+            ctx.drawImage(c, 0, 0, width, height)
+          })
           scaleFrameRef.current = requestAnimationFrame(copyFrame)
         }
         copyFrame()
-        sourceCanvas = scaledCanvas
+        sourceCanvas = recordCanvas
       }
 
       // Criar um stream de mídia a partir do canvas
@@ -167,7 +202,7 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       // Configurar o media recorder com as opções apropriadas
       const options: MediaRecorderOptions = {
         mimeType,
-        videoBitsPerSecond: calculateBitrate()
+        videoBitsPerSecond: bitrate * 1_000_000
       }
 
       const mediaRecorder = new MediaRecorder(stream, options)
@@ -185,6 +220,10 @@ export function VideoExport({ containerRef }: VideoExportProps) {
           cancelAnimationFrame(scaleFrameRef.current)
           scaleFrameRef.current = null
         }
+
+        // Restaurar a resolução original dos renderers
+        restoreRenderersRef.current.forEach((restore) => restore())
+        restoreRenderersRef.current = []
 
         // Criar um blob a partir dos chunks gravados
         const blob = new Blob(chunksRef.current, { type: mimeType.split(";")[0] })
@@ -237,6 +276,9 @@ export function VideoExport({ containerRef }: VideoExportProps) {
         cancelAnimationFrame(scaleFrameRef.current)
         scaleFrameRef.current = null
       }
+
+      restoreRenderersRef.current.forEach((restore) => restore())
+      restoreRenderersRef.current = []
 
       toast({
         title: "Erro na Gravação",
@@ -399,8 +441,13 @@ export function VideoExport({ containerRef }: VideoExportProps) {
                     <SelectItem value="480p">480p</SelectItem>
                     <SelectItem value="720p">720p (HD)</SelectItem>
                     <SelectItem value="1080p">1080p (Full HD)</SelectItem>
+                    <SelectItem value="1440p">1440p (QHD)</SelectItem>
+                    <SelectItem value="2160p">2160p (4K)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-400">
+                  O vídeo é renderizado nativamente na resolução escolhida.
+                </p>
               </div>
 
               {/* Bitrate */}
@@ -409,11 +456,17 @@ export function VideoExport({ containerRef }: VideoExportProps) {
                 <Slider
                   id="bitrate"
                   min={1}
-                  max={16}
+                  max={50}
                   step={1}
                   value={[bitrate]}
-                  onValueChange={(value) => setBitrate(value[0])}
+                  onValueChange={(value) => {
+                    bitrateTouchedRef.current = true
+                    setBitrate(value[0])
+                  }}
                 />
+                <p className="text-xs text-gray-400">
+                  Ajustado automaticamente para a resolução, FPS e qualidade selecionados.
+                </p>
               </div>
 
               <div className="flex items-center space-x-2 pt-2">

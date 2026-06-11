@@ -5,6 +5,7 @@ import { Canvas, useFrame } from "@react-three/fiber"
 import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import * as THREE from "three"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
+import { CaptureHelper } from "@/components/capture-helper"
 
 // Shader code
 const vertexShader = `
@@ -287,6 +288,7 @@ export function GradientScene() {
   return (
     <Canvas gl={glConfig} camera={{ position: [0, 0, 5] }} dpr={[1, pixelRatio]}>
       <GradientShader />
+      <CaptureHelper />
     </Canvas>
   )
 }
