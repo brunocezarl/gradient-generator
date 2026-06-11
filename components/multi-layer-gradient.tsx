@@ -6,6 +6,7 @@ import { useGradientStore } from "@/lib/store"
 import { blendModeToCSS } from "@/lib/layer-utils"
 import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
+import { CaptureHelper } from "@/components/capture-helper"
 
 export function MultiLayerGradient() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -59,6 +60,7 @@ export function MultiLayerGradient() {
                 thresholdMin={layer.thresholdMin}
                 thresholdMax={layer.thresholdMax}
               />
+              <CaptureHelper />
             </Canvas>
           </div>
         )

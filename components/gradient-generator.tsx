@@ -12,6 +12,7 @@ import { MultiLayerGradient } from "@/components/multi-layer-gradient"
 import { LayerManager } from "@/components/layer-manager"
 import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { useGradientStore } from "@/lib/store"
+import { exportCompositeImage } from "@/lib/capture"
 import { useToast } from "@/components/ui/use-toast"
 import { useFullscreen } from "@/hooks/use-fullscreen"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
@@ -74,29 +75,27 @@ export default function GradientGenerator() {
 
         toast({ title: "Processando", description: "Preparando a imagem para download..." })
 
-        let outputCanvas = canvas
-        if (scale !== 1) {
-          const scaledCanvas = document.createElement("canvas")
-          scaledCanvas.width = canvas.width * scale
-          scaledCanvas.height = canvas.height * scale
-          const ctx = scaledCanvas.getContext("2d")
-          if (!ctx) throw new Error("Could not get 2D context")
-          ctx.imageSmoothingEnabled = true
-          ctx.imageSmoothingQuality = "high"
-          ctx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height)
-          outputCanvas = scaledCanvas
-        }
-
         let mimeType = "image/png"
         if (format === "jpeg") mimeType = "image/jpeg"
         if (format === "webp") mimeType = "image/webp"
 
+        // Re-renderiza cada camada nativamente na resolução final (sem
+        // upscaling) e compõe com opacidade/blend modes; usa Blob em vez de
+        // dataURL para suportar arquivos grandes (4K/8K) sem estourar memória
+        const blob = await exportCompositeImage(containerRef.current, {
+          scale,
+          mimeType,
+          quality,
+        })
+
+        const url = URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.download = `gradient-${Date.now()}.${format}`
-        link.href = outputCanvas.toDataURL(mimeType, quality)
+        link.href = url
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
 
         toast({ title: "Sucesso!", description: "Imagem exportada com sucesso." })
       } catch (error) {

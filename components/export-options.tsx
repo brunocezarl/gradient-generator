@@ -186,8 +186,14 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                     <SelectItem value="1">Original (100%)</SelectItem>
                     <SelectItem value="2">Grande (200%)</SelectItem>
                     <SelectItem value="4">Extra Grande (400%)</SelectItem>
+                    <SelectItem value="8">Ultra (800%)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-400">
+                  O gradiente é renderizado nativamente na resolução final — sem perda de
+                  nitidez por upscaling. Tamanhos acima do limite da GPU são ajustados
+                  automaticamente.
+                </p>
               </div>
             </div>
           </div>
