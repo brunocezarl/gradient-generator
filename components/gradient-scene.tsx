@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useEffect, useState, useMemo } from "react"
-import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { useGradientStore } from "@/lib/store"
+import { useRef, useEffect, useMemo } from "react"
+import { Canvas, useFrame } from "@react-three/fiber"
+import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import * as THREE from "three"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 
@@ -18,7 +18,6 @@ const vertexShader = `
 
 const fragmentShader = `
   uniform float uTime;
-  uniform vec2 uResolution;
   uniform float uComplexity;
   uniform float uNoiseScale;
   uniform vec3 uColor1;
@@ -194,11 +193,8 @@ function GradientShader() {
   const timeRef = useRef(0)
   const frameSkipRef = useRef(0)
 
-  // Get current color scheme
-  const currentColorScheme = isCustomMode ? customColors : colorSchemes[colorScheme]
-
-  // Set up scene
-  const { size } = useThree()
+  // Get current color scheme (com fallback para esquemas inexistentes)
+  const currentColorScheme = resolveActiveColors({ isCustomMode, customColors, colorScheme, colorSchemes })
 
   // Initialize shader material
   useEffect(() => {
@@ -208,7 +204,6 @@ function GradientShader() {
         fragmentShader,
         uniforms: {
           uTime: { value: 0 },
-          uResolution: { value: new THREE.Vector2(size.width, size.height) },
           uComplexity: { value: complexity },
           uNoiseScale: { value: noiseScale },
           uColor1: { value: currentColorScheme.color1 },

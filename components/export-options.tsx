@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { ImageIcon, Loader2, Code2, Copy, Check } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import { useGradientStore } from "@/lib/store"
+import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import { rgbToHex } from "@/lib/utils"
 
 interface ExportOptionsProps {
@@ -28,20 +28,12 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   // ─── Gerar CSS ─────────────────────────────────────────────────────────────
 
   const generateCSSGradient = (): string => {
-    let c1: [number, number, number]
-    let c2: [number, number, number]
-    let c3: [number, number, number]
-
-    if (isCustomMode) {
-      c1 = customColors.color1
-      c2 = customColors.color2
-      c3 = customColors.color3
-    } else {
-      const scheme = colorSchemes[colorScheme]
-      c1 = scheme.color1
-      c2 = scheme.color2
-      c3 = scheme.color3
-    }
+    const { color1: c1, color2: c2, color3: c3 } = resolveActiveColors({
+      isCustomMode,
+      customColors,
+      colorScheme,
+      colorSchemes,
+    })
 
     const toHex = (c: [number, number, number]) =>
       rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
@@ -121,6 +113,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   className="h-7 w-7 shrink-0 text-gray-400 hover:text-white"
                   onClick={handleCopyCSS}
                   title="Copiar CSS"
+                  aria-label="Copiar CSS"
                 >
                   {cssCopied ? (
                     <Check className="h-4 w-4 text-green-400" />
@@ -129,6 +122,10 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   )}
                 </Button>
               </div>
+              <p className="text-xs text-gray-400">
+                Aproximação estática: o gradiente animado usa ruído orgânico, que não é
+                representável em CSS puro.
+              </p>
             </div>
 
             <div className="border-t border-gray-700 pt-4 space-y-4">
@@ -142,7 +139,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                     <SelectValue placeholder="Selecione o formato" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    <SelectItem value="png">PNG (Transparência)</SelectItem>
+                    <SelectItem value="png">PNG (Sem perdas)</SelectItem>
                     <SelectItem value="jpeg">JPEG (Menor tamanho)</SelectItem>
                     <SelectItem value="webp">WebP (Moderno)</SelectItem>
                   </SelectContent>

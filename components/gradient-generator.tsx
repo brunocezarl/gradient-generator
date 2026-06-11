@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect, useCallback } from "react"
+import { useRef, useEffect, useCallback } from "react"
 import { GradientScene } from "@/components/gradient-scene"
 import { ControlsPanel } from "@/components/controls-panel"
 import ErrorBoundary from "@/components/error-boundary"
@@ -39,7 +39,6 @@ export default function GradientGenerator() {
   const containerRef = useRef<HTMLDivElement>(null)
   const isWebGLSupported = useWebGLSupport()
   const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(true)
 
   const multiLayerMode = useGradientStore((state) => state.multiLayerMode)
   const isPlaying = useGradientStore((state) => state.isPlaying)
@@ -50,10 +49,11 @@ export default function GradientGenerator() {
 
   const { toggleFullscreen } = useFullscreen()
 
-  // Carregamento inicial
+  // Respeitar preferência de movimento reduzido: iniciar pausado
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000)
-    return () => clearTimeout(timer)
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      useGradientStore.getState().setIsPlaying(false)
+    }
   }, [])
 
   // ─── Captura de imagem ────────────────────────────────────────────────────
@@ -135,16 +135,6 @@ export default function GradientGenerator() {
     },
   })
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-black">
-        <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   if (!isWebGLSupported) {
     return <WebGLNotSupported />
   }
@@ -184,9 +174,11 @@ export default function GradientGenerator() {
         <VideoExport containerRef={containerRef} />
       </div>
 
-      {/* Layer Manager — canto inferior esquerdo */}
+      {/* Layer Manager — canto inferior esquerdo (em telas pequenas fica
+          disponível apenas na aba "Camadas" do painel de controles, para não
+          sobrepor os botões de exportação) */}
       {multiLayerMode && (
-        <div className="absolute bottom-4 left-4 z-40 w-72 bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl p-4">
+        <div className="absolute bottom-4 left-4 z-40 w-72 hidden md:block bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl p-4">
           <LayerManager />
         </div>
       )}
@@ -198,7 +190,7 @@ export default function GradientGenerator() {
 
       {/* Botão de Ajuda (atalhos) — canto inferior esquerdo (acima do layer manager se ativo) */}
       <div
-        className={`absolute z-40 ${multiLayerMode ? "bottom-[calc(1rem+theme(spacing.4)+280px)]" : "bottom-4"} left-4`}
+        className={`absolute z-40 left-4 ${multiLayerMode ? "bottom-4 md:bottom-[calc(1rem+theme(spacing.4)+280px)]" : "bottom-4"}`}
       >
         <Dialog>
           <DialogTrigger asChild>
@@ -207,6 +199,7 @@ export default function GradientGenerator() {
               size="icon"
               className="bg-black/50 border-gray-700 hover:bg-black/70 text-white"
               title="Atalhos de teclado"
+              aria-label="Atalhos de teclado"
             >
               <Keyboard className="h-4 w-4" />
             </Button>

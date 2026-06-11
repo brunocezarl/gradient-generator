@@ -8,7 +8,7 @@ import { GradientLayer, createDefaultLayer, generateLayerId } from "@/lib/layer-
 type GradientColor = [number, number, number]
 
 // Define color scheme type (agora com 3 cores)
-type ColorScheme = {
+export type ColorScheme = {
   color1: GradientColor
   color2: GradientColor
   color3: GradientColor
@@ -29,6 +29,12 @@ type StateSnapshot = {
   thresholdMin: number
   thresholdMax: number
 }
+
+// Coalescência de histórico: edições contínuas (arrastar um slider) geram um
+// único snapshot em vez de um por evento de mudança
+const HISTORY_COALESCE_MS = 1000
+let lastHistoryKey: string | null = null
+let lastHistoryTime = 0
 
 function captureSnapshot(state: GradientStore): StateSnapshot {
   return {
@@ -223,10 +229,37 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   },
 }
 
+// Resolve o esquema de cores ativo com fallback seguro — o nome do esquema
+// pode vir de uma URL compartilhada ou de um store persistido apontando para
+// um esquema que não existe mais
+export function resolveActiveColors(
+  state: Pick<GradientStore, "isCustomMode" | "customColors" | "colorScheme" | "colorSchemes">
+): ColorScheme {
+  if (state.isCustomMode) return state.customColors
+  return (
+    state.colorSchemes[state.colorScheme] ??
+    state.colorSchemes.redBlue ??
+    defaultState.colorSchemes.redBlue
+  )
+}
+
 // Create the store with persistence
 export const useGradientStore = create<GradientStore>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // Tira um snapshot antes da primeira edição de uma sequência contínua
+      // (ex.: arrastar um slider). Edições do mesmo controle dentro da janela
+      // de coalescência não geram novos snapshots.
+      const recordEdit = (key: string) => {
+        const now = Date.now()
+        if (key !== lastHistoryKey || now - lastHistoryTime > HISTORY_COALESCE_MS) {
+          get().pushHistory()
+        }
+        lastHistoryKey = key
+        lastHistoryTime = now
+      }
+
+      return {
       ...defaultState,
       activeLayerId: defaultState.layers[0].id,
 
@@ -236,6 +269,7 @@ export const useGradientStore = create<GradientStore>()(
         const state = get()
         const snapshot = captureSnapshot(state)
         const newPast = [...state.past, snapshot].slice(-50)
+        lastHistoryKey = null
         set({ past: newPast, future: [] })
       },
 
@@ -245,6 +279,7 @@ export const useGradientStore = create<GradientStore>()(
         const current = captureSnapshot(state)
         const newPast = state.past.slice(0, -1)
         const prev = state.past[state.past.length - 1]
+        lastHistoryKey = null
         set({
           ...prev,
           past: newPast,
@@ -257,6 +292,7 @@ export const useGradientStore = create<GradientStore>()(
         if (state.future.length === 0) return
         const current = captureSnapshot(state)
         const [next, ...remainingFuture] = state.future
+        lastHistoryKey = null
         set({
           ...next,
           past: [...state.past, current],
@@ -267,9 +303,18 @@ export const useGradientStore = create<GradientStore>()(
       // ─── Animation parameters ─────────────────────────────────────────────
 
       setIsPlaying: (value) => set({ isPlaying: value }),
-      setSpeed: (value) => set({ speed: value }),
-      setComplexity: (value) => set({ complexity: value }),
-      setNoiseScale: (value) => set({ noiseScale: value }),
+      setSpeed: (value) => {
+        recordEdit("speed")
+        set({ speed: value })
+      },
+      setComplexity: (value) => {
+        recordEdit("complexity")
+        set({ complexity: value })
+      },
+      setNoiseScale: (value) => {
+        recordEdit("noiseScale")
+        set({ noiseScale: value })
+      },
 
       setColorScheme: (value) => {
         get().pushHistory()
@@ -286,23 +331,43 @@ export const useGradientStore = create<GradientStore>()(
       // ─── Advanced controls ─────────────────────────────────────────────────
 
       setAdvancedMode: (value) => set({ advancedMode: value }),
-      setFlowIntensity: (value) => set({ flowIntensity: value }),
-      setGrainAmount: (value) => set({ grainAmount: value }),
-      setGrainScale: (value) => set({ grainScale: value }),
-      setThresholdMin: (value) => set({ thresholdMin: value }),
-      setThresholdMax: (value) =>
-        set({ thresholdMax: Math.max(value, get().thresholdMin + 0.1) }),
+      setFlowIntensity: (value) => {
+        recordEdit("flowIntensity")
+        set({ flowIntensity: value })
+      },
+      setGrainAmount: (value) => {
+        recordEdit("grainAmount")
+        set({ grainAmount: value })
+      },
+      setGrainScale: (value) => {
+        recordEdit("grainScale")
+        set({ grainScale: value })
+      },
+      setThresholdMin: (value) => {
+        recordEdit("thresholdMin")
+        set({ thresholdMin: value })
+      },
+      setThresholdMax: (value) => {
+        recordEdit("thresholdMax")
+        set({ thresholdMax: Math.max(value, get().thresholdMin + 0.1) })
+      },
 
       // ─── Custom color actions ──────────────────────────────────────────────
 
-      setCustomColor1: (color) =>
-        set((state) => ({ customColors: { ...state.customColors, color1: color } })),
+      setCustomColor1: (color) => {
+        recordEdit("customColor1")
+        set((state) => ({ customColors: { ...state.customColors, color1: color } }))
+      },
 
-      setCustomColor2: (color) =>
-        set((state) => ({ customColors: { ...state.customColors, color2: color } })),
+      setCustomColor2: (color) => {
+        recordEdit("customColor2")
+        set((state) => ({ customColors: { ...state.customColors, color2: color } }))
+      },
 
-      setCustomColor3: (color) =>
-        set((state) => ({ customColors: { ...state.customColors, color3: color } })),
+      setCustomColor3: (color) => {
+        recordEdit("customColor3")
+        set((state) => ({ customColors: { ...state.customColors, color3: color } }))
+      },
 
       // ─── Save custom scheme ────────────────────────────────────────────────
 
@@ -321,25 +386,57 @@ export const useGradientStore = create<GradientStore>()(
 
       // ─── Reset to defaults ─────────────────────────────────────────────────
 
+      // Restaura apenas os parâmetros de animação e cores. Esquemas salvos
+      // pelo usuário, camadas e estado da UI são preservados.
       resetToDefaults: () => {
         get().pushHistory()
-        set(defaultState)
+        set({
+          isPlaying: defaultState.isPlaying,
+          speed: defaultState.speed,
+          complexity: defaultState.complexity,
+          noiseScale: defaultState.noiseScale,
+          colorScheme: defaultState.colorScheme,
+          isCustomMode: defaultState.isCustomMode,
+          customColors: {
+            color1: [...defaultState.customColors.color1] as GradientColor,
+            color2: [...defaultState.customColors.color2] as GradientColor,
+            color3: [...defaultState.customColors.color3] as GradientColor,
+          },
+          flowIntensity: defaultState.flowIntensity,
+          grainAmount: defaultState.grainAmount,
+          grainScale: defaultState.grainScale,
+          thresholdMin: defaultState.thresholdMin,
+          thresholdMax: defaultState.thresholdMax,
+        })
       },
 
       // ─── Import settings ───────────────────────────────────────────────────
 
       importSettings: (settings: ShareableGradient) => {
+        const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
+        const validateColor = (
+          color: number[] | undefined,
+          fallback: GradientColor
+        ): GradientColor =>
+          Array.isArray(color) && color.length >= 3 && color.every((c) => typeof c === "number")
+            ? [clamp01(color[0]), clamp01(color[1]), clamp01(color[2])]
+            : fallback
+
+        // URLs compartilhadas podem referenciar um esquema que não existe
+        // neste cliente (ex.: esquema custom de outro usuário)
+        const colorScheme =
+          settings.colorScheme in get().colorSchemes ? settings.colorScheme : "redBlue"
+
         const validatedSettings: Partial<GradientStore> = {
           speed: Math.min(Math.max(settings.speed, 0.1), 3.0),
           complexity: Math.min(Math.max(Math.round(settings.complexity), 1), 10),
           noiseScale: Math.min(Math.max(settings.noiseScale, 0.5), 5.0),
-          colorScheme: settings.colorScheme,
-          isCustomMode: settings.isCustomMode,
+          colorScheme,
+          isCustomMode: Boolean(settings.isCustomMode),
           customColors: {
-            color1: settings.customColors.color1 as GradientColor,
-            color2: settings.customColors.color2 as GradientColor,
-            color3: (settings.customColors as ColorScheme).color3 ??
-              ([0.5, 0.0, 0.5] as GradientColor),
+            color1: validateColor(settings.customColors?.color1, [0.9, 0.1, 0.1]),
+            color2: validateColor(settings.customColors?.color2, [0.0, 0.0, 0.9]),
+            color3: validateColor(settings.customColors?.color3, [0.5, 0.0, 0.5]),
           },
         }
         set(validatedSettings)
@@ -449,7 +546,8 @@ export const useGradientStore = create<GradientStore>()(
             .filter((l): l is GradientLayer => l !== undefined)
           return { layers: newLayers }
         }),
-    }),
+      }
+    },
     {
       name: "gradient-store",
       partialize: (state: GradientStore) => ({
@@ -460,7 +558,14 @@ export const useGradientStore = create<GradientStore>()(
         isCustomMode: state.isCustomMode,
         customColors: state.customColors,
         colorSchemes: state.colorSchemes,
+        flowIntensity: state.flowIntensity,
+        grainAmount: state.grainAmount,
         grainScale: state.grainScale,
+        thresholdMin: state.thresholdMin,
+        thresholdMax: state.thresholdMax,
+        multiLayerMode: state.multiLayerMode,
+        layers: state.layers,
+        activeLayerId: state.activeLayerId,
         // past/future NÃO são persistidos
       }),
     }

@@ -1,9 +1,9 @@
 "use client"
 
 import { useRef, useMemo, useEffect } from "react"
-import { useFrame, useThree } from "@react-three/fiber"
-import { Vector2 } from "three"
+import { useFrame } from "@react-three/fiber"
 import type * as THREE from "three"
+import { useGradientStore } from "@/lib/store"
 
 // Shader code for organic gradients
 const vertexShader = `
@@ -17,7 +17,6 @@ const vertexShader = `
 
 const fragmentShader = `
   uniform float uTime;
-  uniform vec2 uResolution;
   uniform float uComplexity;
   uniform float uNoiseScale;
   uniform vec3 uColor1;
@@ -84,7 +83,7 @@ const fragmentShader = `
       if (i > maxLayers) break;
 
       // Get flow direction from curl noise
-      vec2 flow = curl(uv.x * i * uNoiseScale, uv.y * i * uNoiseScale) * (0.3 + uNoiseScale * 0.1);
+      vec2 flow = curl(uv.x * i * uNoiseScale, uv.y * i * uNoiseScale) * uFlowIntensity;
 
       // Animate the UV coordinates along the flow
       vec2 animatedUV = uv + flow * (sin(time * i * 0.5) * 0.2);
@@ -100,7 +99,7 @@ const fragmentShader = `
     noise = noise * 0.5 + 0.5;
 
     // Create organic shapes by applying threshold
-    float shape = smoothstep(0.3, 0.7, noise);
+    float shape = smoothstep(uThresholdMin, uThresholdMax, noise);
 
     // Mix colors based on the shape value
     vec3 color = mix(uColor1, uColor2, shape);
@@ -138,27 +137,24 @@ export function OrganicGradientShader({
   thresholdMax = 0.7,
 }: OrganicGradientShaderProps) {
   const meshRef = useRef<THREE.Mesh>(null)
-  const { size } = useThree()
   const timeRef = useRef(0)
+  const colorSchemes = useGradientStore((state) => state.colorSchemes)
 
-  // Handle string colorScheme (from layer manager)
+  // Handle string colorScheme (from layer manager): resolver no store
   const colors = useMemo(() => {
     if (typeof colorScheme === 'string') {
-      // This is a placeholder - in a real implementation, you would
-      // look up the color scheme from your store
-      return {
+      return colorSchemes[colorScheme] ?? colorSchemes.redBlue ?? {
         color1: [0.9, 0.1, 0.1],
-        color2: [0.0, 0.0, 0.9]
+        color2: [0.0, 0.0, 0.9],
       }
     }
     return colorScheme
-  }, [colorScheme])
+  }, [colorScheme, colorSchemes])
 
   // Create uniforms for the shader
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uResolution: { value: new Vector2(size.width, size.height) },
       uComplexity: { value: complexity },
       uNoiseScale: { value: noiseScale },
       uColor1: { value: colors.color1 },
@@ -167,7 +163,9 @@ export function OrganicGradientShader({
       uThresholdMin: { value: thresholdMin },
       uThresholdMax: { value: thresholdMax },
     }),
-    [size],
+    // Valores iniciais apenas — atualizações ocorrem no effect abaixo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   )
 
   // Update uniforms directly when props change

@@ -8,10 +8,23 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { VideoIcon, Loader2, StopCircle, Settings, Download, Info } from "lucide-react"
+import { VideoIcon, Loader2, StopCircle, Info } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import { useGradientStore } from "@/lib/store"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
+
+type VideoFormat = "webm" | "mp4"
+
+// Nem todo navegador suporta todos os contêineres/codecs no MediaRecorder
+// (ex.: Chrome/Firefox não gravam MP4). Detectar em runtime.
+const MIME_CANDIDATES: Record<VideoFormat, string[]> = {
+  webm: ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"],
+  mp4: ["video/mp4;codecs=avc1", "video/mp4"],
+}
+
+function getSupportedMimeType(format: VideoFormat): string | null {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return null
+  return MIME_CANDIDATES[format].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null
+}
 
 interface VideoExportProps {
   containerRef: React.RefObject<HTMLDivElement | null> // Allow null
@@ -24,10 +37,9 @@ export function VideoExport({ containerRef }: VideoExportProps) {
   const [duration, setDuration] = useState(5)
   const [fps, setFps] = useState(30)
   const [quality, setQuality] = useState("high")
-  const [format, setFormat] = useState("webm")
+  const [format, setFormat] = useState<VideoFormat>("webm")
   const [activeTab, setActiveTab] = useState("basic")
   const [filename, setFilename] = useState(`gradient-animation-${Date.now()}`)
-  const [showWarning, setShowWarning] = useState(false)
 
   // Configurações avançadas
   const [resolution, setResolution] = useState("original") // original, 720p, 1080p, etc.
@@ -36,25 +48,25 @@ export function VideoExport({ containerRef }: VideoExportProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const animationFrameRef = useRef<number | null>(null)
+  const scaleFrameRef = useRef<number | null>(null)
   const startTimeRef = useRef<number>(0)
   const { toast } = useToast()
 
   // Verificar otimizações de dispositivo
   const { isMobile, quality: deviceQuality } = useDeviceOptimizations()
 
-  // Obter isPlaying do store para pausar durante a gravação
-  const { isPlaying, setIsPlaying } = useGradientStore()
-  const wasPlayingRef = useRef(isPlaying)
-
-  // Verificar suporte a gravação de vídeo
-  const [hasMediaRecorderSupport, setHasMediaRecorderSupport] = useState(false)
+  // Verificar suporte a gravação de vídeo e quais formatos o navegador grava
+  const [supportedFormats, setSupportedFormats] = useState<Record<VideoFormat, string | null>>({
+    webm: null,
+    mp4: null,
+  })
+  const hasMediaRecorderSupport = supportedFormats.webm !== null || supportedFormats.mp4 !== null
 
   useEffect(() => {
-    // Verificar se o navegador suporta MediaRecorder
-    setHasMediaRecorderSupport(
-      typeof window !== "undefined" &&
-      typeof window.MediaRecorder !== "undefined"
-    )
+    setSupportedFormats({
+      webm: getSupportedMimeType("webm"),
+      mp4: getSupportedMimeType("mp4"),
+    })
 
     // Definir qualidade padrão com base no dispositivo
     if (isMobile) {
@@ -65,6 +77,13 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     }
   }, [isMobile, deviceQuality])
 
+  // Se o formato selecionado não é suportado, cair para o que for
+  useEffect(() => {
+    if (!supportedFormats[format] && hasMediaRecorderSupport) {
+      setFormat(supportedFormats.webm ? "webm" : "mp4")
+    }
+  }, [supportedFormats, format, hasMediaRecorderSupport])
+
   // Calcular o bitrate com base na qualidade e resolução
   const calculateBitrate = (): number => {
     // Valores base em Mbps
@@ -72,21 +91,20 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     return bitrate * 1000000 * qualityMultiplier
   }
 
-  // Obter dimensões de saída com base na resolução selecionada
+  // Obter dimensões de saída com base na resolução selecionada,
+  // preservando a proporção do canvas (largura arredondada para par,
+  // exigido por alguns encoders)
   const getOutputDimensions = (canvas: HTMLCanvasElement): { width: number, height: number } => {
-    const aspectRatio = canvas.width / canvas.height
+    const targetHeight =
+      resolution === "480p" ? 480 : resolution === "720p" ? 720 : resolution === "1080p" ? 1080 : null
 
-    switch (resolution) {
-      case "720p":
-        return { width: 1280, height: 720 }
-      case "1080p":
-        return { width: 1920, height: 1080 }
-      case "480p":
-        return { width: 854, height: 480 }
-      case "original":
-      default:
-        return { width: canvas.width, height: canvas.height }
+    if (targetHeight === null || targetHeight === canvas.height) {
+      return { width: canvas.width, height: canvas.height }
     }
+
+    const aspectRatio = canvas.width / canvas.height
+    const width = Math.round((targetHeight * aspectRatio) / 2) * 2
+    return { width, height: targetHeight }
   }
 
   const startRecording = async () => {
@@ -99,13 +117,17 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       return
     }
 
-    try {
-      // Store the current playing state (but don't pause it)
-      wasPlayingRef.current = isPlaying
-      // if (isPlaying) { // Removed pausing
-      //   setIsPlaying(false)
-      // }
+    const mimeType = supportedFormats[format]
+    if (!mimeType) {
+      toast({
+        title: "Formato não suportado",
+        description: `Seu navegador não suporta gravação em ${format.toUpperCase()}.`,
+        variant: "destructive",
+      })
+      return
+    }
 
+    try {
       // Resetar estado
       setIsRecording(true)
       setProgress(0)
@@ -117,12 +139,34 @@ export function VideoExport({ containerRef }: VideoExportProps) {
         throw new Error("Canvas element not found")
       }
 
+      // Gravar na resolução selecionada: se for diferente da original,
+      // copiar cada frame para um canvas redimensionado e gravar a partir dele
+      const { width, height } = getOutputDimensions(canvas)
+      let sourceCanvas: HTMLCanvasElement = canvas
+
+      if (width !== canvas.width || height !== canvas.height) {
+        const scaledCanvas = document.createElement("canvas")
+        scaledCanvas.width = width
+        scaledCanvas.height = height
+        const ctx = scaledCanvas.getContext("2d")
+        if (!ctx) throw new Error("Could not get 2D context for scaled recording")
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = "high"
+
+        const copyFrame = () => {
+          ctx.drawImage(canvas, 0, 0, width, height)
+          scaleFrameRef.current = requestAnimationFrame(copyFrame)
+        }
+        copyFrame()
+        sourceCanvas = scaledCanvas
+      }
+
       // Criar um stream de mídia a partir do canvas
-      const stream = canvas.captureStream(fps)
+      const stream = sourceCanvas.captureStream(fps)
 
       // Configurar o media recorder com as opções apropriadas
       const options: MediaRecorderOptions = {
-        mimeType: format === "webm" ? "video/webm" : "video/mp4",
+        mimeType,
         videoBitsPerSecond: calculateBitrate()
       }
 
@@ -137,8 +181,13 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       }
 
       mediaRecorder.onstop = () => {
+        if (scaleFrameRef.current) {
+          cancelAnimationFrame(scaleFrameRef.current)
+          scaleFrameRef.current = null
+        }
+
         // Criar um blob a partir dos chunks gravados
-        const blob = new Blob(chunksRef.current, { type: format === "webm" ? "video/webm" : "video/mp4" })
+        const blob = new Blob(chunksRef.current, { type: mimeType.split(";")[0] })
 
         // Criar um link de download
         const url = URL.createObjectURL(blob)
@@ -153,11 +202,6 @@ export function VideoExport({ containerRef }: VideoExportProps) {
         URL.revokeObjectURL(url)
         setIsRecording(false)
         setProgress(0)
-
-        // Restore previous playing state if it was paused externally during recording (unlikely but safe)
-        // if (wasPlayingRef.current && !isPlaying) { // Removed resuming based on wasPlayingRef
-        //  setIsPlaying(true)
-        // }
 
         // Atualizar o nome do arquivo para a próxima exportação
         setFilename(`gradient-animation-${Date.now()}`)
@@ -189,16 +233,16 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       console.error("Error starting recording:", error)
       setIsRecording(false)
 
+      if (scaleFrameRef.current) {
+        cancelAnimationFrame(scaleFrameRef.current)
+        scaleFrameRef.current = null
+      }
+
       toast({
         title: "Erro na Gravação",
         description: "Ocorreu um erro ao iniciar a gravação do vídeo.",
         variant: "destructive",
       })
-
-      // Restore previous playing state if it was paused externally during recording (unlikely but safe)
-      // if (wasPlayingRef.current && !isPlaying) { // Removed resuming based on wasPlayingRef
-      //  setIsPlaying(true)
-      // }
     }
   }
 
@@ -319,13 +363,13 @@ export function VideoExport({ containerRef }: VideoExportProps) {
               {/* Format */}
               <div className="space-y-2">
                 <Label htmlFor="format" className="text-white">Formato</Label>
-                <Select value={format} onValueChange={setFormat}>
+                <Select value={format} onValueChange={(value) => setFormat(value as VideoFormat)}>
                   <SelectTrigger id="format" className="bg-gray-800 border-gray-700 text-white">
                     <SelectValue placeholder="Selecione o formato" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    <SelectItem value="webm">WebM (Melhor compatibilidade)</SelectItem>
-                    <SelectItem value="mp4">MP4 (Mais compatível)</SelectItem>
+                    {supportedFormats.webm && <SelectItem value="webm">WebM (Recomendado)</SelectItem>}
+                    {supportedFormats.mp4 && <SelectItem value="mp4">MP4</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -382,7 +426,7 @@ export function VideoExport({ containerRef }: VideoExportProps) {
 
             <div className="pt-4">
               <p className="text-xs text-gray-400">
-                Nota: A gravação irá pausar a animação temporariamente. Ela será retomada após a conclusão.
+                Nota: A animação continua em execução durante a gravação.
               </p>
             </div>
           </Tabs>
@@ -400,21 +444,11 @@ export function VideoExport({ containerRef }: VideoExportProps) {
                 startRecording()
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={showWarning}
             >
               <VideoIcon className="mr-2 h-4 w-4" />
               Iniciar Gravação
             </Button>
           </DialogFooter>
-
-          {showWarning && (
-            <div className="mt-2 p-3 bg-yellow-900/30 border border-yellow-700 rounded-md">
-              <p className="text-sm text-yellow-300">
-                Atenção: A gravação de vídeo pode consumir muitos recursos do sistema.
-                Feche outras aplicações para obter melhores resultados.
-              </p>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
 
