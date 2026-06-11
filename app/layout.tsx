@@ -4,9 +4,9 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/toaster"
 
 export const metadata = {
-  title: "Organic Gradient Generator",
-  description: "Create HD animated gradients with organic shapes for branding systems",
-  generator: "v0.dev",
+  title: "Gerador de Gradientes Orgânicos",
+  description:
+    "Crie gradientes animados em HD com formas orgânicas para sistemas de marca. Exporte como imagem, vídeo ou CSS.",
 }
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <body className="font-sans">
         <ThemeProvider
           attribute="class"

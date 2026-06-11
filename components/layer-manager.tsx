@@ -73,6 +73,7 @@ function SortableLayerItem({
         className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 mr-1 touch-none"
         onClick={(e) => e.stopPropagation()}
         title="Arrastar para reordenar"
+        aria-label="Arrastar para reordenar"
       >
         <GripVertical className="h-3 w-3" />
       </button>
@@ -87,6 +88,7 @@ function SortableLayerItem({
           onToggleVisibility()
         }}
         title={layer.visible ? "Ocultar camada" : "Mostrar camada"}
+        aria-label={layer.visible ? "Ocultar camada" : "Mostrar camada"}
       >
         {layer.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
       </Button>
@@ -106,6 +108,7 @@ function SortableLayerItem({
         }}
         disabled={!canRemove}
         title="Remover camada"
+        aria-label="Remover camada"
       >
         <Trash2 className="h-3 w-3" />
       </Button>
@@ -180,6 +183,7 @@ export function LayerManager() {
               className="h-6 w-6 text-gray-400 hover:text-white"
               onClick={addLayer}
               title="Adicionar camada"
+              aria-label="Adicionar camada"
             >
               <Plus className="h-4 w-4" />
             </Button>

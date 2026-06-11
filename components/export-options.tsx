@@ -113,6 +113,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   className="h-7 w-7 shrink-0 text-gray-400 hover:text-white"
                   onClick={handleCopyCSS}
                   title="Copiar CSS"
+                  aria-label="Copiar CSS"
                 >
                   {cssCopied ? (
                     <Check className="h-4 w-4 text-green-400" />
@@ -121,6 +122,10 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   )}
                 </Button>
               </div>
+              <p className="text-xs text-gray-400">
+                Aproximação estática: o gradiente animado usa ruído orgânico, que não é
+                representável em CSS puro.
+              </p>
             </div>
 
             <div className="border-t border-gray-700 pt-4 space-y-4">
@@ -134,7 +139,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                     <SelectValue placeholder="Selecione o formato" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    <SelectItem value="png">PNG (Transparência)</SelectItem>
+                    <SelectItem value="png">PNG (Sem perdas)</SelectItem>
                     <SelectItem value="jpeg">JPEG (Menor tamanho)</SelectItem>
                     <SelectItem value="webp">WebP (Moderno)</SelectItem>
                   </SelectContent>

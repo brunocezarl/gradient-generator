@@ -32,6 +32,7 @@ export function FullscreenButton({ targetRef }: FullscreenButtonProps) {
             variant="outline"
             size="icon"
             onClick={handleToggle}
+            aria-label={isFullscreen ? "Sair da tela cheia" : "Modo tela cheia"}
             className="bg-black/50 border-gray-700 hover:bg-black/70 text-white"
           >
             {isFullscreen ? (

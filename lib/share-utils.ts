@@ -60,17 +60,3 @@ export function parseShareableURL(url: string): ShareableGradient | null {
     return null
   }
 }
-
-// Generate a short code for sharing
-export function generateShareCode(): string {
-  // Generate a random 6-character alphanumeric code
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-  let code = ""
-  
-  for (let i = 0; i < 6; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length)
-    code += characters.charAt(randomIndex)
-  }
-  
-  return code
-}

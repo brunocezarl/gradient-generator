@@ -558,7 +558,14 @@ export const useGradientStore = create<GradientStore>()(
         isCustomMode: state.isCustomMode,
         customColors: state.customColors,
         colorSchemes: state.colorSchemes,
+        flowIntensity: state.flowIntensity,
+        grainAmount: state.grainAmount,
         grainScale: state.grainScale,
+        thresholdMin: state.thresholdMin,
+        thresholdMax: state.thresholdMax,
+        multiLayerMode: state.multiLayerMode,
+        layers: state.layers,
+        activeLayerId: state.activeLayerId,
         // past/future NÃO são persistidos
       }),
     }

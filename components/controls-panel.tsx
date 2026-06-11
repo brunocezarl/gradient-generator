@@ -78,6 +78,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           size="icon"
           className="bg-black/50 border-gray-700 hover:bg-black/70 text-white"
           onClick={toggleMenu}
+          aria-label={menuOpen ? "Ocultar controles" : "Mostrar controles"}
         >
           <Settings className="h-5 w-5" />
         </Button>
@@ -88,7 +89,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         <div className="absolute top-16 left-4 z-50 w-72 md:w-80 lg:w-96 bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl overflow-hidden">
           <div className="p-4 border-b border-gray-800 flex justify-between items-center">
             <h3 className="text-white font-medium">Gradient Controls</h3>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={toggleMenu}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={toggleMenu} aria-label="Fechar painel de controles">
               <ChevronUp className="h-4 w-4" />
             </Button>
           </div>

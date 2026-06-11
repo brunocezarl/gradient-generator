@@ -113,6 +113,7 @@ export function ShareGradient() {
                   <Button
                     size="icon"
                     onClick={copyToClipboard}
+                    aria-label="Copiar link"
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
