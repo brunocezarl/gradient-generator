@@ -1,11 +1,12 @@
 "use client"
 
 import { useRef, useEffect, useMemo } from "react"
-import { Canvas, useFrame } from "@react-three/fiber"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import * as THREE from "three"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
+import { registerTimeControl, unregisterTimeControl, isTimeOverridden } from "@/lib/capture"
 
 // Shader code
 const vertexShader = `
@@ -243,8 +244,28 @@ function GradientShader() {
   // Obter otimizações de dispositivo
   const { frameSkip, isMobile, isLowPower } = useDeviceOptimizations()
 
+  // Expor o relógio da animação para a exportação offline (frame a frame)
+  const { gl } = useThree()
+  useEffect(() => {
+    const canvas = gl.domElement
+    registerTimeControl(canvas, {
+      getTime: () => timeRef.current,
+      getSpeed: () => useGradientStore.getState().speed,
+      apply: (time) => {
+        timeRef.current = time
+        if (materialRef.current) {
+          materialRef.current.uniforms.uTime.value = time
+        }
+      },
+    })
+    return () => unregisterTimeControl(canvas)
+  }, [gl])
+
   // Animation loop with frame skipping for mobile devices
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    // Durante a exportação offline, o relógio é controlado externamente
+    if (isTimeOverridden(state.gl.domElement)) return
+
     if (materialRef.current) {
       // Para dispositivos móveis ou de baixa potência, podemos pular frames para melhorar o desempenho
       if (frameSkip > 0) {

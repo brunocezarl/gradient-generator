@@ -12,7 +12,7 @@ import { MultiLayerGradient } from "@/components/multi-layer-gradient"
 import { LayerManager } from "@/components/layer-manager"
 import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { useGradientStore } from "@/lib/store"
-import { exportCompositeImage } from "@/lib/capture"
+import { exportCompositeImage, type ImageExportTarget } from "@/lib/capture"
 import { useToast } from "@/components/ui/use-toast"
 import { useFullscreen } from "@/hooks/use-fullscreen"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
@@ -60,7 +60,12 @@ export default function GradientGenerator() {
   // ─── Captura de imagem ────────────────────────────────────────────────────
 
   const captureImage = useCallback(
-    async (format = "png", quality = 1, scale = 1) => {
+    async (
+      format = "png",
+      quality = 1,
+      target: ImageExportTarget = { kind: "scale", scale: 1 },
+      supersample = 1,
+    ) => {
       try {
         if (!containerRef.current) return
         const canvas = containerRef.current.querySelector("canvas")
@@ -83,9 +88,10 @@ export default function GradientGenerator() {
         // upscaling) e compõe com opacidade/blend modes; usa Blob em vez de
         // dataURL para suportar arquivos grandes (4K/8K) sem estourar memória
         const blob = await exportCompositeImage(containerRef.current, {
-          scale,
+          target,
           mimeType,
           quality,
+          supersample,
         })
 
         const url = URL.createObjectURL(blob)

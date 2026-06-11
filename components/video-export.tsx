@@ -12,6 +12,9 @@ import { VideoIcon, Loader2, StopCircle, Info } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { overrideRenderSize, getLayerCompositing, recommendBitrateMbps } from "@/lib/capture"
+import { renderOfflineVideo, isWebCodecsSupported } from "@/lib/offline-video"
+
+type RenderEngine = "offline" | "realtime"
 
 type VideoFormat = "webm" | "mp4"
 
@@ -39,6 +42,8 @@ export function VideoExport({ containerRef }: VideoExportProps) {
   const [fps, setFps] = useState(30)
   const [quality, setQuality] = useState("high")
   const [format, setFormat] = useState<VideoFormat>("webm")
+  const [engine, setEngine] = useState<RenderEngine>("realtime")
+  const [webCodecsSupported, setWebCodecsSupported] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [filename, setFilename] = useState(`gradient-animation-${Date.now()}`)
 
@@ -51,6 +56,7 @@ export function VideoExport({ containerRef }: VideoExportProps) {
   const animationFrameRef = useRef<number | null>(null)
   const scaleFrameRef = useRef<number | null>(null)
   const restoreRenderersRef = useRef<(() => void)[]>([])
+  const abortRef = useRef<AbortController | null>(null)
   const bitrateTouchedRef = useRef(false)
   const startTimeRef = useRef<number>(0)
   const { toast } = useToast()
@@ -64,12 +70,21 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     mp4: null,
   })
   const hasMediaRecorderSupport = supportedFormats.webm !== null || supportedFormats.mp4 !== null
+  const hasAnyVideoSupport = hasMediaRecorderSupport || webCodecsSupported
 
   useEffect(() => {
     setSupportedFormats({
       webm: getSupportedMimeType("webm"),
       mp4: getSupportedMimeType("mp4"),
     })
+
+    // Renderização offline (WebCodecs) é o padrão quando disponível: frames
+    // exatos, sem perdas — e permite MP4 mesmo onde MediaRecorder não grava
+    if (isWebCodecsSupported()) {
+      setWebCodecsSupported(true)
+      setEngine("offline")
+      setFormat("mp4")
+    }
 
     // Definir qualidade padrão com base no dispositivo
     if (isMobile) {
@@ -80,12 +95,12 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     }
   }, [isMobile, deviceQuality])
 
-  // Se o formato selecionado não é suportado, cair para o que for
+  // No modo tempo real, cair para o formato que o MediaRecorder suporta
   useEffect(() => {
-    if (!supportedFormats[format] && hasMediaRecorderSupport) {
+    if (engine === "realtime" && !supportedFormats[format] && hasMediaRecorderSupport) {
       setFormat(supportedFormats.webm ? "webm" : "mp4")
     }
-  }, [supportedFormats, format, hasMediaRecorderSupport])
+  }, [engine, supportedFormats, format, hasMediaRecorderSupport])
 
   // Obter dimensões de saída com base na resolução selecionada,
   // preservando a proporção do canvas (largura arredondada para par,
@@ -119,6 +134,83 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     setBitrate(recommendBitrateMbps(width, height, fps, quality))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolution, fps, quality])
+
+  // ─── Renderização offline (frame a frame, WebCodecs) ──────────────────────
+
+  const downloadBlob = (blob: Blob) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${filename}.${format}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setFilename(`gradient-animation-${Date.now()}`)
+  }
+
+  const startOfflineRender = async () => {
+    const container = containerRef.current
+    const canvas = container?.querySelector("canvas")
+    if (!container || !canvas) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível encontrar o elemento para renderizar.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsRecording(true)
+    setProgress(0)
+    abortRef.current = new AbortController()
+
+    toast({
+      title: "Renderização Iniciada",
+      description: `Renderizando ${duration * fps} frames em ${format.toUpperCase()}...`,
+    })
+
+    try {
+      const { width, height } = getOutputDimensions(canvas)
+      const blob = await renderOfflineVideo({
+        container,
+        width,
+        height,
+        fps,
+        duration,
+        format,
+        bitrate: bitrate * 1_000_000,
+        onProgress: (fraction) => setProgress(fraction * 100),
+        signal: abortRef.current.signal,
+      })
+
+      downloadBlob(blob)
+      toast({
+        title: "Vídeo Exportado",
+        description: "Vídeo renderizado frame a frame com sucesso.",
+      })
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast({ title: "Exportação Cancelada", description: "A renderização foi interrompida." })
+      } else {
+        console.error("Error rendering offline video:", error)
+        toast({
+          title: "Erro na Renderização",
+          description:
+            format === "mp4"
+              ? "Falha ao renderizar em MP4. Tente o formato WebM."
+              : "Ocorreu um erro ao renderizar o vídeo.",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      abortRef.current = null
+      setIsRecording(false)
+      setProgress(0)
+    }
+  }
+
+  // ─── Gravação em tempo real (MediaRecorder) ────────────────────────────────
 
   const startRecording = async () => {
     if (!containerRef.current) {
@@ -225,25 +317,11 @@ export function VideoExport({ containerRef }: VideoExportProps) {
         restoreRenderersRef.current.forEach((restore) => restore())
         restoreRenderersRef.current = []
 
-        // Criar um blob a partir dos chunks gravados
+        // Criar um blob a partir dos chunks gravados e baixar
         const blob = new Blob(chunksRef.current, { type: mimeType.split(";")[0] })
-
-        // Criar um link de download
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-        link.download = `${filename}.${format}`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-
-        // Limpar recursos
-        URL.revokeObjectURL(url)
+        downloadBlob(blob)
         setIsRecording(false)
         setProgress(0)
-
-        // Atualizar o nome do arquivo para a próxima exportação
-        setFilename(`gradient-animation-${Date.now()}`)
 
         toast({
           title: "Vídeo Exportado",
@@ -289,6 +367,8 @@ export function VideoExport({ containerRef }: VideoExportProps) {
   }
 
   const stopRecording = () => {
+    abortRef.current?.abort()
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop()
     }
@@ -314,14 +394,14 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       <Button
         onClick={() => setOpen(true)}
         className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
-        disabled={isRecording || !hasMediaRecorderSupport}
+        disabled={isRecording || !hasAnyVideoSupport}
       >
         {isRecording ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Gravando... {Math.round(progress)}%
+            {engine === "offline" ? "Renderizando..." : "Gravando..."} {Math.round(progress)}%
           </>
-        ) : !hasMediaRecorderSupport ? (
+        ) : !hasAnyVideoSupport ? (
           <>
             <VideoIcon className="mr-2 h-4 w-4" />
             Exportação de Vídeo Indisponível
@@ -334,13 +414,13 @@ export function VideoExport({ containerRef }: VideoExportProps) {
         )}
       </Button>
 
-      {!hasMediaRecorderSupport && (
+      {!hasAnyVideoSupport && (
         <div className="mt-2 text-xs text-gray-400 text-center">
-          Seu navegador não suporta gravação de vídeo.
+          Seu navegador não suporta exportação de vídeo.
         </div>
       )}
 
-      <Dialog open={open && !isRecording && hasMediaRecorderSupport} onOpenChange={(value) => !isRecording && setOpen(value)}>
+      <Dialog open={open && !isRecording && hasAnyVideoSupport} onOpenChange={(value) => !isRecording && setOpen(value)}>
         <DialogContent className="bg-gray-900 text-white border-gray-700 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Exportar Vídeo</DialogTitle>
@@ -357,6 +437,29 @@ export function VideoExport({ containerRef }: VideoExportProps) {
             </TabsList>
 
             <TabsContent value="basic" className="mt-4 space-y-4">
+              {/* Engine */}
+              {webCodecsSupported && (
+                <div className="space-y-2">
+                  <Label htmlFor="engine" className="text-white">Modo de Renderização</Label>
+                  <Select value={engine} onValueChange={(value) => setEngine(value as RenderEngine)}>
+                    <SelectTrigger id="engine" className="bg-gray-800 border-gray-700 text-white">
+                      <SelectValue placeholder="Selecione o modo" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                      <SelectItem value="offline">Alta Qualidade — frame a frame (Recomendado)</SelectItem>
+                      {hasMediaRecorderSupport && (
+                        <SelectItem value="realtime">Tempo real — captura da tela</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-400">
+                    {engine === "offline"
+                      ? "Cada frame é renderizado e codificado individualmente: nenhum frame perdido e cadência perfeita, mesmo em 4K/60fps."
+                      : "Grava a tela em tempo real; frames podem ser perdidos se o dispositivo estiver sobrecarregado."}
+                  </p>
+                </div>
+              )}
+
               {/* Duration */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -410,8 +513,17 @@ export function VideoExport({ containerRef }: VideoExportProps) {
                     <SelectValue placeholder="Selecione o formato" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    {supportedFormats.webm && <SelectItem value="webm">WebM (Recomendado)</SelectItem>}
-                    {supportedFormats.mp4 && <SelectItem value="mp4">MP4</SelectItem>}
+                    {engine === "offline" ? (
+                      <>
+                        <SelectItem value="mp4">MP4 (Recomendado)</SelectItem>
+                        <SelectItem value="webm">WebM</SelectItem>
+                      </>
+                    ) : (
+                      <>
+                        {supportedFormats.webm && <SelectItem value="webm">WebM (Recomendado)</SelectItem>}
+                        {supportedFormats.mp4 && <SelectItem value="mp4">MP4</SelectItem>}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -479,7 +591,9 @@ export function VideoExport({ containerRef }: VideoExportProps) {
 
             <div className="pt-4">
               <p className="text-xs text-gray-400">
-                Nota: A animação continua em execução durante a gravação.
+                {engine === "offline"
+                  ? "Nota: A renderização pode ser mais rápida ou mais lenta que o tempo real — a qualidade não é afetada."
+                  : "Nota: A animação continua em execução durante a gravação."}
               </p>
             </div>
           </Tabs>
@@ -494,12 +608,16 @@ export function VideoExport({ containerRef }: VideoExportProps) {
             <Button
               onClick={() => {
                 setOpen(false)
-                startRecording()
+                if (engine === "offline") {
+                  startOfflineRender()
+                } else {
+                  startRecording()
+                }
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <VideoIcon className="mr-2 h-4 w-4" />
-              Iniciar Gravação
+              {engine === "offline" ? "Renderizar Vídeo" : "Iniciar Gravação"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -508,7 +626,9 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       {isRecording && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-gray-900 p-6 rounded-lg shadow-xl max-w-md w-full">
-            <h3 className="text-xl font-bold text-white mb-4">Gravando Vídeo</h3>
+            <h3 className="text-xl font-bold text-white mb-4">
+              {engine === "offline" ? "Renderizando Vídeo" : "Gravando Vídeo"}
+            </h3>
 
             <div className="w-full bg-gray-800 rounded-full h-4 mb-4">
               <div
@@ -526,7 +646,7 @@ export function VideoExport({ containerRef }: VideoExportProps) {
               className="w-full bg-red-600 hover:bg-red-700 text-white"
             >
               <StopCircle className="mr-2 h-4 w-4" />
-              Parar Gravação
+              {engine === "offline" ? "Cancelar Renderização" : "Parar Gravação"}
             </Button>
           </div>
         </div>

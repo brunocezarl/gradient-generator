@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest"
-import { cssBlendToComposite, clampToMaxSize, recommendBitrateMbps } from "./capture"
+import {
+  cssBlendToComposite,
+  clampToMaxSize,
+  recommendBitrateMbps,
+  resolveTargetDimensions,
+} from "./capture"
 
 describe("cssBlendToComposite", () => {
   it("converte 'normal' para 'source-over'", () => {
@@ -41,6 +46,31 @@ describe("clampToMaxSize", () => {
     const result = clampToMaxSize(1, 100000, 1024)
     expect(result.width).toBeGreaterThanOrEqual(1)
     expect(result.height).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe("resolveTargetDimensions", () => {
+  it("multiplica o tamanho base quando o alvo é escala", () => {
+    expect(resolveTargetDimensions({ kind: "scale", scale: 2 }, 1280, 720)).toEqual({
+      width: 2560,
+      height: 1440,
+    })
+  })
+
+  it("usa dimensões exatas quando fornecidas, independente do tamanho base", () => {
+    expect(
+      resolveTargetDimensions({ kind: "dimensions", width: 3840, height: 2160 }, 1280, 720),
+    ).toEqual({ width: 3840, height: 2160 })
+  })
+
+  it("arredonda e nunca retorna dimensões menores que 1", () => {
+    expect(resolveTargetDimensions({ kind: "scale", scale: 0.0001 }, 100, 100)).toEqual({
+      width: 1,
+      height: 1,
+    })
+    expect(
+      resolveTargetDimensions({ kind: "dimensions", width: 1919.6, height: 1079.6 }, 1, 1),
+    ).toEqual({ width: 1920, height: 1080 })
   })
 })
 

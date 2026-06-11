@@ -23,6 +23,52 @@ export function getCaptureContext(canvas: HTMLCanvasElement): CaptureContext | n
   return contexts.get(canvas) ?? null
 }
 
+// ─── Controle de tempo da animação ───────────────────────────────────────────
+
+// Cada shader registra como ler/escrever seu relógio de animação (uTime),
+// permitindo que a exportação offline avance o tempo de forma determinística
+// (frame a frame) em vez de seguir o relógio de parede
+export interface TimeControl {
+  getTime(): number
+  getSpeed(): number
+  apply(time: number): void
+}
+
+const timeControls = new Map<HTMLCanvasElement, TimeControl>()
+const timeOverrides = new Set<HTMLCanvasElement>()
+
+export function registerTimeControl(canvas: HTMLCanvasElement, control: TimeControl) {
+  timeControls.set(canvas, control)
+}
+
+export function unregisterTimeControl(canvas: HTMLCanvasElement) {
+  timeControls.delete(canvas)
+  timeOverrides.delete(canvas)
+}
+
+export function getTimeControl(canvas: HTMLCanvasElement): TimeControl | null {
+  return timeControls.get(canvas) ?? null
+}
+
+// Enquanto ativo, o loop de animação do shader não deve avançar nem
+// sobrescrever uTime — a exportação offline é dona do relógio
+export function setTimeOverride(canvas: HTMLCanvasElement, active: boolean) {
+  if (active) timeOverrides.add(canvas)
+  else timeOverrides.delete(canvas)
+}
+
+export function isTimeOverridden(canvas: HTMLCanvasElement): boolean {
+  return timeOverrides.has(canvas)
+}
+
+// Renderiza um frame imediatamente (síncrono) no canvas registrado
+export function renderFrame(canvas: HTMLCanvasElement): boolean {
+  const context = contexts.get(canvas)
+  if (!context) return false
+  context.gl.render(context.scene, context.camera)
+  return true
+}
+
 // ─── Helpers puros ────────────────────────────────────────────────────────────
 
 const COMPOSITE_BLEND_MODES: ReadonlySet<string> = new Set([
@@ -134,10 +180,35 @@ export function overrideRenderSize(
   }
 }
 
+// Alvo de exportação: múltiplo do tamanho da tela ou dimensões exatas
+export type ImageExportTarget =
+  | { kind: "scale"; scale: number }
+  | { kind: "dimensions"; width: number; height: number }
+
 export interface ExportImageOptions {
-  scale: number
+  target: ImageExportTarget
   mimeType: string
   quality: number
+  // Fator de supersampling: renderiza em resolução maior e reduz com filtro,
+  // suavizando o grão e as bordas das formas orgânicas
+  supersample?: number
+}
+
+export function resolveTargetDimensions(
+  target: ImageExportTarget,
+  baseWidth: number,
+  baseHeight: number,
+): { width: number; height: number } {
+  if (target.kind === "dimensions") {
+    return {
+      width: Math.max(1, Math.round(target.width)),
+      height: Math.max(1, Math.round(target.height)),
+    }
+  }
+  return {
+    width: Math.max(1, Math.round(baseWidth * target.scale)),
+    height: Math.max(1, Math.round(baseHeight * target.scale)),
+  }
 }
 
 // Exporta a composição de todos os canvases dentro de `container` como Blob,
@@ -145,7 +216,7 @@ export interface ExportImageOptions {
 // opacidade e blend modes (equivalente ao que o CSS faz na tela)
 export async function exportCompositeImage(
   container: HTMLElement,
-  { scale, mimeType, quality }: ExportImageOptions,
+  { target, mimeType, quality, supersample = 1 }: ExportImageOptions,
 ): Promise<Blob> {
   const canvases = Array.from(container.querySelectorAll("canvas"))
   if (canvases.length === 0) {
@@ -153,8 +224,9 @@ export async function exportCompositeImage(
   }
 
   const base = canvases[0]
-  const width = Math.max(1, Math.round(base.width * scale))
-  const height = Math.max(1, Math.round(base.height * scale))
+  const { width, height } = resolveTargetDimensions(target, base.width, base.height)
+  const renderWidth = width * supersample
+  const renderHeight = height * supersample
 
   const output = document.createElement("canvas")
   output.width = width
@@ -171,7 +243,7 @@ export async function exportCompositeImage(
 
   for (const canvas of canvases) {
     const { opacity, blend } = getLayerCompositing(canvas, container)
-    const restore = overrideRenderSize(canvas, width, height)
+    const restore = overrideRenderSize(canvas, renderWidth, renderHeight)
     try {
       ctx.globalAlpha = opacity
       ctx.globalCompositeOperation = blend

@@ -1,9 +1,10 @@
 "use client"
 
 import { useRef, useMemo, useEffect } from "react"
-import { useFrame } from "@react-three/fiber"
+import { useFrame, useThree } from "@react-three/fiber"
 import type * as THREE from "three"
 import { useGradientStore } from "@/lib/store"
+import { registerTimeControl, unregisterTimeControl, isTimeOverridden } from "@/lib/capture"
 
 // Shader code for organic gradients
 const vertexShader = `
@@ -184,8 +185,32 @@ export function OrganicGradientShader({
     }
   }, [complexity, noiseScale, colors, flowIntensity, thresholdMin, thresholdMax])
 
+  // Expor o relógio da animação para a exportação offline (frame a frame)
+  const { gl } = useThree()
+  const speedRef = useRef(speed)
+  speedRef.current = speed
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    registerTimeControl(canvas, {
+      getTime: () => timeRef.current,
+      getSpeed: () => speedRef.current,
+      apply: (time) => {
+        timeRef.current = time
+        const material = meshRef.current?.material as THREE.ShaderMaterial | undefined
+        if (material?.uniforms?.uTime) {
+          material.uniforms.uTime.value = time
+        }
+      },
+    })
+    return () => unregisterTimeControl(canvas)
+  }, [gl])
+
   // Animation loop
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    // Durante a exportação offline, o relógio é controlado externamente
+    if (isTimeOverridden(state.gl.domElement)) return
+
     if (meshRef.current) {
       const material = meshRef.current.material as THREE.ShaderMaterial
       if (material && material.uniforms) {

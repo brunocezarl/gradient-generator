@@ -3,25 +3,53 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { ImageIcon, Loader2, Code2, Copy, Check } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import { rgbToHex } from "@/lib/utils"
+import type { ImageExportTarget } from "@/lib/capture"
 
 interface ExportOptionsProps {
-  onExport: (format: string, quality: number, scale: number) => Promise<void>
+  onExport: (
+    format: string,
+    quality: number,
+    target: ImageExportTarget,
+    supersample: number,
+  ) => Promise<void>
 }
+
+const clampDimension = (value: number) => Math.min(16384, Math.max(16, Math.round(value) || 16))
 
 export function ExportOptions({ onExport }: ExportOptionsProps) {
   const [open, setOpen] = useState(false)
   const [format, setFormat] = useState("png")
   const [quality, setQuality] = useState(1)
-  const [scale, setScale] = useState(1)
+  const [sizePreset, setSizePreset] = useState("screen-1")
+  const [customWidth, setCustomWidth] = useState(3840)
+  const [customHeight, setCustomHeight] = useState(2160)
+  const [supersample, setSupersample] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [cssCopied, setCssCopied] = useState(false)
   const { toast } = useToast()
+
+  const resolveTarget = (): ImageExportTarget => {
+    if (sizePreset === "custom") {
+      return {
+        kind: "dimensions",
+        width: clampDimension(customWidth),
+        height: clampDimension(customHeight),
+      }
+    }
+    if (sizePreset.startsWith("screen-")) {
+      return { kind: "scale", scale: Number(sizePreset.slice("screen-".length)) }
+    }
+    const [width, height] = sizePreset.split("x").map(Number)
+    return { kind: "dimensions", width, height }
+  }
 
   const { colorScheme, colorSchemes, isCustomMode, customColors } = useGradientStore()
 
@@ -66,7 +94,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   const handleExport = async () => {
     try {
       setIsExporting(true)
-      await onExport(format, quality, scale)
+      await onExport(format, quality, resolveTarget(), supersample ? 2 : 1)
       setOpen(false)
     } catch (error) {
       console.error("Export error:", error)
@@ -171,29 +199,75 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
 
               {/* Tamanho */}
               <div className="space-y-2">
-                <Label htmlFor="scale" className="text-white">
+                <Label htmlFor="size" className="text-white">
                   Tamanho
                 </Label>
-                <Select
-                  value={scale.toString()}
-                  onValueChange={(value) => setScale(Number(value))}
-                >
-                  <SelectTrigger id="scale" className="bg-gray-800 border-gray-700 text-white">
+                <Select value={sizePreset} onValueChange={setSizePreset}>
+                  <SelectTrigger id="size" className="bg-gray-800 border-gray-700 text-white">
                     <SelectValue placeholder="Selecione o tamanho" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    <SelectItem value="0.5">Pequeno (50%)</SelectItem>
-                    <SelectItem value="1">Original (100%)</SelectItem>
-                    <SelectItem value="2">Grande (200%)</SelectItem>
-                    <SelectItem value="4">Extra Grande (400%)</SelectItem>
-                    <SelectItem value="8">Ultra (800%)</SelectItem>
+                    <SelectItem value="screen-1">Tela (100%)</SelectItem>
+                    <SelectItem value="screen-2">Tela (200%)</SelectItem>
+                    <SelectItem value="screen-4">Tela (400%)</SelectItem>
+                    <SelectItem value="1920x1080">Full HD (1920×1080)</SelectItem>
+                    <SelectItem value="2560x1440">QHD (2560×1440)</SelectItem>
+                    <SelectItem value="3840x2160">4K (3840×2160)</SelectItem>
+                    <SelectItem value="7680x4320">8K (7680×4320)</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {sizePreset === "custom" && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={16}
+                      max={16384}
+                      value={customWidth}
+                      onChange={(e) => setCustomWidth(Number(e.target.value))}
+                      onBlur={() => setCustomWidth(clampDimension(customWidth))}
+                      className="bg-gray-800 border-gray-700 text-white"
+                      aria-label="Largura em pixels"
+                    />
+                    <span className="text-gray-400">×</span>
+                    <Input
+                      type="number"
+                      min={16}
+                      max={16384}
+                      value={customHeight}
+                      onChange={(e) => setCustomHeight(Number(e.target.value))}
+                      onBlur={() => setCustomHeight(clampDimension(customHeight))}
+                      className="bg-gray-800 border-gray-700 text-white"
+                      aria-label="Altura em pixels"
+                    />
+                    <span className="text-gray-400 text-xs">px</span>
+                  </div>
+                )}
+
                 <p className="text-xs text-gray-400">
                   O gradiente é renderizado nativamente na resolução final — sem perda de
                   nitidez por upscaling. Tamanhos acima do limite da GPU são ajustados
                   automaticamente.
                 </p>
+              </div>
+
+              {/* Supersampling */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="supersample" className="text-white">
+                    Suavização (supersampling 2×)
+                  </Label>
+                  <p className="text-xs text-gray-400">
+                    Renderiza em resolução dobrada e reduz com filtro, suavizando o grão e
+                    as bordas das formas.
+                  </p>
+                </div>
+                <Switch
+                  id="supersample"
+                  checked={supersample}
+                  onCheckedChange={setSupersample}
+                />
               </div>
             </div>
           </div>
