@@ -174,9 +174,11 @@ export default function GradientGenerator() {
         <VideoExport containerRef={containerRef} />
       </div>
 
-      {/* Layer Manager — canto inferior esquerdo */}
+      {/* Layer Manager — canto inferior esquerdo (em telas pequenas fica
+          disponível apenas na aba "Camadas" do painel de controles, para não
+          sobrepor os botões de exportação) */}
       {multiLayerMode && (
-        <div className="absolute bottom-4 left-4 z-40 w-72 bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl p-4">
+        <div className="absolute bottom-4 left-4 z-40 w-72 hidden md:block bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl p-4">
           <LayerManager />
         </div>
       )}
@@ -188,7 +190,7 @@ export default function GradientGenerator() {
 
       {/* Botão de Ajuda (atalhos) — canto inferior esquerdo (acima do layer manager se ativo) */}
       <div
-        className={`absolute z-40 ${multiLayerMode ? "bottom-[calc(1rem+theme(spacing.4)+280px)]" : "bottom-4"} left-4`}
+        className={`absolute z-40 left-4 ${multiLayerMode ? "bottom-4 md:bottom-[calc(1rem+theme(spacing.4)+280px)]" : "bottom-4"}`}
       >
         <Dialog>
           <DialogTrigger asChild>
