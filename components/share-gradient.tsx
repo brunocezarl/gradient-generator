@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -10,14 +10,20 @@ import { Share, Copy, Check, QrCode } from "lucide-react"
 import { useGradientStore } from "@/lib/store"
 import { createShareableURL } from "@/lib/share-utils"
 import { useToast } from "@/components/ui/use-toast"
-import QRCode from "qrcode.react"
+import { QRCodeSVG } from "qrcode.react"
 
 export function ShareGradient() {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState("link")
+  const [canWebShare, setCanWebShare] = useState(false)
   const gradientState = useGradientStore()
   const { toast } = useToast()
+
+  // Web Share API só existe em alguns navegadores e não está disponível no SSR
+  useEffect(() => {
+    setCanWebShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
+  }, [])
   
   // Generate shareable URL
   const shareableURL = createShareableURL(gradientState)
@@ -47,7 +53,7 @@ export function ShareGradient() {
   
   // Handle share via Web Share API if available
   const shareViaWebShare = async () => {
-    if (navigator.share) {
+    if (canWebShare) {
       try {
         await navigator.share({
           title: "Meu Gradiente Orgânico",
@@ -114,7 +120,7 @@ export function ShareGradient() {
                 </div>
               </div>
               
-              {navigator.share && (
+              {canWebShare && (
                 <Button
                   onClick={shareViaWebShare}
                   className="w-full bg-blue-600 hover:bg-blue-700"
@@ -127,7 +133,7 @@ export function ShareGradient() {
             
             <TabsContent value="qrcode" className="mt-4 space-y-4">
               <div className="flex justify-center p-4 bg-white rounded-md">
-                <QRCode value={shareableURL} size={200} />
+                <QRCodeSVG value={shareableURL} size={200} />
               </div>
               <p className="text-sm text-gray-400 text-center">
                 Escaneie o código QR com a câmera do seu dispositivo para abrir este gradiente.

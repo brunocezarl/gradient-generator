@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { ImageIcon, Loader2, Code2, Copy, Check } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import { useGradientStore } from "@/lib/store"
+import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import { rgbToHex } from "@/lib/utils"
 
 interface ExportOptionsProps {
@@ -28,20 +28,12 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   // ─── Gerar CSS ─────────────────────────────────────────────────────────────
 
   const generateCSSGradient = (): string => {
-    let c1: [number, number, number]
-    let c2: [number, number, number]
-    let c3: [number, number, number]
-
-    if (isCustomMode) {
-      c1 = customColors.color1
-      c2 = customColors.color2
-      c3 = customColors.color3
-    } else {
-      const scheme = colorSchemes[colorScheme]
-      c1 = scheme.color1
-      c2 = scheme.color2
-      c3 = scheme.color3
-    }
+    const { color1: c1, color2: c2, color3: c3 } = resolveActiveColors({
+      isCustomMode,
+      customColors,
+      colorScheme,
+      colorSchemes,
+    })
 
     const toHex = (c: [number, number, number]) =>
       rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))

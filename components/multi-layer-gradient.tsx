@@ -18,7 +18,7 @@ export function MultiLayerGradient() {
   const glConfig = {
     preserveDrawingBuffer: true,
     antialias: quality !== 'low', // Disable antialiasing on low-end devices
-    powerPreference: quality === 'high' ? 'high-performance' : 'low-power',
+    powerPreference: (quality === 'high' ? 'high-performance' : 'low-power') as WebGLPowerPreference,
     depth: false, // We don't need depth testing for a 2D gradient
     stencil: false, // We don't need stencil buffer
   }
@@ -54,7 +54,7 @@ export function MultiLayerGradient() {
                 speed={1.0} // Use a fixed speed for all layers
                 complexity={3} // Use a fixed complexity for all layers
                 noiseScale={layer.noiseScale}
-                colorScheme={layer.isCustomMode ? layer.customColors : layer.colorScheme}
+                colorScheme={layer.isCustomMode && layer.customColors ? layer.customColors : layer.colorScheme}
                 flowIntensity={layer.flowIntensity}
                 thresholdMin={layer.thresholdMin}
                 thresholdMax={layer.thresholdMax}

@@ -281,8 +281,11 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                       onClick={() => {
                         // Copy current scheme to custom colors
                         const currentScheme = colorSchemes[colorScheme]
-                        setCustomColor1(currentScheme.color1)
-                        setCustomColor2(currentScheme.color2)
+                        if (currentScheme) {
+                          setCustomColor1(currentScheme.color1)
+                          setCustomColor2(currentScheme.color2)
+                          setCustomColor3(currentScheme.color3)
+                        }
                         setCustomMode(true)
                       }}
                       className="w-full mt-4 bg-gray-700 hover:bg-gray-600 text-white"

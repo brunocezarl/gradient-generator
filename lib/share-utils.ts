@@ -12,6 +12,7 @@ export interface ShareableGradient {
   customColors: {
     color1: number[]
     color2: number[]
+    color3?: number[]
   }
 }
 
@@ -27,6 +28,7 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     customColors: state.customColors || {
       color1: [0.9, 0.1, 0.1],
       color2: [0.0, 0.0, 0.9],
+      color3: [0.5, 0.0, 0.5],
     },
   }
 

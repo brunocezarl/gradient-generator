@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { useGradientStore } from "@/lib/store"
+import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import * as THREE from "three"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 
@@ -194,8 +194,8 @@ function GradientShader() {
   const timeRef = useRef(0)
   const frameSkipRef = useRef(0)
 
-  // Get current color scheme
-  const currentColorScheme = isCustomMode ? customColors : colorSchemes[colorScheme]
+  // Get current color scheme (com fallback para esquemas inexistentes)
+  const currentColorScheme = resolveActiveColors({ isCustomMode, customColors, colorScheme, colorSchemes })
 
   // Set up scene
   const { size } = useThree()

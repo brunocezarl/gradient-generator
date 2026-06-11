@@ -1,5 +1,7 @@
 "use client"
 
+import type { CSSProperties } from "react"
+
 // Define a gradient layer
 export interface GradientLayer {
   id: string
@@ -35,8 +37,8 @@ export const blendModes = {
 }
 
 // Convert blend mode to CSS mix-blend-mode
-export function blendModeToCSS(mode: string): string {
-  const cssMap: Record<string, string> = {
+export function blendModeToCSS(mode: string): CSSProperties["mixBlendMode"] {
+  const cssMap: Record<string, CSSProperties["mixBlendMode"]> = {
     normal: "normal",
     multiply: "multiply",
     screen: "screen",
