@@ -1,0 +1,38 @@
+{
+  "passed": [
+    "Page loads (HTTP + networkidle)",
+    "Canvas renders (894x502)",
+    "WebGL context acquired",
+    "Layer list panel visible",
+    "Layer selection works",
+    "Effect picker present",
+    "Add effect works",
+    "Select effect works",
+    "Property panel visible",
+    "Property panel opacity slider updates",
+    "Variables panel visible",
+    "Add image layer",
+    "Image layer URL input present and fillable",
+    "Mouse move over canvas (no crash)",
+    "Save/Load JSON buttons exist",
+    "Save JSON triggers download"
+  ],
+  "failed": [
+    {
+      "name": "flowIntensity slider",
+      "reason": "Slider not found"
+    },
+    {
+      "name": "Load JSON updates scene",
+      "reason": "test_layer not found after load"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "Reorder effect",
+      "reason": "Only 1 effect row(s)"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}
