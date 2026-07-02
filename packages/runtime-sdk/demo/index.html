@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShaderCanvas Runtime SDK Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #111;
+        color: #f5f5f5;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      #canvas-host {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #333;
+        background: #000;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+        align-items: center;
+      }
+      button {
+        background: #222;
+        color: #fff;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: #666;
+      }
+      button.danger {
+        border-color: #733;
+        color: #faa;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #bbb;
+      }
+      input[type="range"] {
+        width: 160px;
+      }
+      .status {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #888;
+      }
+      code {
+        background: #1a1a1a;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ShaderCanvas Embed Demo</h1>
+      <p>
+        Loads the built runtime SDK, mounts a scene from <code>scene.json</code>, and exposes
+        <code>setVariable()</code>, play/pause, and destroy.
+      </p>
+      <div id="canvas-host"></div>
+      <div class="controls">
+        <button id="play" type="button">Play</button>
+        <button id="pause" type="button">Pause</button>
+        <label>
+          flowIntensity
+          <input id="flow-slider" type="range" min="0" max="1" step="0.01" value="0.35" />
+          <span id="flow-value">0.35</span>
+        </label>
+        <button id="destroy" type="button" class="danger">Destroy</button>
+      </div>
+      <p id="status" class="status">Initializing…</p>
+    </main>
+    <!-- Browser-native resolution for workspace package names (dev demo only). -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@shadercanvas/engine": "/packages/engine/dist/index.js",
+          "@shadercanvas/scene-schema": "/packages/scene-schema/dist/index.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import { ShaderCanvas } from "/packages/runtime-sdk/dist/index.js";
+
+      const statusEl = document.getElementById("status");
+      const host = document.getElementById("canvas-host");
+      const flowSlider = document.getElementById("flow-slider");
+      const flowValue = document.getElementById("flow-value");
+
+      const sceneResponse = await fetch("/packages/runtime-sdk/demo/scene.json");
+      const scene = await sceneResponse.json();
+
+      let instance = await ShaderCanvas.create({ container: host, scene, autoplay: true });
+      statusEl.textContent = "Running — drag over the canvas to see mouse-driven effects if configured.";
+
+      document.getElementById("play").addEventListener("click", () => {
+        instance.play();
+        statusEl.textContent = "Playing";
+      });
+
+      document.getElementById("pause").addEventListener("click", () => {
+        instance.pause();
+        statusEl.textContent = "Paused";
+      });
+
+      flowSlider.addEventListener("input", () => {
+        const value = Number(flowSlider.value);
+        flowValue.textContent = value.toFixed(2);
+        instance.setVariable("flowIntensity", value);
+      });
+
+      document.getElementById("destroy").addEventListener("click", () => {
+        instance.destroy();
+        instance = null;
+        statusEl.textContent = "Destroyed — reload the page to recreate the embed.";
+      });
+
+      window.addEventListener("resize", () => {
+        instance?.resize();
+      });
+    </script>
+  </body>
+</html>

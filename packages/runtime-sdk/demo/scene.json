@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "canvas": {
+    "width": 1280,
+    "height": 720,
+    "backgroundColor": [0.05, 0.05, 0.08, 1]
+  },
+  "variables": {
+    "flowIntensity": 0.35
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "shader",
+      "transform": { "opacity": 1, "blendMode": "normal", "visible": true },
+      "effects": [
+        {
+          "id": "noise_fill",
+          "enabled": true,
+          "uniforms": {
+            "complexity": 3,
+            "noiseScale": 2.5,
+            "flowIntensity": 0.35,
+            "thresholdMin": 0.25,
+            "thresholdMax": 0.75,
+            "color1": [0.95, 0.2, 0.35],
+            "color2": [0.15, 0.35, 0.95],
+            "color3": [0.55, 0.1, 0.75]
+          }
+        },
+        {
+          "id": "grain",
+          "enabled": true,
+          "uniforms": { "amount": 0.06, "scale": 600 }
+        }
+      ]
+    }
+  ]
+}
