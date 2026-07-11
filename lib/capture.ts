@@ -135,7 +135,12 @@ export function overrideRenderSize(
 }
 
 export interface ExportImageOptions {
-  scale: number
+  scale?: number
+  // Dimensões fixas de saída (ex.: presets 1920×1080, 1080×1920). Quando
+  // presentes, têm precedência sobre `scale` — o gradiente é re-renderizado
+  // nesse tamanho exato, independente da proporção da tela
+  width?: number
+  height?: number
   mimeType: string
   quality: number
 }
@@ -145,16 +150,18 @@ export interface ExportImageOptions {
 // opacidade e blend modes (equivalente ao que o CSS faz na tela)
 export async function exportCompositeImage(
   container: HTMLElement,
-  { scale, mimeType, quality }: ExportImageOptions,
+  options: ExportImageOptions,
 ): Promise<Blob> {
+  const { mimeType, quality } = options
   const canvases = Array.from(container.querySelectorAll("canvas"))
   if (canvases.length === 0) {
     throw new Error("No canvas found to export")
   }
 
   const base = canvases[0]
-  const width = Math.max(1, Math.round(base.width * scale))
-  const height = Math.max(1, Math.round(base.height * scale))
+  const scale = options.scale ?? 1
+  const width = Math.max(1, Math.round(options.width ?? base.width * scale))
+  const height = Math.max(1, Math.round(options.height ?? base.height * scale))
 
   const output = document.createElement("canvas")
   output.width = width

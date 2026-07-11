@@ -254,6 +254,77 @@ describe("exportCompositeImage", () => {
     container.remove()
   })
 
+  it("usa dimensões fixas quando fornecidas, ignorando a escala", async () => {
+    const fakeCtx = {
+      imageSmoothingEnabled: false,
+      imageSmoothingQuality: "",
+      fillStyle: "",
+      globalAlpha: 1,
+      globalCompositeOperation: "source-over",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+    }
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeCtx as unknown as RenderingContext
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      callback: BlobCallback
+    ) {
+      callback(new Blob(["png"], { type: "image/png" }))
+    })
+
+    const container = document.createElement("div")
+    const canvas = document.createElement("canvas")
+    canvas.width = 100
+    canvas.height = 50
+    container.appendChild(canvas)
+    document.body.appendChild(container)
+
+    await exportCompositeImage(container, {
+      scale: 2,
+      width: 1920,
+      height: 1080,
+      mimeType: "image/png",
+      quality: 1,
+    })
+
+    // Preset fixo (1920×1080) tem precedência sobre scale=2 (200×100)
+    expect(fakeCtx.fillRect).toHaveBeenCalledWith(0, 0, 1920, 1080)
+    expect(fakeCtx.drawImage).toHaveBeenCalledWith(canvas, 0, 0, 1920, 1080)
+    container.remove()
+  })
+
+  it("scale é opcional (padrão 1)", async () => {
+    const fakeCtx = {
+      imageSmoothingEnabled: false,
+      imageSmoothingQuality: "",
+      fillStyle: "",
+      globalAlpha: 1,
+      globalCompositeOperation: "source-over",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+    }
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeCtx as unknown as RenderingContext
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      callback: BlobCallback
+    ) {
+      callback(new Blob(["png"], { type: "image/png" }))
+    })
+
+    const container = document.createElement("div")
+    const canvas = document.createElement("canvas")
+    canvas.width = 100
+    canvas.height = 50
+    container.appendChild(canvas)
+    document.body.appendChild(container)
+
+    await exportCompositeImage(container, { mimeType: "image/png", quality: 1 })
+    expect(fakeCtx.fillRect).toHaveBeenCalledWith(0, 0, 100, 50)
+    container.remove()
+  })
+
   it("rejeita quando o blob não pode ser codificado", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
       imageSmoothingEnabled: false,

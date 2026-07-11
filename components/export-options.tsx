@@ -11,7 +11,23 @@ import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import { rgbToHex } from "@/lib/utils"
 
 interface ExportOptionsProps {
-  onExport: (format: string, quality: number, scale: number) => Promise<void>
+  onExport: (
+    format: string,
+    quality: number,
+    scale: number,
+    size?: { width: number; height: number },
+  ) => Promise<void>
+}
+
+// Tamanhos de saída prontos para os destinos mais comuns (redes sociais,
+// wallpapers). "screen" mantém o comportamento original de escalar a tela.
+const SIZE_PRESETS: Record<string, { label: string; width?: number; height?: number }> = {
+  screen: { label: "Tela atual (usar escala)" },
+  fullhd: { label: "Full HD — 1920×1080", width: 1920, height: 1080 },
+  uhd4k: { label: "4K — 3840×2160", width: 3840, height: 2160 },
+  qhd: { label: "Wallpaper QHD — 2560×1440", width: 2560, height: 1440 },
+  square: { label: "Post quadrado — 1080×1080", width: 1080, height: 1080 },
+  story: { label: "Story / Celular — 1080×1920", width: 1080, height: 1920 },
 }
 
 export function ExportOptions({ onExport }: ExportOptionsProps) {
@@ -19,6 +35,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   const [format, setFormat] = useState("png")
   const [quality, setQuality] = useState(1)
   const [scale, setScale] = useState(1)
+  const [sizePreset, setSizePreset] = useState("screen")
   const [isExporting, setIsExporting] = useState(false)
   const [cssCopied, setCssCopied] = useState(false)
   const { toast } = useToast()
@@ -66,7 +83,12 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   const handleExport = async () => {
     try {
       setIsExporting(true)
-      await onExport(format, quality, scale)
+      const preset = SIZE_PRESETS[sizePreset]
+      const size =
+        preset?.width && preset?.height
+          ? { width: preset.width, height: preset.height }
+          : undefined
+      await onExport(format, quality, scale, size)
       setOpen(false)
     } catch (error) {
       console.error("Export error:", error)
@@ -169,32 +191,53 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                 </div>
               )}
 
-              {/* Tamanho */}
+              {/* Dimensões */}
               <div className="space-y-2">
-                <Label htmlFor="scale" className="text-white">
-                  Tamanho
+                <Label htmlFor="size-preset" className="text-white">
+                  Dimensões
                 </Label>
-                <Select
-                  value={scale.toString()}
-                  onValueChange={(value) => setScale(Number(value))}
-                >
-                  <SelectTrigger id="scale" className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="Selecione o tamanho" />
+                <Select value={sizePreset} onValueChange={setSizePreset}>
+                  <SelectTrigger id="size-preset" className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Selecione as dimensões" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    <SelectItem value="0.5">Pequeno (50%)</SelectItem>
-                    <SelectItem value="1">Original (100%)</SelectItem>
-                    <SelectItem value="2">Grande (200%)</SelectItem>
-                    <SelectItem value="4">Extra Grande (400%)</SelectItem>
-                    <SelectItem value="8">Ultra (800%)</SelectItem>
+                    {Object.entries(SIZE_PRESETS).map(([key, preset]) => (
+                      <SelectItem key={key} value={key}>
+                        {preset.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-400">
-                  O gradiente é renderizado nativamente na resolução final — sem perda de
-                  nitidez por upscaling. Tamanhos acima do limite da GPU são ajustados
-                  automaticamente.
-                </p>
               </div>
+
+              {/* Escala — apenas quando exportando no tamanho da tela */}
+              {sizePreset === "screen" && (
+                <div className="space-y-2">
+                  <Label htmlFor="scale" className="text-white">
+                    Tamanho
+                  </Label>
+                  <Select
+                    value={scale.toString()}
+                    onValueChange={(value) => setScale(Number(value))}
+                  >
+                    <SelectTrigger id="scale" className="bg-gray-800 border-gray-700 text-white">
+                      <SelectValue placeholder="Selecione o tamanho" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                      <SelectItem value="0.5">Pequeno (50%)</SelectItem>
+                      <SelectItem value="1">Original (100%)</SelectItem>
+                      <SelectItem value="2">Grande (200%)</SelectItem>
+                      <SelectItem value="4">Extra Grande (400%)</SelectItem>
+                      <SelectItem value="8">Ultra (800%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <p className="text-xs text-gray-400">
+                O gradiente é renderizado nativamente na resolução final — sem perda de
+                nitidez por upscaling. Tamanhos acima do limite da GPU são ajustados
+                automaticamente.
+              </p>
             </div>
           </div>
 

@@ -7,6 +7,7 @@ import ErrorBoundary from "@/components/error-boundary"
 import WebGLNotSupported from "@/components/webgl-not-supported"
 import { ExportOptions } from "@/components/export-options"
 import { VideoExport } from "@/components/video-export"
+import { ShareGradient } from "@/components/share-gradient"
 import { FullscreenButton } from "@/components/fullscreen-button"
 import { MultiLayerGradient } from "@/components/multi-layer-gradient"
 import { LayerManager } from "@/components/layer-manager"
@@ -60,7 +61,12 @@ export default function GradientGenerator() {
   // ─── Captura de imagem ────────────────────────────────────────────────────
 
   const captureImage = useCallback(
-    async (format = "png", quality = 1, scale = 1) => {
+    async (
+      format = "png",
+      quality = 1,
+      scale = 1,
+      size?: { width: number; height: number },
+    ) => {
       try {
         if (!containerRef.current) return
         const canvas = containerRef.current.querySelector("canvas")
@@ -84,6 +90,8 @@ export default function GradientGenerator() {
         // dataURL para suportar arquivos grandes (4K/8K) sem estourar memória
         const blob = await exportCompositeImage(containerRef.current, {
           scale,
+          width: size?.width,
+          height: size?.height,
           mimeType,
           quality,
         })
@@ -171,6 +179,7 @@ export default function GradientGenerator() {
       <div className="absolute bottom-4 right-4 z-40 w-64 space-y-2">
         <ExportOptions onExport={captureImage} />
         <VideoExport containerRef={containerRef} />
+        <ShareGradient />
       </div>
 
       {/* Layer Manager — canto inferior esquerdo (em telas pequenas fica

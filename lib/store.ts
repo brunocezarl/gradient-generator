@@ -2,7 +2,12 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { ShareableGradient } from "@/lib/share-utils"
 import { AnimationPreset, animationPresets } from "@/lib/animation-presets"
-import { GradientLayer, createDefaultLayer, generateLayerId } from "@/lib/layer-utils"
+import {
+  GradientLayer,
+  blendModes,
+  createDefaultLayer,
+  generateLayerId,
+} from "@/lib/layer-utils"
 
 // Define color type
 type GradientColor = [number, number, number]
@@ -15,8 +20,9 @@ export type ColorScheme = {
   name?: string
 }
 
-// Snapshot para undo/redo
-type StateSnapshot = {
+// Snapshot do "visual" do gradiente: cores + parâmetros de animação.
+// Usado pelo undo/redo, pelos presets salvos e pelo histórico do randomizador.
+export type StateSnapshot = {
   speed: number
   complexity: number
   noiseScale: number
@@ -29,6 +35,16 @@ type StateSnapshot = {
   thresholdMin: number
   thresholdMax: number
 }
+
+// Preset completo salvo pelo usuário: cores + todos os parâmetros de animação
+export type GradientPreset = {
+  id: string
+  name: string
+  createdAt: number
+  snapshot: StateSnapshot
+}
+
+const RANDOM_HISTORY_LIMIT = 10
 
 // Coalescência de histórico: edições contínuas (arrastar um slider) geram um
 // único snapshot em vez de um por evento de mudança
@@ -90,6 +106,10 @@ export type GradientStore = {
   past: StateSnapshot[]
   future: StateSnapshot[]
 
+  // Presets completos e histórico do randomizador
+  savedPresets: GradientPreset[]
+  randomHistory: StateSnapshot[]
+
   // Actions
   setIsPlaying: (value: boolean) => void
   setSpeed: (value: number) => void
@@ -128,6 +148,12 @@ export type GradientStore = {
   pushHistory: () => void
   undo: () => void
   redo: () => void
+
+  // Preset e histórico do randomizador
+  saveCurrentPreset: (name: string) => void
+  applyPreset: (id: string) => void
+  deletePreset: (id: string) => void
+  applySnapshot: (snapshot: StateSnapshot) => void
 }
 
 // Define the type for actions to omit them from defaultState
@@ -164,6 +190,10 @@ type StoreActions = Pick<
   | "pushHistory"
   | "undo"
   | "redo"
+  | "saveCurrentPreset"
+  | "applyPreset"
+  | "deletePreset"
+  | "applySnapshot"
 >
 
 // Default state
@@ -194,6 +224,9 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
 
   past: [],
   future: [],
+
+  savedPresets: [],
+  randomHistory: [],
 
   colorSchemes: {
     redBlue: {
@@ -299,6 +332,41 @@ export const useGradientStore = create<GradientStore>()(
           future: remainingFuture,
         })
       },
+
+      // ─── Presets completos e histórico do randomizador ────────────────────
+
+      applySnapshot: (snapshot) => {
+        get().pushHistory()
+        set({
+          ...snapshot,
+          customColors: {
+            color1: [...snapshot.customColors.color1] as GradientColor,
+            color2: [...snapshot.customColors.color2] as GradientColor,
+            color3: [...snapshot.customColors.color3] as GradientColor,
+          },
+        })
+      },
+
+      saveCurrentPreset: (name) =>
+        set((state) => {
+          const preset: GradientPreset = {
+            id: `preset_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            name,
+            createdAt: Date.now(),
+            snapshot: captureSnapshot(state),
+          }
+          return { savedPresets: [preset, ...state.savedPresets] }
+        }),
+
+      applyPreset: (id) => {
+        const preset = get().savedPresets.find((p) => p.id === id)
+        if (preset) get().applySnapshot(preset.snapshot)
+      },
+
+      deletePreset: (id) =>
+        set((state) => ({
+          savedPresets: state.savedPresets.filter((p) => p.id !== id),
+        })),
 
       // ─── Animation parameters ─────────────────────────────────────────────
 
@@ -427,6 +495,11 @@ export const useGradientStore = create<GradientStore>()(
         const colorScheme =
           settings.colorScheme in get().colorSchemes ? settings.colorScheme : "redBlue"
 
+        const clampNum = (n: unknown, min: number, max: number, fallback: number) =>
+          typeof n === "number" && Number.isFinite(n)
+            ? Math.min(Math.max(n, min), max)
+            : fallback
+
         const validatedSettings: Partial<GradientStore> = {
           speed: Math.min(Math.max(settings.speed, 0.1), 3.0),
           complexity: Math.min(Math.max(Math.round(settings.complexity), 1), 10),
@@ -439,6 +512,53 @@ export const useGradientStore = create<GradientStore>()(
             color3: validateColor(settings.customColors?.color3, [0.5, 0.0, 0.5]),
           },
         }
+
+        // Parâmetros avançados (links v2) — links antigos não os incluem,
+        // então só sobrescrevem quando presentes
+        if (settings.flowIntensity !== undefined)
+          validatedSettings.flowIntensity = clampNum(settings.flowIntensity, 0.1, 1.0, 0.3)
+        if (settings.grainAmount !== undefined)
+          validatedSettings.grainAmount = clampNum(settings.grainAmount, 0, 0.2, 0.05)
+        if (settings.grainScale !== undefined)
+          validatedSettings.grainScale = clampNum(settings.grainScale, 50, 1500, 500)
+        if (settings.thresholdMin !== undefined || settings.thresholdMax !== undefined) {
+          const tMin = clampNum(settings.thresholdMin, 0.1, 0.8, 0.3)
+          const tMax = clampNum(settings.thresholdMax, tMin + 0.1, 0.9, 0.7)
+          validatedSettings.thresholdMin = tMin
+          validatedSettings.thresholdMax = Math.max(tMax, tMin + 0.1)
+        }
+
+        // Camadas (links v2 com multi-camadas ativo): valida cada camada e
+        // regenera os ids para não colidir com camadas locais
+        if (settings.multiLayerMode && Array.isArray(settings.layers) && settings.layers.length > 0) {
+          const validatedLayers: GradientLayer[] = settings.layers.map((layer, index) => ({
+            id: `${generateLayerId()}_${index}`,
+            opacity: clampNum(layer?.opacity, 0, 1, 1),
+            blendMode: typeof layer?.blendMode === "string" && layer.blendMode in blendModes
+              ? layer.blendMode
+              : "normal",
+            visible: layer?.visible !== false,
+            colorScheme:
+              typeof layer?.colorScheme === "string" && layer.colorScheme in get().colorSchemes
+                ? layer.colorScheme
+                : "redBlue",
+            isCustomMode: Boolean(layer?.isCustomMode),
+            customColors: layer?.customColors
+              ? {
+                  color1: validateColor(layer.customColors.color1, [0.9, 0.1, 0.1]),
+                  color2: validateColor(layer.customColors.color2, [0.0, 0.0, 0.9]),
+                }
+              : undefined,
+            noiseScale: clampNum(layer?.noiseScale, 0.5, 5.0, 2.0),
+            flowIntensity: clampNum(layer?.flowIntensity, 0.1, 1.0, 0.3),
+            thresholdMin: clampNum(layer?.thresholdMin, 0.1, 0.8, 0.3),
+            thresholdMax: clampNum(layer?.thresholdMax, 0.2, 0.9, 0.7),
+          }))
+          validatedSettings.multiLayerMode = true
+          validatedSettings.layers = validatedLayers
+          validatedSettings.activeLayerId = validatedLayers[0].id
+        }
+
         set(validatedSettings)
       },
 
@@ -489,6 +609,13 @@ export const useGradientStore = create<GradientStore>()(
             color3: randColor(),
           },
         })
+
+        // Guarda o resultado no histórico do randomizador para que um bom
+        // sorteio não se perca no próximo clique
+        const rolled = captureSnapshot(get())
+        set((state) => ({
+          randomHistory: [rolled, ...state.randomHistory].slice(0, RANDOM_HISTORY_LIMIT),
+        }))
       },
 
       // ─── Multi-layer actions ───────────────────────────────────────────────
@@ -566,6 +693,8 @@ export const useGradientStore = create<GradientStore>()(
         multiLayerMode: state.multiLayerMode,
         layers: state.layers,
         activeLayerId: state.activeLayerId,
+        savedPresets: state.savedPresets,
+        randomHistory: state.randomHistory,
         // past/future NÃO são persistidos
       }),
     }
