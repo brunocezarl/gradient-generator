@@ -12,12 +12,12 @@ export default function ShareHandler() {
   const [isProcessingShare, setIsProcessingShare] = useState(true)
 
   useEffect(() => {
-    const gradientParam = searchParams.get("gradient")
+    // "g" é o formato compacto atual; "gradient" é o formato legado (JSON)
+    const gradientParam = searchParams.get("g") ?? searchParams.get("gradient")
 
     if (gradientParam) {
       try {
-        const fullUrl = `${window.location.origin}${window.location.pathname}?gradient=${gradientParam}`
-        const sharedSettings = parseShareableURL(fullUrl)
+        const sharedSettings = parseShareableURL(window.location.href)
 
         if (sharedSettings) {
           importSettings(sharedSettings)

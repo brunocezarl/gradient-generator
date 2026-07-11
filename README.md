@@ -12,11 +12,16 @@ ruído simplex e curl noise, renderizado via React Three Fiber.
   RGB/HSL/HEX e salvamento de esquemas próprios
 - **Multi-camadas** com modos de mesclagem (blend modes), opacidade e reordenação
   por arrastar e soltar
-- **Presets de animação** e gerador aleatório
+- **Presets de animação** e gerador aleatório com **histórico dos últimos
+  sorteios** (clique numa miniatura para restaurar um bom resultado)
+- **Presets completos** salvos pelo usuário: cores + todos os parâmetros de
+  animação, com galeria de miniaturas
 - **Undo/Redo** (Ctrl+Z / Ctrl+Y) com coalescência de edições contínuas
-- **Exportação**: imagem (PNG/JPEG/WebP em até 4×), vídeo (WebM/MP4 conforme
+- **Exportação**: imagem (PNG/JPEG/WebP) com escala de até 8× ou dimensões
+  prontas (Full HD, 4K, QHD, post quadrado, story), vídeo (WebM/MP4 conforme
   suporte do navegador, com resolução configurável) e CSS estático aproximado
-- **Compartilhamento** por URL com os parâmetros do gradiente
+- **Compartilhamento** por URL compacta que reproduz o gradiente completo —
+  incluindo parâmetros avançados (fluxo, grão, limiares) e camadas
 - **Atalhos de teclado**: `Espaço` play/pause, `R` reset, `S` salvar imagem,
   `F` tela cheia
 

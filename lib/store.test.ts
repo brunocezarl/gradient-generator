@@ -202,6 +202,92 @@ describe("importSettings", () => {
     expect(customColors.color1).toEqual([0.9, 0.1, 0.1])
     expect(customColors.color2).toEqual([0.0, 0.0, 0.9])
   })
+
+  it("aplica parâmetros avançados com clamping (links v2)", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customColors: { color1: [0, 0, 0], color2: [1, 1, 1] },
+      flowIntensity: 99,
+      grainAmount: -1,
+      grainScale: 700,
+      thresholdMin: 0.5,
+      thresholdMax: 0.2,
+    })
+
+    const state = useGradientStore.getState()
+    expect(state.flowIntensity).toBe(1.0)
+    expect(state.grainAmount).toBe(0)
+    expect(state.grainScale).toBe(700)
+    expect(state.thresholdMin).toBe(0.5)
+    // thresholdMax é forçado a ficar acima de thresholdMin
+    expect(state.thresholdMax).toBeCloseTo(0.6)
+  })
+
+  it("não altera parâmetros avançados ausentes (links v1)", () => {
+    useGradientStore.getState().setFlowIntensity(0.8)
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customColors: { color1: [0, 0, 0], color2: [1, 1, 1] },
+    })
+
+    expect(useGradientStore.getState().flowIntensity).toBe(0.8)
+  })
+
+  it("importa camadas com ids regenerados e blend mode validado", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customColors: { color1: [0, 0, 0], color2: [1, 1, 1] },
+      multiLayerMode: true,
+      layers: [
+        {
+          opacity: 5,
+          blendMode: "modo_invalido",
+          visible: true,
+          colorScheme: "esquema_que_nao_existe",
+          isCustomMode: false,
+          noiseScale: 1.5,
+          flowIntensity: 0.4,
+          thresholdMin: 0.2,
+          thresholdMax: 0.8,
+        },
+        {
+          opacity: 0.5,
+          blendMode: "screen",
+          visible: false,
+          colorScheme: "neon",
+          isCustomMode: true,
+          customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+          noiseScale: 3,
+          flowIntensity: 0.6,
+          thresholdMin: 0.3,
+          thresholdMax: 0.7,
+        },
+      ],
+    })
+
+    const state = useGradientStore.getState()
+    expect(state.multiLayerMode).toBe(true)
+    expect(state.layers).toHaveLength(2)
+    expect(state.layers[0].opacity).toBe(1) // clampado
+    expect(state.layers[0].blendMode).toBe("normal") // fallback
+    expect(state.layers[0].colorScheme).toBe("redBlue") // fallback
+    expect(state.layers[1].blendMode).toBe("screen")
+    expect(state.layers[1].visible).toBe(false)
+    expect(state.layers[0].id).not.toBe(state.layers[1].id)
+    expect(state.activeLayerId).toBe(state.layers[0].id)
+  })
 })
 
 describe("resolveActiveColors", () => {
@@ -308,6 +394,105 @@ describe("saveCustomScheme", () => {
   })
 })
 
+describe("presets completos", () => {
+  it("salva uma cópia congelada do estado atual", () => {
+    useGradientStore.getState().setSpeed(2.2)
+    advance(2000)
+    useGradientStore.getState().setFlowIntensity(0.7)
+    useGradientStore.getState().saveCurrentPreset("Meu Visual")
+
+    // Edições posteriores não podem alterar o preset salvo
+    advance(2000)
+    useGradientStore.getState().setSpeed(0.5)
+
+    const [preset] = useGradientStore.getState().savedPresets
+    expect(preset.name).toBe("Meu Visual")
+    expect(preset.snapshot.speed).toBe(2.2)
+    expect(preset.snapshot.flowIntensity).toBe(0.7)
+  })
+
+  it("applyPreset restaura todos os parâmetros e é desfazível", () => {
+    useGradientStore.getState().setSpeed(2.2)
+    advance(2000)
+    useGradientStore.getState().setGrainAmount(0.15)
+    useGradientStore.getState().saveCurrentPreset("Salvo")
+    const presetId = useGradientStore.getState().savedPresets[0].id
+
+    advance(2000)
+    useGradientStore.getState().resetToDefaults()
+    expect(useGradientStore.getState().speed).toBe(1.0)
+
+    useGradientStore.getState().applyPreset(presetId)
+    expect(useGradientStore.getState().speed).toBe(2.2)
+    expect(useGradientStore.getState().grainAmount).toBe(0.15)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().speed).toBe(1.0)
+  })
+
+  it("applyPreset é no-op para id desconhecido", () => {
+    const before = useGradientStore.getState().speed
+    useGradientStore.getState().applyPreset("preset_falso")
+    expect(useGradientStore.getState().speed).toBe(before)
+  })
+
+  it("deletePreset remove apenas o preset alvo", () => {
+    useGradientStore.getState().saveCurrentPreset("A")
+    advance(2000)
+    useGradientStore.getState().saveCurrentPreset("B")
+
+    const presets = useGradientStore.getState().savedPresets
+    expect(presets).toHaveLength(2)
+
+    useGradientStore.getState().deletePreset(presets[0].id)
+    const remaining = useGradientStore.getState().savedPresets
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].id).toBe(presets[1].id)
+  })
+})
+
+describe("histórico do randomizador", () => {
+  it("guarda cada sorteio no histórico (mais recente primeiro)", () => {
+    advance(2000)
+    useGradientStore.getState().randomize()
+    const firstSpeed = useGradientStore.getState().speed
+
+    advance(2000)
+    useGradientStore.getState().randomize()
+
+    const history = useGradientStore.getState().randomHistory
+    expect(history).toHaveLength(2)
+    expect(history[1].speed).toBe(firstSpeed)
+    expect(history[0].speed).toBe(useGradientStore.getState().speed)
+  })
+
+  it("limita o histórico a 10 sorteios", () => {
+    for (let i = 0; i < 15; i++) {
+      advance(2000)
+      useGradientStore.getState().randomize()
+    }
+    expect(useGradientStore.getState().randomHistory).toHaveLength(10)
+  })
+
+  it("applySnapshot restaura um sorteio antigo e é desfazível", () => {
+    advance(2000)
+    useGradientStore.getState().randomize()
+    const rolled = useGradientStore.getState().randomHistory[0]
+
+    advance(2000)
+    useGradientStore.getState().resetToDefaults()
+    expect(useGradientStore.getState().speed).toBe(1.0)
+
+    useGradientStore.getState().applySnapshot(rolled)
+    const state = useGradientStore.getState()
+    expect(state.speed).toBe(rolled.speed)
+    expect(state.customColors.color1).toEqual(rolled.customColors.color1)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().speed).toBe(1.0)
+  })
+})
+
 describe("persistência", () => {
   it("não persiste o histórico de undo/redo", () => {
     useGradientStore.getState().setSpeed(2.0)
@@ -318,6 +503,18 @@ describe("persistência", () => {
     expect(persisted).not.toHaveProperty("future")
     expect(persisted).toHaveProperty("speed", 2.0)
     expect(persisted).toHaveProperty("layers")
+  })
+
+  it("persiste presets salvos e histórico do randomizador", () => {
+    useGradientStore.getState().saveCurrentPreset("Persistente")
+    advance(2000)
+    useGradientStore.getState().randomize()
+
+    const { partialize } = useGradientStore.persist.getOptions()
+    const persisted = partialize!(useGradientStore.getState()) as Record<string, unknown>
+
+    expect(persisted).toHaveProperty("savedPresets")
+    expect(persisted).toHaveProperty("randomHistory")
   })
 })
 

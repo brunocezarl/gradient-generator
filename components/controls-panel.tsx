@@ -14,6 +14,7 @@ import { useGradientStore } from "@/lib/store"
 import { ColorPicker } from "@/components/color-picker"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { AnimationPresetsSelector } from "@/components/animation-presets-selector"
+import { PresetGallery, RandomHistoryStrip } from "@/components/preset-gallery"
 // import { AdvancedControls } from "@/components/advanced-controls" // No longer needed here
 import { LayerManager } from "@/components/layer-manager"
 import { useToast } from "@/components/ui/use-toast"
@@ -182,6 +183,8 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     Randomizar
                   </Button>
 
+                  <RandomHistoryStrip />
+
                   <Button
                     onClick={() => {
                       resetToDefaults()
@@ -299,12 +302,14 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
               </TabsContent>
 
               <TabsContent value="presets" className="mt-4 space-y-4">
-                {/* Removed duplicate opening p tag */}
-                <p className="text-sm text-gray-400 mb-2">
-                  Selecione um preset de animação para aplicar configurações pré-definidas ao seu gradiente.
-                </p>
-                <AnimationPresetsSelector />
-                {/* Removed AdvancedControls and LayerManager from here */}
+                <PresetGallery />
+
+                <div className="border-t border-gray-800 pt-4 space-y-2">
+                  <p className="text-sm text-gray-400 mb-2">
+                    Selecione um preset de animação para aplicar configurações pré-definidas ao seu gradiente.
+                  </p>
+                  <AnimationPresetsSelector />
+                </div>
               </TabsContent>
 
               {/* Advanced Controls Tab - Added responsive grid */}
