@@ -1,3 +1,6 @@
+// @vitest-environment happy-dom
+// (o middleware zustand/persist exige window.localStorage; sem DOM ele se
+// desabilita silenciosamente e a API useGradientStore.persist não existe)
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { useGradientStore, resolveActiveColors } from "@/lib/store"
 
@@ -241,6 +244,83 @@ describe("randomize", () => {
   })
 })
 
+describe("setThresholdMax", () => {
+  it("mantém thresholdMax pelo menos 0.1 acima de thresholdMin", () => {
+    useGradientStore.getState().setThresholdMin(0.5)
+    advance(2000)
+    useGradientStore.getState().setThresholdMax(0.2)
+
+    const state = useGradientStore.getState()
+    expect(state.thresholdMax).toBeCloseTo(0.6)
+  })
+
+  it("aceita valores acima do mínimo sem alteração", () => {
+    useGradientStore.getState().setThresholdMax(0.9)
+    expect(useGradientStore.getState().thresholdMax).toBe(0.9)
+  })
+})
+
+describe("applyAnimationPreset", () => {
+  it("aplica os parâmetros do preset e desativa o modo custom", () => {
+    useGradientStore.getState().setCustomMode(true)
+    advance(2000)
+    useGradientStore.getState().applyAnimationPreset("energetic")
+
+    const state = useGradientStore.getState()
+    expect(state.speed).toBe(2.0)
+    expect(state.complexity).toBe(5)
+    expect(state.noiseScale).toBe(3.0)
+    expect(state.colorScheme).toBe("neon")
+    expect(state.isCustomMode).toBe(false)
+  })
+
+  it("registra um passo de histórico desfazível", () => {
+    useGradientStore.getState().applyAnimationPreset("calm")
+    expect(useGradientStore.getState().speed).toBe(0.5)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().speed).toBe(1.0)
+  })
+
+  it("é no-op para preset desconhecido", () => {
+    const before = useGradientStore.getState()
+    useGradientStore.getState().applyAnimationPreset("preset_falso")
+
+    const after = useGradientStore.getState()
+    expect(after.speed).toBe(before.speed)
+    expect(after.past).toHaveLength(0)
+  })
+})
+
+describe("saveCustomScheme", () => {
+  it("salva uma cópia isolada das cores customizadas", () => {
+    useGradientStore.getState().setCustomColor1([0.2, 0.3, 0.4])
+    useGradientStore.getState().saveCustomScheme("Congelado")
+    const savedKey = useGradientStore.getState().colorScheme
+
+    // Editar as cores customizadas depois não pode alterar o esquema salvo
+    advance(2000)
+    useGradientStore.getState().setCustomColor1([0.9, 0.9, 0.9])
+
+    const saved = useGradientStore.getState().colorSchemes[savedKey]
+    expect(saved.color1).toEqual([0.2, 0.3, 0.4])
+    expect(saved.name).toBe("Congelado")
+  })
+})
+
+describe("persistência", () => {
+  it("não persiste o histórico de undo/redo", () => {
+    useGradientStore.getState().setSpeed(2.0)
+    const { partialize } = useGradientStore.persist.getOptions()
+    const persisted = partialize!(useGradientStore.getState()) as Record<string, unknown>
+
+    expect(persisted).not.toHaveProperty("past")
+    expect(persisted).not.toHaveProperty("future")
+    expect(persisted).toHaveProperty("speed", 2.0)
+    expect(persisted).toHaveProperty("layers")
+  })
+})
+
 describe("camadas", () => {
   it("não remove a última camada", () => {
     const state = useGradientStore.getState()
@@ -256,5 +336,66 @@ describe("camadas", () => {
 
     const reordered = useGradientStore.getState().layers.map((l) => l.id)
     expect(reordered).toEqual([ids[1], ids[0]])
+  })
+
+  it("addLayer torna a nova camada ativa", () => {
+    useGradientStore.getState().addLayer()
+    const state = useGradientStore.getState()
+    expect(state.layers).toHaveLength(2)
+    expect(state.activeLayerId).toBe(state.layers[1].id)
+  })
+
+  it("remover a camada ativa move a seleção para uma camada restante", () => {
+    useGradientStore.getState().addLayer()
+    const active = useGradientStore.getState().activeLayerId
+    useGradientStore.getState().removeLayer(active)
+
+    const state = useGradientStore.getState()
+    expect(state.layers).toHaveLength(1)
+    expect(state.activeLayerId).toBe(state.layers[0].id)
+    expect(state.activeLayerId).not.toBe(active)
+  })
+
+  it("remover uma camada inativa preserva a seleção", () => {
+    useGradientStore.getState().addLayer()
+    const [first, second] = useGradientStore.getState().layers
+    useGradientStore.getState().setActiveLayer(second.id)
+    useGradientStore.getState().removeLayer(first.id)
+
+    expect(useGradientStore.getState().activeLayerId).toBe(second.id)
+  })
+
+  it("updateLayer altera apenas a camada alvo", () => {
+    useGradientStore.getState().addLayer()
+    const [first, second] = useGradientStore.getState().layers
+    useGradientStore.getState().updateLayer(first.id, { opacity: 0.5, blendMode: "multiply" })
+
+    const [updatedFirst, untouchedSecond] = useGradientStore.getState().layers
+    expect(updatedFirst.opacity).toBe(0.5)
+    expect(updatedFirst.blendMode).toBe("multiply")
+    expect(untouchedSecond.opacity).toBe(second.opacity)
+    expect(untouchedSecond.blendMode).toBe("normal")
+  })
+
+  it("moveLayer troca camadas adjacentes nas duas direções", () => {
+    useGradientStore.getState().addLayer()
+    const [a, b] = useGradientStore.getState().layers.map((l) => l.id)
+
+    useGradientStore.getState().moveLayer(b, "up")
+    expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual([b, a])
+
+    useGradientStore.getState().moveLayer(b, "down")
+    expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual([a, b])
+  })
+
+  it("moveLayer é no-op nas bordas e para id desconhecido", () => {
+    useGradientStore.getState().addLayer()
+    const ids = useGradientStore.getState().layers.map((l) => l.id)
+
+    useGradientStore.getState().moveLayer(ids[0], "up")
+    useGradientStore.getState().moveLayer(ids[1], "down")
+    useGradientStore.getState().moveLayer("id_falso", "up")
+
+    expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual(ids)
   })
 })
