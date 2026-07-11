@@ -19,13 +19,15 @@ export interface ShareableGradient {
 // Create a shareable URL for the current gradient settings
 export function createShareableURL(state: Partial<GradientStore>): string {
   // Extract only the properties we want to share
+  // `??` em vez de `||`: valores numéricos legítimos como 0 não devem cair
+  // no padrão (0 || 1.0 === 1.0 corromperia o compartilhamento)
   const shareableData: ShareableGradient = {
-    speed: state.speed || 1.0,
-    complexity: state.complexity || 3,
-    noiseScale: state.noiseScale || 2.0,
+    speed: state.speed ?? 1.0,
+    complexity: state.complexity ?? 3,
+    noiseScale: state.noiseScale ?? 2.0,
     colorScheme: state.colorScheme || "redBlue",
-    isCustomMode: state.isCustomMode || false,
-    customColors: state.customColors || {
+    isCustomMode: state.isCustomMode ?? false,
+    customColors: state.customColors ?? {
       color1: [0.9, 0.1, 0.1],
       color2: [0.0, 0.0, 0.9],
       color3: [0.5, 0.0, 0.5],

@@ -41,6 +41,22 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.customColors.color3).toEqual([0.5, 0.0, 0.5])
   })
 
+  it("preserva valores falsy legítimos (0 não vira o padrão)", () => {
+    const url = createShareableURL({
+      speed: 0,
+      complexity: 0,
+      noiseScale: 0,
+      isCustomMode: false,
+    })
+
+    const parsed = parseShareableURL(url)
+    expect(parsed).not.toBeNull()
+    expect(parsed!.speed).toBe(0)
+    expect(parsed!.complexity).toBe(0)
+    expect(parsed!.noiseScale).toBe(0)
+    expect(parsed!.isCustomMode).toBe(false)
+  })
+
   it("retorna null para URL sem parâmetro de gradiente", () => {
     expect(parseShareableURL("https://gradients.example/")).toBeNull()
   })
