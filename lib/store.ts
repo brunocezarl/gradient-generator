@@ -7,7 +7,9 @@ import {
   blendModes,
   createDefaultLayer,
   generateLayerId,
+  generateSeed,
 } from "@/lib/layer-utils"
+import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
 
 // Define color type
 type GradientColor = [number, number, number]
@@ -20,7 +22,7 @@ export type ColorScheme = {
   name?: string
 }
 
-// Snapshot do "visual" do gradiente: cores + parâmetros de animação.
+// Snapshot do "visual" do gradiente: cores + parâmetros de animação + camadas.
 // Usado pelo undo/redo, pelos presets salvos e pelo histórico do randomizador.
 export type StateSnapshot = {
   speed: number
@@ -34,6 +36,14 @@ export type StateSnapshot = {
   grainScale: number
   thresholdMin: number
   thresholdMax: number
+  vibrance: number
+  blendSpace: ColorBlendSpace
+  seed: [number, number]
+  // Camadas fazem parte do snapshot para que criar, remover, reordenar e
+  // editar camada sejam ações desfazíveis. Opcionais porque presets salvos
+  // antes desta versão não as têm.
+  multiLayerMode?: boolean
+  layers?: GradientLayer[]
 }
 
 // Preset completo salvo pelo usuário: cores + todos os parâmetros de animação
@@ -52,6 +62,28 @@ const HISTORY_COALESCE_MS = 1000
 let lastHistoryKey: string | null = null
 let lastHistoryTime = 0
 
+function cloneColors(colors: ColorScheme): ColorScheme {
+  return {
+    color1: [...colors.color1] as GradientColor,
+    color2: [...colors.color2] as GradientColor,
+    color3: [...colors.color3] as GradientColor,
+  }
+}
+
+function cloneLayers(layers: GradientLayer[]): GradientLayer[] {
+  return layers.map((layer) => ({
+    ...layer,
+    seed: [...layer.seed] as [number, number],
+    customColors: layer.customColors
+      ? {
+          color1: [...layer.customColors.color1],
+          color2: [...layer.customColors.color2],
+          color3: [...layer.customColors.color3],
+        }
+      : undefined,
+  }))
+}
+
 function captureSnapshot(state: GradientStore): StateSnapshot {
   return {
     speed: state.speed,
@@ -59,17 +91,55 @@ function captureSnapshot(state: GradientStore): StateSnapshot {
     noiseScale: state.noiseScale,
     colorScheme: state.colorScheme,
     isCustomMode: state.isCustomMode,
-    customColors: {
-      color1: [...state.customColors.color1] as GradientColor,
-      color2: [...state.customColors.color2] as GradientColor,
-      color3: [...state.customColors.color3] as GradientColor,
-    },
+    customColors: cloneColors(state.customColors),
     flowIntensity: state.flowIntensity,
     grainAmount: state.grainAmount,
     grainScale: state.grainScale,
     thresholdMin: state.thresholdMin,
     thresholdMax: state.thresholdMax,
+    vibrance: state.vibrance,
+    blendSpace: state.blendSpace,
+    seed: [...state.seed] as [number, number],
+    multiLayerMode: state.multiLayerMode,
+    layers: cloneLayers(state.layers),
   }
+}
+
+// Converte um snapshot em patch de estado. Snapshots antigos (presets salvos
+// antes das camadas entrarem no snapshot) não carregam `layers`; nesse caso as
+// camadas atuais são preservadas em vez de apagadas.
+function snapshotToState(
+  snapshot: StateSnapshot,
+  currentActiveLayerId?: string
+): Partial<GradientStore> {
+  const patch: Partial<GradientStore> = {
+    speed: snapshot.speed,
+    complexity: snapshot.complexity,
+    noiseScale: snapshot.noiseScale,
+    colorScheme: snapshot.colorScheme,
+    isCustomMode: snapshot.isCustomMode,
+    customColors: cloneColors(snapshot.customColors),
+    flowIntensity: snapshot.flowIntensity,
+    grainAmount: snapshot.grainAmount,
+    grainScale: snapshot.grainScale,
+    thresholdMin: snapshot.thresholdMin,
+    thresholdMax: snapshot.thresholdMax,
+    vibrance: snapshot.vibrance,
+    blendSpace: snapshot.blendSpace,
+    seed: [...snapshot.seed] as [number, number],
+  }
+
+  if (snapshot.layers && snapshot.layers.length > 0) {
+    const layers = cloneLayers(snapshot.layers)
+    patch.layers = layers
+    patch.multiLayerMode = snapshot.multiLayerMode ?? false
+    // Mantém a camada selecionada quando ela sobrevive ao snapshot restaurado
+    patch.activeLayerId = layers.some((layer) => layer.id === currentActiveLayerId)
+      ? currentActiveLayerId
+      : layers[0].id
+  }
+
+  return patch
 }
 
 // Define the store type
@@ -91,6 +161,11 @@ export type GradientStore = {
   grainScale: number
   thresholdMin: number
   thresholdMax: number
+  vibrance: number
+  blendSpace: ColorBlendSpace
+  // Deslocamento no campo de ruído: define *qual* forma orgânica é desenhada.
+  // Guardado em snapshots e links, então um resultado bom é reproduzível.
+  seed: [number, number]
 
   // Multi-layer support
   multiLayerMode: boolean
@@ -134,6 +209,9 @@ export type GradientStore = {
   setGrainScale: (value: number) => void
   setThresholdMin: (value: number) => void
   setThresholdMax: (value: number) => void
+  setVibrance: (value: number) => void
+  setBlendSpace: (value: ColorBlendSpace) => void
+  shuffleSeed: () => void
 
   // Multi-layer actions
   setMultiLayerMode: (value: boolean) => void
@@ -180,6 +258,9 @@ type StoreActions = Pick<
   | "setGrainScale"
   | "setThresholdMin"
   | "setThresholdMax"
+  | "setVibrance"
+  | "setBlendSpace"
+  | "shuffleSeed"
   | "setMultiLayerMode"
   | "setActiveLayer"
   | "addLayer"
@@ -217,6 +298,11 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   grainScale: 500.0,
   thresholdMin: 0.3,
   thresholdMax: 0.7,
+  // Vibrância neutra por padrão: o HEX escolhido no picker é exatamente o
+  // pixel exportado. Quem quiser saturar mais aumenta conscientemente.
+  vibrance: 0,
+  blendSpace: "oklab",
+  seed: [0, 0],
 
   multiLayerMode: false,
   layers: [createDefaultLayer(generateLayerId())],
@@ -276,6 +362,117 @@ export function resolveActiveColors(
   )
 }
 
+// ─── Migração da persistência ────────────────────────────────────────────────
+// Sem versão + migração, um localStorage gravado por uma versão anterior chega
+// ao app com campos faltando, e o código precisa de `?? fallback` espalhado em
+// toda leitura para não quebrar. A migração normaliza uma vez, na hidratação.
+
+export const PERSIST_VERSION = 1
+
+function migrateSeed(seed: unknown): [number, number] {
+  return Array.isArray(seed) &&
+    typeof seed[0] === "number" &&
+    Number.isFinite(seed[0]) &&
+    typeof seed[1] === "number" &&
+    Number.isFinite(seed[1])
+    ? [seed[0], seed[1]]
+    : [0, 0]
+}
+
+// Esquemas gravados antes da 3ª parada de cor recebem `color3 = color2`,
+// preservando exatamente a aparência de duas cores que o usuário salvou
+function migrateColors(colors: unknown): ColorScheme | undefined {
+  if (!colors || typeof colors !== "object") return undefined
+  const source = colors as Record<string, unknown>
+  const color1 = source.color1 as GradientColor | undefined
+  const color2 = source.color2 as GradientColor | undefined
+  if (!Array.isArray(color1) || !Array.isArray(color2)) return undefined
+  const color3 = Array.isArray(source.color3)
+    ? (source.color3 as GradientColor)
+    : ([...color2] as GradientColor)
+  return { ...source, color1, color2, color3 } as ColorScheme
+}
+
+function migrateLayer(layer: unknown): unknown {
+  if (!layer || typeof layer !== "object") return layer
+  const source = layer as Record<string, unknown>
+  const customColors = migrateColors(source.customColors)
+  return {
+    ...source,
+    seed: migrateSeed(source.seed),
+    ...(customColors ? { customColors } : {}),
+  }
+}
+
+function migrateSnapshot(snapshot: unknown): unknown {
+  if (!snapshot || typeof snapshot !== "object") return snapshot
+  const source = snapshot as Record<string, unknown>
+  const customColors = migrateColors(source.customColors)
+  return {
+    ...source,
+    vibrance: typeof source.vibrance === "number" ? source.vibrance : defaultState.vibrance,
+    blendSpace:
+      typeof source.blendSpace === "string" && source.blendSpace in colorBlendSpaces
+        ? source.blendSpace
+        : defaultState.blendSpace,
+    seed: migrateSeed(source.seed),
+    ...(customColors ? { customColors } : {}),
+    ...(Array.isArray(source.layers) ? { layers: source.layers.map(migrateLayer) } : {}),
+  }
+}
+
+// Normaliza um estado persistido para o formato atual: preenche o que falta
+// (3ª cor, seed, parâmetros do pipeline de cor) e descarta o que é inválido.
+// É idempotente de propósito — roda em toda hidratação, não só na troca de
+// versão (ver a opção `merge` do persist abaixo).
+export function normalizePersistedState(persisted: unknown): unknown {
+  if (!persisted || typeof persisted !== "object") return persisted
+  const state = { ...(persisted as Record<string, unknown>) }
+
+  if (typeof state.vibrance !== "number") state.vibrance = defaultState.vibrance
+  if (typeof state.blendSpace !== "string" || !(state.blendSpace in colorBlendSpaces)) {
+    state.blendSpace = defaultState.blendSpace
+  }
+  state.seed = migrateSeed(state.seed)
+
+  const customColors = migrateColors(state.customColors)
+  if (customColors) state.customColors = customColors
+
+  if (state.colorSchemes && typeof state.colorSchemes === "object") {
+    state.colorSchemes = Object.fromEntries(
+      Object.entries(state.colorSchemes as Record<string, unknown>).flatMap(
+        ([key, scheme]) => {
+          const migrated = migrateColors(scheme)
+          return migrated ? [[key, migrated]] : []
+        }
+      )
+    )
+  }
+
+  if (Array.isArray(state.layers)) state.layers = state.layers.map(migrateLayer)
+
+  if (Array.isArray(state.savedPresets)) {
+    state.savedPresets = state.savedPresets.map((preset) =>
+      preset && typeof preset === "object"
+        ? { ...preset, snapshot: migrateSnapshot((preset as Record<string, unknown>).snapshot) }
+        : preset
+    )
+  }
+
+  if (Array.isArray(state.randomHistory)) {
+    state.randomHistory = state.randomHistory.map(migrateSnapshot)
+  }
+
+  return state
+}
+
+export function migratePersistedState(persisted: unknown, version: number): unknown {
+  // v0 → v1: pipeline de cor (vibrância + espaço de mistura), seed
+  // reproduzível, 3ª cor e seed por camada
+  const from = typeof version === "number" && Number.isFinite(version) ? version : 0
+  return from < PERSIST_VERSION ? normalizePersistedState(persisted) : persisted
+}
+
 // Create the store with persistence
 export const useGradientStore = create<GradientStore>()(
   persist(
@@ -314,7 +511,7 @@ export const useGradientStore = create<GradientStore>()(
         const prev = state.past[state.past.length - 1]
         lastHistoryKey = null
         set({
-          ...prev,
+          ...snapshotToState(prev, state.activeLayerId),
           past: newPast,
           future: [current, ...state.future],
         })
@@ -327,7 +524,7 @@ export const useGradientStore = create<GradientStore>()(
         const [next, ...remainingFuture] = state.future
         lastHistoryKey = null
         set({
-          ...next,
+          ...snapshotToState(next, state.activeLayerId),
           past: [...state.past, current],
           future: remainingFuture,
         })
@@ -337,14 +534,7 @@ export const useGradientStore = create<GradientStore>()(
 
       applySnapshot: (snapshot) => {
         get().pushHistory()
-        set({
-          ...snapshot,
-          customColors: {
-            color1: [...snapshot.customColors.color1] as GradientColor,
-            color2: [...snapshot.customColors.color2] as GradientColor,
-            color3: [...snapshot.customColors.color3] as GradientColor,
-          },
-        })
+        set(snapshotToState(snapshot, get().activeLayerId))
       },
 
       saveCurrentPreset: (name) =>
@@ -419,6 +609,18 @@ export const useGradientStore = create<GradientStore>()(
         recordEdit("thresholdMax")
         set({ thresholdMax: Math.max(value, get().thresholdMin + 0.1) })
       },
+      setVibrance: (value) => {
+        recordEdit("vibrance")
+        set({ vibrance: value })
+      },
+      setBlendSpace: (value) => {
+        get().pushHistory()
+        set({ blendSpace: value })
+      },
+      shuffleSeed: () => {
+        get().pushHistory()
+        set({ seed: generateSeed() })
+      },
 
       // ─── Custom color actions ──────────────────────────────────────────────
 
@@ -475,6 +677,9 @@ export const useGradientStore = create<GradientStore>()(
           grainScale: defaultState.grainScale,
           thresholdMin: defaultState.thresholdMin,
           thresholdMax: defaultState.thresholdMax,
+          vibrance: defaultState.vibrance,
+          blendSpace: defaultState.blendSpace,
+          seed: [...defaultState.seed] as [number, number],
         })
       },
 
@@ -499,6 +704,11 @@ export const useGradientStore = create<GradientStore>()(
           typeof n === "number" && Number.isFinite(n)
             ? Math.min(Math.max(n, min), max)
             : fallback
+
+        const validateSeed = (seed: unknown): [number, number] =>
+          Array.isArray(seed) && seed.length >= 2
+            ? [clampNum(seed[0], -1000, 1000, 0), clampNum(seed[1], -1000, 1000, 0)]
+            : [0, 0]
 
         const validatedSettings: Partial<GradientStore> = {
           speed: Math.min(Math.max(settings.speed, 0.1), 3.0),
@@ -527,6 +737,15 @@ export const useGradientStore = create<GradientStore>()(
           validatedSettings.thresholdMin = tMin
           validatedSettings.thresholdMax = Math.max(tMax, tMin + 0.1)
         }
+        if (settings.vibrance !== undefined)
+          validatedSettings.vibrance = clampNum(settings.vibrance, -1, 1, 0)
+        if (settings.blendSpace !== undefined)
+          validatedSettings.blendSpace =
+            settings.blendSpace in colorBlendSpaces
+              ? (settings.blendSpace as ColorBlendSpace)
+              : "oklab"
+        if (settings.seed !== undefined)
+          validatedSettings.seed = validateSeed(settings.seed)
 
         // Camadas (links v2 com multi-camadas ativo): valida cada camada e
         // regenera os ids para não colidir com camadas locais
@@ -547,12 +766,14 @@ export const useGradientStore = create<GradientStore>()(
               ? {
                   color1: validateColor(layer.customColors.color1, [0.9, 0.1, 0.1]),
                   color2: validateColor(layer.customColors.color2, [0.0, 0.0, 0.9]),
+                  color3: validateColor(layer.customColors.color3, [0.5, 0.0, 0.5]),
                 }
               : undefined,
             noiseScale: clampNum(layer?.noiseScale, 0.5, 5.0, 2.0),
             flowIntensity: clampNum(layer?.flowIntensity, 0.1, 1.0, 0.3),
             thresholdMin: clampNum(layer?.thresholdMin, 0.1, 0.8, 0.3),
             thresholdMax: clampNum(layer?.thresholdMax, 0.2, 0.9, 0.7),
+            seed: validateSeed(layer?.seed),
           }))
           validatedSettings.multiLayerMode = true
           validatedSettings.layers = validatedLayers
@@ -602,6 +823,8 @@ export const useGradientStore = create<GradientStore>()(
           grainAmount: parseFloat(rand(0, 0.15).toFixed(2)),
           thresholdMin: parseFloat(tMin.toFixed(2)),
           thresholdMax: parseFloat(tMax.toFixed(2)),
+          // Sortear também a forma, não só as cores e o ritmo
+          seed: generateSeed(),
           isCustomMode: true,
           customColors: {
             color1: randColor(),
@@ -620,33 +843,50 @@ export const useGradientStore = create<GradientStore>()(
 
       // ─── Multi-layer actions ───────────────────────────────────────────────
 
-      setMultiLayerMode: (value) => set({ multiLayerMode: value }),
+      // Camadas entram no histórico: remover uma camada por engano é
+      // justamente o tipo de ação que precisa de Ctrl+Z
+      setMultiLayerMode: (value) => {
+        get().pushHistory()
+        set({ multiLayerMode: value })
+      },
 
+      // Selecionar camada é navegação, não edição — fora do histórico
       setActiveLayer: (id) => set({ activeLayerId: id }),
 
-      addLayer: () =>
+      addLayer: () => {
+        get().pushHistory()
         set((state) => {
-          const newLayer = createDefaultLayer(generateLayerId())
+          // Seed próprio: uma camada nova com os parâmetros padrão desenha uma
+          // forma diferente da anterior, em vez de sobrepor a mesma imagem
+          const newLayer = createDefaultLayer(generateLayerId(), generateSeed())
           return { layers: [...state.layers, newLayer], activeLayerId: newLayer.id }
-        }),
+        })
+      },
 
-      removeLayer: (id) =>
+      removeLayer: (id) => {
+        if (get().layers.length <= 1) return
+        get().pushHistory()
         set((state) => {
-          if (state.layers.length <= 1) return state
           const newLayers = state.layers.filter((layer) => layer.id !== id)
           const newActiveId =
             id === state.activeLayerId ? newLayers[0].id : state.activeLayerId
           return { layers: newLayers, activeLayerId: newActiveId }
-        }),
+        })
+      },
 
-      updateLayer: (id, updates) =>
+      updateLayer: (id, updates) => {
+        // Coalescência por camada+propriedade: arrastar o slider de opacidade
+        // de uma camada gera um snapshot, não um por evento
+        recordEdit(`layer:${id}:${Object.keys(updates).sort().join(",")}`)
         set((state) => ({
           layers: state.layers.map((layer) =>
             layer.id === id ? { ...layer, ...updates } : layer
           ),
-        })),
+        }))
+      },
 
-      moveLayer: (id, direction) =>
+      moveLayer: (id, direction) => {
+        get().pushHistory()
         set((state) => {
           const index = state.layers.findIndex((layer) => layer.id === id)
           if (index === -1) return state
@@ -663,20 +903,35 @@ export const useGradientStore = create<GradientStore>()(
             ]
           }
           return { layers: newLayers }
-        }),
+        })
+      },
 
-      reorderLayers: (ids: string[]) =>
+      reorderLayers: (ids: string[]) => {
+        get().pushHistory()
         set((state) => {
           const layerMap = new Map(state.layers.map((l) => [l.id, l]))
           const newLayers = ids
             .map((id) => layerMap.get(id))
             .filter((l): l is GradientLayer => l !== undefined)
           return { layers: newLayers }
-        }),
+        })
+      },
       }
     },
     {
       name: "gradient-store",
+      version: PERSIST_VERSION,
+      migrate: migratePersistedState,
+      // O zustand só chama `migrate` quando o JSON gravado tem `version`
+      // numérico — e as versões anteriores persistiam sem esse campo, então o
+      // localStorage real dos usuários passaria batido pela migração e chegaria
+      // ao shader sem a 3ª cor. `merge` roda em toda hidratação e é onde a
+      // normalização (idempotente) realmente pega esses estados.
+      merge: (persisted, current) =>
+        ({
+          ...current,
+          ...(normalizePersistedState(persisted) as Partial<GradientStore>),
+        }) as GradientStore,
       partialize: (state: GradientStore) => ({
         speed: state.speed,
         complexity: state.complexity,
@@ -690,6 +945,9 @@ export const useGradientStore = create<GradientStore>()(
         grainScale: state.grainScale,
         thresholdMin: state.thresholdMin,
         thresholdMax: state.thresholdMax,
+        vibrance: state.vibrance,
+        blendSpace: state.blendSpace,
+        seed: state.seed,
         multiLayerMode: state.multiLayerMode,
         layers: state.layers,
         activeLayerId: state.activeLayerId,

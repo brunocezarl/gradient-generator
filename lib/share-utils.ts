@@ -28,6 +28,11 @@ export interface ShareableGradient {
   // Multi-camadas (v2)
   multiLayerMode?: boolean
   layers?: ShareableLayer[]
+  // Cor e forma (v3): sem o seed, abrir um link reproduzia as cores e o ritmo
+  // mas desenhava outra forma
+  vibrance?: number
+  blendSpace?: string
+  seed?: [number, number]
 }
 
 // ─── Codificação compacta ─────────────────────────────────────────────────────
@@ -60,14 +65,16 @@ type PackedLayer = {
   cm: 0 | 1 // isCustomMode
   k1?: number[] // customColors.color1
   k2?: number[] // customColors.color2
+  k3?: number[] // customColors.color3
   n: number // noiseScale
   f: number // flowIntensity
   tn: number // thresholdMin
   tx: number // thresholdMax
+  sd?: number[] // seed
 }
 
 type PackedGradient = {
-  v: 2
+  v: 2 | 3
   s: number // speed
   c: number // complexity
   n: number // noiseScale
@@ -83,11 +90,14 @@ type PackedGradient = {
   tx?: number // thresholdMax
   ml?: 0 | 1 // multiLayerMode
   ly?: PackedLayer[]
+  vb?: number // vibrance
+  bs?: string // blendSpace
+  sd?: number[] // seed
 }
 
 function pack(data: ShareableGradient): PackedGradient {
   const packed: PackedGradient = {
-    v: 2,
+    v: 3,
     s: round3(data.speed),
     c: data.complexity,
     n: round3(data.noiseScale),
@@ -103,6 +113,9 @@ function pack(data: ShareableGradient): PackedGradient {
   if (data.grainScale !== undefined) packed.gs = round3(data.grainScale)
   if (data.thresholdMin !== undefined) packed.tn = round3(data.thresholdMin)
   if (data.thresholdMax !== undefined) packed.tx = round3(data.thresholdMax)
+  if (data.vibrance !== undefined) packed.vb = round3(data.vibrance)
+  if (data.blendSpace !== undefined) packed.bs = data.blendSpace
+  if (data.seed !== undefined) packed.sd = data.seed.map(round3)
 
   if (data.multiLayerMode && data.layers && data.layers.length > 0) {
     packed.ml = 1
@@ -121,7 +134,9 @@ function pack(data: ShareableGradient): PackedGradient {
       if (layer.customColors) {
         pl.k1 = roundColor(layer.customColors.color1)
         pl.k2 = roundColor(layer.customColors.color2)
+        pl.k3 = roundColor(layer.customColors.color3)
       }
+      if (layer.seed) pl.sd = layer.seed.map(round3)
       return pl
     })
   }
@@ -148,6 +163,10 @@ function unpack(packed: PackedGradient): ShareableGradient {
   if (packed.gs !== undefined) data.grainScale = packed.gs
   if (packed.tn !== undefined) data.thresholdMin = packed.tn
   if (packed.tx !== undefined) data.thresholdMax = packed.tx
+  if (packed.vb !== undefined) data.vibrance = packed.vb
+  if (packed.bs !== undefined) data.blendSpace = packed.bs
+  if (packed.sd !== undefined && packed.sd.length >= 2)
+    data.seed = [packed.sd[0], packed.sd[1]]
 
   if (packed.ml === 1 && Array.isArray(packed.ly)) {
     data.multiLayerMode = true
@@ -158,11 +177,15 @@ function unpack(packed: PackedGradient): ShareableGradient {
       colorScheme: pl.cs,
       isCustomMode: pl.cm === 1,
       customColors:
-        pl.k1 && pl.k2 ? { color1: pl.k1, color2: pl.k2 } : undefined,
+        pl.k1 && pl.k2
+          ? { color1: pl.k1, color2: pl.k2, color3: pl.k3 ?? pl.k2 }
+          : undefined,
       noiseScale: pl.n,
       flowIntensity: pl.f,
       thresholdMin: pl.tn,
       thresholdMax: pl.tx,
+      seed:
+        pl.sd && pl.sd.length >= 2 ? ([pl.sd[0], pl.sd[1]] as [number, number]) : [0, 0],
     }))
   }
 
@@ -190,6 +213,9 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     grainScale: state.grainScale ?? 500.0,
     thresholdMin: state.thresholdMin ?? 0.3,
     thresholdMax: state.thresholdMax ?? 0.7,
+    vibrance: state.vibrance ?? 0,
+    blendSpace: state.blendSpace ?? "oklab",
+    seed: state.seed ?? [0, 0],
   }
 
   // Camadas só entram no link quando o modo multi-camadas está ativo — o

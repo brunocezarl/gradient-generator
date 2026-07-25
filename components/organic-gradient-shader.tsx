@@ -1,208 +1,131 @@
 "use client"
 
 import { useRef, useMemo, useEffect } from "react"
-import { useFrame } from "@react-three/fiber"
+import { useFrame, useThree } from "@react-three/fiber"
 import type * as THREE from "three"
-import { useGradientStore } from "@/lib/store"
+import {
+  organicGradientFragmentShader,
+  organicGradientVertexShader,
+} from "@/lib/shaders/organic-gradient"
+import { srgbTripletToLinear, type ColorBlendSpace } from "@/lib/color"
 
-// Shader code for organic gradients
-const vertexShader = `
-  varying vec2 vUv;
-
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-const fragmentShader = `
-  uniform float uTime;
-  uniform float uComplexity;
-  uniform float uNoiseScale;
-  uniform vec3 uColor1;
-  uniform vec3 uColor2;
-  uniform float uFlowIntensity;
-  uniform float uThresholdMin;
-  uniform float uThresholdMax;
-
-  varying vec2 vUv;
-
-  // Simplex 2D noise
-  vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
-
-  float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-             -0.577350269189626, 0.024390243902439);
-    vec2 i  = floor(v + dot(v, C.yy));
-    vec2 x0 = v -   i + dot(i, C.xx);
-    vec2 i1;
-    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod(i, 289.0);
-    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
-    + i.x + vec3(0.0, i1.x, 1.0 ));
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
-      dot(x12.zw,x12.zw)), 0.0);
-    m = m*m;
-    m = m*m;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
-    vec3 g;
-    g.x  = a0.x  * x0.x  + h.x  * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
-  }
-
-  // Curl noise for organic flow
-  vec2 curl(float x, float y) {
-    float eps = 0.01;
-    float n1 = snoise(vec2(x + eps, y));
-    float n2 = snoise(vec2(x - eps, y));
-    float n3 = snoise(vec2(x, y + eps));
-    float n4 = snoise(vec2(x, y - eps));
-    float dy = (n1 - n2) / (2.0 * eps);
-    float dx = (n3 - n4) / (2.0 * eps);
-    return vec2(dy, -dx);
-  }
-
-  void main() {
-    vec2 uv = vUv;
-    float time = uTime * 0.5;
-
-    // Create multiple layers of noise with different frequencies
-    float noise = 0.0;
-
-    // Use complexity to determine how many layers to use
-    float maxLayers = max(1.0, uComplexity * 1.5);
-
-    for (float i = 1.0; i <= 10.0; i++) {
-      if (i > maxLayers) break;
-
-      // Get flow direction from curl noise
-      vec2 flow = curl(uv.x * i * uNoiseScale, uv.y * i * uNoiseScale) * uFlowIntensity;
-
-      // Animate the UV coordinates along the flow
-      vec2 animatedUV = uv + flow * (sin(time * i * 0.5) * 0.2);
-
-      // Add noise with different frequencies
-      float layerNoise = snoise(animatedUV * i * uNoiseScale + time * i * 0.3);
-
-      // Weight the noise layers (higher frequencies have less influence)
-      noise += layerNoise * (1.0 / i);
-    }
-
-    // Normalize noise to 0-1 range
-    noise = noise * 0.5 + 0.5;
-
-    // Create organic shapes by applying threshold
-    float shape = smoothstep(uThresholdMin, uThresholdMax, noise);
-
-    // Mix colors based on the shape value
-    vec3 color = mix(uColor1, uColor2, shape);
-
-    // Add some grain/noise texture
-    float grain = snoise(uv * 500.0) * 0.05;
-    color += grain;
-
-    gl_FragColor = vec4(color, 1.0);
-  }
-`
-
-interface OrganicGradientShaderProps {
+export interface OrganicGradientParams {
   isPlaying: boolean
   speed: number
   complexity: number
   noiseScale: number
-  colorScheme: {
+  // Cores em sRGB 0-1, como saem do color picker
+  colors: {
     color1: number[]
     color2: number[]
-  } | string
-  flowIntensity?: number
-  thresholdMin?: number
-  thresholdMax?: number
+    color3: number[]
+  }
+  flowIntensity: number
+  grainAmount: number
+  grainScale: number
+  thresholdMin: number
+  thresholdMax: number
+  vibrance: number
+  blendSpace: ColorBlendSpace
+  seed: [number, number]
 }
 
+// Único componente de shader do app: a cena simples e cada camada do modo
+// multi-camadas renderizam por aqui, garantindo que a mesma configuração
+// produza a mesma imagem nos dois modos.
 export function OrganicGradientShader({
   isPlaying,
   speed,
   complexity,
   noiseScale,
-  colorScheme,
-  flowIntensity = 0.3,
-  thresholdMin = 0.3,
-  thresholdMax = 0.7,
-}: OrganicGradientShaderProps) {
+  colors,
+  flowIntensity,
+  grainAmount,
+  grainScale,
+  thresholdMin,
+  thresholdMax,
+  vibrance,
+  blendSpace,
+  seed,
+}: OrganicGradientParams) {
   const meshRef = useRef<THREE.Mesh>(null)
   const timeRef = useRef(0)
-  const colorSchemes = useGradientStore((state) => state.colorSchemes)
+  const invalidate = useThree((state) => state.invalidate)
 
-  // Handle string colorScheme (from layer manager): resolver no store
-  const colors = useMemo(() => {
-    if (typeof colorScheme === 'string') {
-      return colorSchemes[colorScheme] ?? colorSchemes.redBlue ?? {
-        color1: [0.9, 0.1, 0.1],
-        color2: [0.0, 0.0, 0.9],
-      }
-    }
-    return colorScheme
-  }, [colorScheme, colorSchemes])
-
-  // Create uniforms for the shader
+  // Valores iniciais apenas — as atualizações acontecem no effect abaixo, sem
+  // recriar o material (recriar recompila o shader e pisca a tela)
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uComplexity: { value: complexity },
       uNoiseScale: { value: noiseScale },
-      uColor1: { value: colors.color1 },
-      uColor2: { value: colors.color2 },
+      uColor1: { value: srgbTripletToLinear(colors.color1) },
+      uColor2: { value: srgbTripletToLinear(colors.color2) },
+      uColor3: { value: srgbTripletToLinear(colors.color3) },
       uFlowIntensity: { value: flowIntensity },
+      uGrainAmount: { value: grainAmount },
+      uGrainScale: { value: grainScale },
       uThresholdMin: { value: thresholdMin },
       uThresholdMax: { value: thresholdMax },
+      uVibrance: { value: vibrance },
+      uOklabMix: { value: blendSpace === "oklab" ? 1 : 0 },
+      uSeed: { value: [seed[0], seed[1]] },
     }),
-    // Valores iniciais apenas — atualizações ocorrem no effect abaixo
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  // Update uniforms directly when props change
   useEffect(() => {
-    if (meshRef.current) {
-      const material = meshRef.current.material as THREE.ShaderMaterial
-      if (material && material.uniforms) {
-        material.uniforms.uComplexity.value = complexity
-        material.uniforms.uNoiseScale.value = noiseScale
-        material.uniforms.uColor1.value = colors.color1
-        material.uniforms.uColor2.value = colors.color2
-        material.uniforms.uFlowIntensity.value = flowIntensity
-        material.uniforms.uThresholdMin.value = thresholdMin
-        material.uniforms.uThresholdMax.value = thresholdMax
-      }
-    }
-  }, [complexity, noiseScale, colors, flowIntensity, thresholdMin, thresholdMax])
+    const material = meshRef.current?.material as THREE.ShaderMaterial | undefined
+    if (!material?.uniforms) return
 
-  // Animation loop
+    material.uniforms.uComplexity.value = complexity
+    material.uniforms.uNoiseScale.value = noiseScale
+    material.uniforms.uColor1.value = srgbTripletToLinear(colors.color1)
+    material.uniforms.uColor2.value = srgbTripletToLinear(colors.color2)
+    material.uniforms.uColor3.value = srgbTripletToLinear(colors.color3)
+    material.uniforms.uFlowIntensity.value = flowIntensity
+    material.uniforms.uGrainAmount.value = grainAmount
+    material.uniforms.uGrainScale.value = grainScale
+    material.uniforms.uThresholdMin.value = thresholdMin
+    material.uniforms.uThresholdMax.value = thresholdMax
+    material.uniforms.uVibrance.value = vibrance
+    material.uniforms.uOklabMix.value = blendSpace === "oklab" ? 1 : 0
+    material.uniforms.uSeed.value = [seed[0], seed[1]]
+
+    // Com a animação pausada o canvas roda em frameloop "demand": sem isto a
+    // tela ficaria com a imagem antiga ao mexer nos controles
+    invalidate()
+  }, [
+    complexity,
+    noiseScale,
+    colors,
+    flowIntensity,
+    grainAmount,
+    grainScale,
+    thresholdMin,
+    thresholdMax,
+    vibrance,
+    blendSpace,
+    seed,
+    invalidate,
+  ])
+
   useFrame((_, delta) => {
-    if (meshRef.current) {
-      const material = meshRef.current.material as THREE.ShaderMaterial
-      if (material && material.uniforms) {
-        if (isPlaying) {
-          timeRef.current += delta * speed
-        }
-        material.uniforms.uTime.value = timeRef.current
-      }
+    const material = meshRef.current?.material as THREE.ShaderMaterial | undefined
+    if (!material?.uniforms) return
+    if (isPlaying) {
+      timeRef.current += delta * speed
     }
+    material.uniforms.uTime.value = timeRef.current
   })
 
   return (
     <mesh ref={meshRef}>
       <planeGeometry args={[20, 20]} />
       <shaderMaterial
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
+        vertexShader={organicGradientVertexShader}
+        fragmentShader={organicGradientFragmentShader}
         uniforms={uniforms}
         transparent={true}
       />

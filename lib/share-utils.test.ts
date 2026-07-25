@@ -65,6 +65,7 @@ describe("createShareableURL / parseShareableURL", () => {
         flowIntensity: 0.4,
         thresholdMin: 0.2,
         thresholdMax: 0.8,
+        seed: [12.5, 7.25],
       },
       {
         id: "layer_2",
@@ -73,11 +74,12 @@ describe("createShareableURL / parseShareableURL", () => {
         visible: false,
         colorScheme: "redBlue",
         isCustomMode: true,
-        customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+        customColors: { color1: [1, 0, 0], color2: [0, 0, 1], color3: [0, 1, 0] },
         noiseScale: 3.0,
         flowIntensity: 0.6,
         thresholdMin: 0.3,
         thresholdMax: 0.7,
+        seed: [0, 0],
       },
     ]
 
@@ -95,7 +97,10 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.layers![1].customColors).toEqual({
       color1: [1, 0, 0],
       color2: [0, 0, 1],
+      color3: [0, 1, 0],
     })
+    // O seed viaja no link: a forma do ruído é reproduzida, não só as cores
+    expect(parsed!.layers![0].seed).toEqual([12.5, 7.25])
   })
 
   it("não inclui camadas quando o modo multi-camadas está inativo", () => {
@@ -113,6 +118,7 @@ describe("createShareableURL / parseShareableURL", () => {
           flowIntensity: 0.3,
           thresholdMin: 0.3,
           thresholdMax: 0.7,
+          seed: [0, 0],
         },
       ],
     })

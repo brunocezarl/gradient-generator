@@ -35,7 +35,9 @@ export function snapshotToGradientCSS(
   })
   const hex = (c: number[]) =>
     rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
-  return `linear-gradient(135deg, ${hex(color1)}, ${hex(color2)}, ${hex(color3)})`
+  // Mesmo espaço de interpolação do render, para a miniatura não mentir
+  const interpolation = snapshot.blendSpace === "linear" ? " in srgb-linear" : " in oklab"
+  return `linear-gradient(135deg${interpolation}, ${hex(color1)}, ${hex(color2)}, ${hex(color3)})`
 }
 
 // ─── Galeria de presets completos ────────────────────────────────────────────

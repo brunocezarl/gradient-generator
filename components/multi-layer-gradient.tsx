@@ -1,70 +1,105 @@
 "use client"
 
-import { useRef } from "react"
+import { useMemo } from "react"
 import { Canvas } from "@react-three/fiber"
+import { useShallow } from "zustand/react/shallow"
 import { useGradientStore } from "@/lib/store"
-import { blendModeToCSS } from "@/lib/layer-utils"
+import { blendModeToCSS, type GradientLayer } from "@/lib/layer-utils"
 import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
 
 export function MultiLayerGradient() {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const { layers, multiLayerMode } = useGradientStore()
-  
-  // Device optimizations
+  const layers = useGradientStore((state) => state.layers)
+  const multiLayerMode = useGradientStore((state) => state.multiLayerMode)
+  const colorSchemes = useGradientStore((state) => state.colorSchemes)
+
+  // O movimento e o acabamento são globais: a composição inteira se move junta
+  // e recebe o mesmo tratamento de cor. Antes estes valores eram fixos aqui
+  // dentro, então play/pause, velocidade e complexidade não tinham efeito
+  // nenhum no modo multi-camadas.
+  const isPlaying = useGradientStore((state) => state.isPlaying)
+  const globals = useGradientStore(
+    useShallow((state) => ({
+      speed: state.speed,
+      complexity: state.complexity,
+      grainAmount: state.grainAmount,
+      grainScale: state.grainScale,
+      vibrance: state.vibrance,
+      blendSpace: state.blendSpace,
+    }))
+  )
+
   const { quality } = useDeviceOptimizations()
-  
-  // Configure renderer based on device quality
-  const glConfig = {
-    preserveDrawingBuffer: true,
-    antialias: quality !== 'low', // Disable antialiasing on low-end devices
-    powerPreference: (quality === 'high' ? 'high-performance' : 'low-power') as WebGLPowerPreference,
-    depth: false, // We don't need depth testing for a 2D gradient
-    stencil: false, // We don't need stencil buffer
-  }
-  
-  // If not in multi-layer mode, return null (will use the regular GradientScene)
+
+  const glConfig = useMemo(
+    () => ({
+      preserveDrawingBuffer: true,
+      antialias: quality !== "low",
+      powerPreference: (quality === "high"
+        ? "high-performance"
+        : "low-power") as WebGLPowerPreference,
+      depth: false,
+      stencil: false,
+    }),
+    [quality]
+  )
+
   if (!multiLayerMode) {
     return null
   }
-  
-  // Sort layers from bottom to top (reverse order for z-index)
+
+  // Resolve as cores da camada já com a 3ª parada — antes o shader de camada
+  // só recebia duas, e a mesma configuração rendia imagens diferentes nos dois
+  // modos. Fallback para um esquema existente: o nome pode vir de um link
+  // compartilhado apontando para um esquema que este cliente não tem.
+  const layerColors = (layer: GradientLayer) => {
+    if (layer.isCustomMode && layer.customColors) return layer.customColors
+    return colorSchemes[layer.colorScheme] ?? colorSchemes.redBlue
+  }
+
+  // Ordem de baixo para cima (z-index invertido)
   const sortedLayers = [...layers].reverse()
-  
+
   return (
-    <div ref={containerRef} className="w-full h-full relative">
-      {sortedLayers.map((layer, index) => (
-        layer.visible && (
-          <div 
+    <div className="w-full h-full relative">
+      {sortedLayers.map((layer, index) =>
+        layer.visible ? (
+          <div
             key={layer.id}
             className="absolute inset-0"
-            style={{ 
+            style={{
               opacity: layer.opacity,
               mixBlendMode: blendModeToCSS(layer.blendMode),
-              zIndex: index + 1
+              zIndex: index + 1,
             }}
           >
-            <Canvas 
-              gl={glConfig} 
+            <Canvas
+              gl={glConfig}
               camera={{ position: [0, 0, 5] }}
-              dpr={[1, quality === 'high' ? 2 : 1.5]}
+              dpr={[1, quality === "high" ? 2 : 1.5]}
+              frameloop={isPlaying ? "always" : "demand"}
             >
               <OrganicGradientShader
-                isPlaying={true}
-                speed={1.0} // Use a fixed speed for all layers
-                complexity={3} // Use a fixed complexity for all layers
+                isPlaying={isPlaying}
+                speed={globals.speed}
+                complexity={globals.complexity}
+                grainAmount={globals.grainAmount}
+                grainScale={globals.grainScale}
+                vibrance={globals.vibrance}
+                blendSpace={globals.blendSpace}
+                colors={layerColors(layer)}
                 noiseScale={layer.noiseScale}
-                colorScheme={layer.isCustomMode && layer.customColors ? layer.customColors : layer.colorScheme}
                 flowIntensity={layer.flowIntensity}
                 thresholdMin={layer.thresholdMin}
                 thresholdMax={layer.thresholdMax}
+                seed={layer.seed}
               />
               <CaptureHelper />
             </Canvas>
           </div>
-        )
-      ))}
+        ) : null
+      )}
     </div>
   )
 }

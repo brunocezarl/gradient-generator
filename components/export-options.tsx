@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { ImageIcon, Loader2, Code2, Copy, Check } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { useShallow } from "zustand/react/shallow"
 import { useGradientStore, resolveActiveColors } from "@/lib/store"
 import { rgbToHex } from "@/lib/utils"
 
@@ -40,7 +41,16 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   const [cssCopied, setCssCopied] = useState(false)
   const { toast } = useToast()
 
-  const { colorScheme, colorSchemes, isCustomMode, customColors } = useGradientStore()
+  const { colorScheme, colorSchemes, isCustomMode, customColors, blendSpace } =
+    useGradientStore(
+      useShallow((state) => ({
+        colorScheme: state.colorScheme,
+        colorSchemes: state.colorSchemes,
+        isCustomMode: state.isCustomMode,
+        customColors: state.customColors,
+        blendSpace: state.blendSpace,
+      }))
+    )
 
   // ─── Gerar CSS ─────────────────────────────────────────────────────────────
 
@@ -59,7 +69,11 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
     const h2 = toHex(c2)
     const h3 = toHex(c3)
 
-    return `background: linear-gradient(135deg, ${h1} 0%, ${h2} 50%, ${h3} 100%);`
+    // O espaço de interpolação acompanha o do render: sem `in oklab` o CSS
+    // misturaria em sRGB e produziria um meio de gradiente diferente do canvas
+    const interpolation = blendSpace === "oklab" ? " in oklab" : " in srgb-linear"
+
+    return `background: linear-gradient(135deg${interpolation}, ${h1} 0%, ${h2} 50%, ${h3} 100%);`
   }
 
   const handleCopyCSS = async () => {

@@ -106,9 +106,57 @@ export function getLayerCompositing(
   return { opacity, blend }
 }
 
+// Ajusta a projeção da câmera para a proporção de saída, retornando uma função
+// que restaura a projeção original (ou null quando nada precisou mudar).
+//
+// Sem isso, exportar numa proporção diferente da tela renderiza o
+// enquadramento da tela esticado dentro do buffer alvo: um "story" 1080×1920
+// gerado a partir de uma janela 16:9 sai horizontalmente comprimido, porque a
+// câmera continua projetando em 16:9. A proporção da câmera é normalmente
+// atualizada pelo react-three-fiber no resize do container — e a exportação
+// redimensiona o drawing buffer sem passar por lá.
+export function overrideCameraAspect(
+  camera: THREE.Camera,
+  aspect: number,
+): (() => void) | null {
+  const perspective = camera as THREE.PerspectiveCamera
+  if (perspective.isPerspectiveCamera) {
+    const prevAspect = perspective.aspect
+    if (prevAspect === aspect) return null
+    perspective.aspect = aspect
+    perspective.updateProjectionMatrix()
+    return () => {
+      perspective.aspect = prevAspect
+      perspective.updateProjectionMatrix()
+    }
+  }
+
+  const orthographic = camera as THREE.OrthographicCamera
+  if (orthographic.isOrthographicCamera) {
+    const { left, right, top, bottom } = orthographic
+    // Preserva a altura visível e recalcula a largura pela nova proporção,
+    // mantendo o centro do enquadramento
+    const halfHeight = (top - bottom) / 2
+    const centerX = (left + right) / 2
+    const halfWidth = halfHeight * aspect
+    if (left === centerX - halfWidth && right === centerX + halfWidth) return null
+    orthographic.left = centerX - halfWidth
+    orthographic.right = centerX + halfWidth
+    orthographic.updateProjectionMatrix()
+    return () => {
+      orthographic.left = left
+      orthographic.right = right
+      orthographic.updateProjectionMatrix()
+    }
+  }
+
+  return null
+}
+
 // Redimensiona o drawing buffer do renderer para a resolução alvo sem alterar
-// o tamanho CSS do canvas. Retorna uma função que restaura o estado original,
-// ou null se o canvas não tem renderer registrado.
+// o tamanho CSS do canvas, reprojetando a câmera na proporção alvo. Retorna uma
+// função que restaura o estado original, ou null se o canvas não tem renderer
+// registrado.
 export function overrideRenderSize(
   canvas: HTMLCanvasElement,
   width: number,
@@ -123,11 +171,14 @@ export function overrideRenderSize(
   const maxSize = gl.capabilities.maxTextureSize || 8192
   const target = clampToMaxSize(width, height, maxSize)
 
+  const restoreCamera = overrideCameraAspect(camera, target.width / target.height)
+
   gl.setPixelRatio(1)
   gl.setSize(target.width, target.height, false)
   gl.render(scene, camera)
 
   return () => {
+    restoreCamera?.()
     gl.setPixelRatio(prevPixelRatio)
     gl.setSize(prevSize.x, prevSize.y, false)
     gl.render(scene, camera)

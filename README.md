@@ -8,15 +8,23 @@ ruído simplex e curl noise, renderizado via React Three Fiber.
 
 - **Animação em tempo real** com controles de velocidade, complexidade, escala de
   ruído, fluxo, granulação e limiares de forma
+- **Cor fiel**: as paradas de cor são interpoladas em Oklab (perceptual) ou em
+  RGB linear, com codificação sRGB na saída — o HEX escolhido no picker é
+  exatamente o pixel exportado. Dither triangular sub-quantização elimina o
+  banding típico de gradientes suaves em 8 bits
 - **Esquemas de cores** prontos (3 cores) + modo personalizado com color picker
   RGB/HSL/HEX e salvamento de esquemas próprios
+- **Forma reproduzível**: o *seed* do campo de ruído entra em presets, histórico
+  e links — "Sortear Forma" troca o desenho mantendo cores e ritmo
 - **Multi-camadas** com modos de mesclagem (blend modes), opacidade e reordenação
-  por arrastar e soltar
+  por arrastar e soltar; movimento e acabamento vêm do estado global, cada
+  camada tem sua própria forma
 - **Presets de animação** e gerador aleatório com **histórico dos últimos
   sorteios** (clique numa miniatura para restaurar um bom resultado)
 - **Presets completos** salvos pelo usuário: cores + todos os parâmetros de
   animação, com galeria de miniaturas
-- **Undo/Redo** (Ctrl+Z / Ctrl+Y) com coalescência de edições contínuas
+- **Undo/Redo** (Ctrl+Z / Ctrl+Y) com coalescência de edições contínuas,
+  cobrindo também criar, remover, editar e reordenar camadas
 - **Exportação**: imagem (PNG/JPEG/WebP) com escala de até 8× ou dimensões
   prontas (Full HD, 4K, QHD, post quadrado, story), vídeo (WebM/MP4 conforme
   suporte do navegador, com resolução configurável) e CSS estático aproximado
@@ -57,5 +65,21 @@ npm test           # testes unitários (Vitest)
 app/          # rotas e layout (App Router)
 components/   # componentes da aplicação + components/ui (shadcn)
 hooks/        # hooks (atalhos de teclado, fullscreen, otimizações de dispositivo)
-lib/          # store Zustand, presets, utilitários de camadas e compartilhamento
+lib/          # store Zustand, presets, cor, captura e compartilhamento
+lib/shaders/  # fonte única do GLSL (usada pela cena simples e por cada camada)
 ```
+
+## Notas de implementação
+
+- **Pipeline de cor**: as cores saem do picker em sRGB, são convertidas para
+  linear em `lib/color.ts`, interpoladas no espaço escolhido (Oklab ou linear)
+  e reencodadas em sRGB no fim do fragment shader. Vibrância padrão 0 mantém o
+  round-trip exato; o CSS exportado usa `in oklab` / `in srgb-linear` para
+  interpolar no mesmo espaço do render.
+- **Exportação**: cada camada é re-renderizada nativamente na resolução final e
+  a câmera é reprojetada na proporção de saída, então exportar 1080×1920 a
+  partir de uma janela 16:9 gera a mesma imagem que ver a cena numa janela
+  9:16 — sem distorção nem upscaling.
+- **Persistência**: o store é versionado (`PERSIST_VERSION`) e normalizado na
+  hidratação. Como o zustand só chama `migrate` quando o JSON gravado tem
+  `version` numérico, a normalização roda no `merge`, que sempre executa.

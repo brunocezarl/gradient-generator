@@ -4,7 +4,9 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Play, Pause, ImageIcon, ChevronUp, Settings, RefreshCw, Save, Palette, Shuffle } from "lucide-react"
+import { Play, Pause, ImageIcon, ChevronUp, Settings, RefreshCw, Save, Palette, Shuffle, Waves } from "lucide-react"
+import { useShallow } from "zustand/react/shallow"
+import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
@@ -15,7 +17,6 @@ import { ColorPicker } from "@/components/color-picker"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { AnimationPresetsSelector } from "@/components/animation-presets-selector"
 import { PresetGallery, RandomHistoryStrip } from "@/components/preset-gallery"
-// import { AdvancedControls } from "@/components/advanced-controls" // No longer needed here
 import { LayerManager } from "@/components/layer-manager"
 import { useToast } from "@/components/ui/use-toast"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -30,7 +31,8 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   const { toast } = useToast()
   const isMobile = useMediaQuery('(max-width: 768px)')
 
-  // Get state and actions from store
+  // Seletor explícito em vez do store inteiro: o painel não precisa
+  // re-renderizar quando histórico, presets ou camadas mudam
   const {
     isPlaying,
     speed,
@@ -41,12 +43,14 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     isCustomMode,
     customColors,
     colorSchemes,
-    // Import advanced state and setters
     flowIntensity,
     grainAmount,
+    grainScale,
     thresholdMin,
     thresholdMax,
-    multiLayerMode, // Import multiLayerMode
+    vibrance,
+    blendSpace,
+    multiLayerMode,
     setIsPlaying,
     setSpeed,
     setComplexity,
@@ -60,15 +64,56 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     saveCustomScheme,
     resetToDefaults,
     randomize,
-    // Import advanced setters
     setFlowIntensity,
     setGrainAmount,
+    setGrainScale,
     setThresholdMin,
     setThresholdMax,
-    // Get grainScale state and setter
-    grainScale,
-    setGrainScale
-  } = useGradientStore()
+    setVibrance,
+    setBlendSpace,
+    shuffleSeed,
+  } = useGradientStore(
+    useShallow((state) => ({
+      isPlaying: state.isPlaying,
+      speed: state.speed,
+      complexity: state.complexity,
+      noiseScale: state.noiseScale,
+      colorScheme: state.colorScheme,
+      menuOpen: state.menuOpen,
+      isCustomMode: state.isCustomMode,
+      customColors: state.customColors,
+      colorSchemes: state.colorSchemes,
+      flowIntensity: state.flowIntensity,
+      grainAmount: state.grainAmount,
+      grainScale: state.grainScale,
+      thresholdMin: state.thresholdMin,
+      thresholdMax: state.thresholdMax,
+      vibrance: state.vibrance,
+      blendSpace: state.blendSpace,
+      multiLayerMode: state.multiLayerMode,
+      setIsPlaying: state.setIsPlaying,
+      setSpeed: state.setSpeed,
+      setComplexity: state.setComplexity,
+      setNoiseScale: state.setNoiseScale,
+      setColorScheme: state.setColorScheme,
+      toggleMenu: state.toggleMenu,
+      setCustomMode: state.setCustomMode,
+      setCustomColor1: state.setCustomColor1,
+      setCustomColor2: state.setCustomColor2,
+      setCustomColor3: state.setCustomColor3,
+      saveCustomScheme: state.saveCustomScheme,
+      resetToDefaults: state.resetToDefaults,
+      randomize: state.randomize,
+      setFlowIntensity: state.setFlowIntensity,
+      setGrainAmount: state.setGrainAmount,
+      setGrainScale: state.setGrainScale,
+      setThresholdMin: state.setThresholdMin,
+      setThresholdMax: state.setThresholdMax,
+      setVibrance: state.setVibrance,
+      setBlendSpace: state.setBlendSpace,
+      shuffleSeed: state.shuffleSeed,
+    }))
+  )
 
   return (
     <>
@@ -89,7 +134,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       {menuOpen && (
         <div className="absolute top-16 left-4 z-50 w-72 md:w-80 lg:w-96 bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl overflow-hidden">
           <div className="p-4 border-b border-gray-800 flex justify-between items-center">
-            <h3 className="text-white font-medium">Gradient Controls</h3>
+            <h3 className="text-white font-medium">Controles do Gradiente</h3>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={toggleMenu} aria-label="Fechar painel de controles">
               <ChevronUp className="h-4 w-4" />
             </Button>
@@ -173,7 +218,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                       randomize()
                       toast({
                         title: "Randomizado!",
-                        description: "Cores e parâmetros gerados aleatoriamente."
+                        description: "Cores, forma e parâmetros gerados aleatoriamente."
                       })
                     }}
                     variant="outline"
@@ -181,6 +226,21 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                   >
                     <Shuffle className="mr-2 h-4 w-4" />
                     Randomizar
+                  </Button>
+
+                  <Button
+                    onClick={() => {
+                      shuffleSeed()
+                      toast({
+                        title: "Nova Forma",
+                        description: "Mesmas cores e parâmetros, outro desenho do ruído."
+                      })
+                    }}
+                    variant="outline"
+                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+                  >
+                    <Waves className="mr-2 h-4 w-4" />
+                    Sortear Forma
                   </Button>
 
                   <RandomHistoryStrip />
@@ -203,6 +263,29 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
               </TabsContent>
 
               <TabsContent value="colors" className="mt-4 space-y-4">
+                {/* Espaço de mistura das paradas de cor */}
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Espaço de Mistura</Label>
+                    <TooltipHelp content="Como as cores são interpoladas. Oklab é perceptualmente uniforme e evita o meio escuro entre matizes opostos; Linear é a mistura física de luz. Em ambos, as cores escolhidas aparecem exatamente como no picker." />
+                  </div>
+                  <Select
+                    value={blendSpace}
+                    onValueChange={(value) => setBlendSpace(value as ColorBlendSpace)}
+                  >
+                    <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-gray-700 text-white">
+                      {Object.entries(colorBlendSpaces).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Custom Colors Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -326,6 +409,21 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     max={1.0}
                     step={0.01}
                     onValueChange={(value) => setFlowIntensity(value[0])}
+                  />
+                </div>
+
+                {/* Vibrance */}
+                <div className="space-y-2 lg:col-span-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Vibrância: {vibrance.toFixed(2)}</Label>
+                    <TooltipHelp content="Afasta as cores do cinza de mesma luminosidade. Em 0.00 o gradiente entrega exatamente as cores escolhidas — valores altos saturam e podem estourar canais." />
+                  </div>
+                  <Slider
+                    value={[vibrance]}
+                    min={-0.5}
+                    max={1.0}
+                    step={0.05}
+                    onValueChange={(value) => setVibrance(value[0])}
                   />
                 </div>
 

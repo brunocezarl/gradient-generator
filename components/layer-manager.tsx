@@ -5,9 +5,10 @@ import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Layers, Plus, Trash2, Eye, EyeOff, GripVertical } from "lucide-react"
+import { Layers, Plus, Trash2, Eye, EyeOff, GripVertical, Waves } from "lucide-react"
+import { useShallow } from "zustand/react/shallow"
 import { useGradientStore } from "@/lib/store"
-import { blendModes } from "@/lib/layer-utils"
+import { blendModes, generateSeed } from "@/lib/layer-utils"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -130,7 +131,20 @@ export function LayerManager() {
     updateLayer,
     reorderLayers,
     colorSchemes,
-  } = useGradientStore()
+  } = useGradientStore(
+    useShallow((state) => ({
+      multiLayerMode: state.multiLayerMode,
+      setMultiLayerMode: state.setMultiLayerMode,
+      layers: state.layers,
+      activeLayerId: state.activeLayerId,
+      setActiveLayer: state.setActiveLayer,
+      addLayer: state.addLayer,
+      removeLayer: state.removeLayer,
+      updateLayer: state.updateLayer,
+      reorderLayers: state.reorderLayers,
+      colorSchemes: state.colorSchemes,
+    }))
+  )
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -307,6 +321,16 @@ export function LayerManager() {
                 <Label className="text-white">
                   Escala de Ruído: {activeLayer.noiseScale.toFixed(1)}
                 </Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-gray-400 hover:text-white"
+                  onClick={() => updateLayer(activeLayer.id, { seed: generateSeed() })}
+                  title="Sortear outra forma para esta camada"
+                >
+                  <Waves className="h-3.5 w-3.5 mr-1" />
+                  Forma
+                </Button>
               </div>
               <Slider
                 value={[activeLayer.noiseScale]}

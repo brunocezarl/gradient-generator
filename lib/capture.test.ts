@@ -10,6 +10,7 @@ import {
   getCaptureContext,
   getLayerCompositing,
   overrideRenderSize,
+  overrideCameraAspect,
   exportCompositeImage,
   type CaptureContext,
 } from "./capture"
@@ -93,11 +94,14 @@ function createStubRenderer(width = 300, height = 150, pixelRatio = 2) {
   }
 }
 
-function stubContext(gl: ReturnType<typeof createStubRenderer>): CaptureContext {
+function stubContext(
+  gl: ReturnType<typeof createStubRenderer>,
+  camera: THREE.Camera = {} as THREE.Camera
+): CaptureContext {
   return {
     gl: gl as unknown as THREE.WebGLRenderer,
     scene: {} as THREE.Scene,
-    camera: {} as THREE.Camera,
+    camera,
   }
 }
 
@@ -161,10 +165,76 @@ describe("getLayerCompositing", () => {
   })
 })
 
+describe("overrideCameraAspect", () => {
+  it("reprojeta a câmera perspectiva na proporção alvo e restaura", () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 100)
+    const projectionBefore = camera.projectionMatrix.clone()
+
+    const restore = overrideCameraAspect(camera, 1080 / 1920)
+    expect(restore).not.toBeNull()
+    expect(camera.aspect).toBeCloseTo(0.5625)
+    // A projeção realmente mudou — não basta escrever o campo `aspect`
+    expect(camera.projectionMatrix.equals(projectionBefore)).toBe(false)
+
+    restore!()
+    expect(camera.aspect).toBeCloseTo(16 / 9)
+    expect(camera.projectionMatrix.equals(projectionBefore)).toBe(true)
+  })
+
+  it("não faz nada quando a proporção já é a alvo", () => {
+    const camera = new THREE.PerspectiveCamera(75, 1920 / 1080, 0.1, 100)
+    expect(overrideCameraAspect(camera, 1920 / 1080)).toBeNull()
+  })
+
+  it("recalcula a largura da câmera ortográfica preservando a altura", () => {
+    const camera = new THREE.OrthographicCamera(-8, 8, 4.5, -4.5, 0.1, 100)
+
+    const restore = overrideCameraAspect(camera, 1)
+    expect(restore).not.toBeNull()
+    // Altura 9 preservada; largura passa a 9 para proporção 1:1
+    expect(camera.left).toBeCloseTo(-4.5)
+    expect(camera.right).toBeCloseTo(4.5)
+    expect(camera.top).toBeCloseTo(4.5)
+    expect(camera.bottom).toBeCloseTo(-4.5)
+
+    restore!()
+    expect(camera.left).toBeCloseTo(-8)
+    expect(camera.right).toBeCloseTo(8)
+  })
+
+  it("ignora câmeras de tipo desconhecido", () => {
+    expect(overrideCameraAspect({} as THREE.Camera, 2)).toBeNull()
+  })
+})
+
 describe("overrideRenderSize", () => {
   it("retorna null para canvas sem renderer registrado", () => {
     const canvas = document.createElement("canvas")
     expect(overrideRenderSize(canvas, 1920, 1080)).toBeNull()
+  })
+
+  it("reprojeta a câmera na proporção de saída antes de renderizar", () => {
+    // Exportar um story 1080×1920 a partir de uma janela 16:9: sem reprojetar,
+    // o frame landscape sai comprimido dentro do buffer retrato
+    const canvas = document.createElement("canvas")
+    const gl = createStubRenderer(1920, 1080, 1)
+    const camera = new THREE.PerspectiveCamera(75, 1920 / 1080, 0.1, 100)
+    registerCaptureContext(canvas, stubContext(gl, camera))
+
+    const aspectDuringRender: number[] = []
+    gl.render.mockImplementation(() => {
+      aspectDuringRender.push(camera.aspect)
+    })
+
+    const restore = overrideRenderSize(canvas, 1080, 1920)
+    expect(aspectDuringRender[0]).toBeCloseTo(1080 / 1920)
+
+    restore!()
+    expect(camera.aspect).toBeCloseTo(1920 / 1080)
+    // O frame de restauração já usa a proporção original
+    expect(aspectDuringRender[1]).toBeCloseTo(1920 / 1080)
+
+    unregisterCaptureContext(canvas)
   })
 
   it("re-renderiza no tamanho alvo (limitado pela GPU) e restaura o estado", () => {
