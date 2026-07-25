@@ -11,6 +11,69 @@ export interface CaptureContext {
 
 const contexts = new Map<HTMLCanvasElement, CaptureContext>()
 
+// Consumidores de tempo: cada material de shader registra como aplicar um
+// instante da animação. Fora do render loop, é isto que permite desenhar um
+// instante *específico* em vez do instante em que o navegador chamou o rAF.
+export type TimeConsumer = (time: number) => void
+
+const timeConsumers = new Map<HTMLCanvasElement, Set<TimeConsumer>>()
+
+export function registerTimeConsumer(
+  canvas: HTMLCanvasElement,
+  consumer: TimeConsumer,
+): () => void {
+  const set = timeConsumers.get(canvas) ?? new Set<TimeConsumer>()
+  set.add(consumer)
+  timeConsumers.set(canvas, set)
+  return () => {
+    set.delete(consumer)
+    if (set.size === 0) timeConsumers.delete(canvas)
+  }
+}
+
+// Renderizador do canvas. Cenas com múltiplas passagens (composição de
+// camadas) registram o próprio; uma cena simples usa o fallback gl.render.
+export type FrameRenderer = () => void
+
+const frameRenderers = new Map<HTMLCanvasElement, FrameRenderer>()
+
+export function registerFrameRenderer(
+  canvas: HTMLCanvasElement,
+  render: FrameRenderer,
+): () => void {
+  frameRenderers.set(canvas, render)
+  return () => {
+    if (frameRenderers.get(canvas) === render) frameRenderers.delete(canvas)
+  }
+}
+
+function renderCanvas(canvas: HTMLCanvasElement): boolean {
+  const renderer = frameRenderers.get(canvas)
+  if (renderer) {
+    renderer()
+    return true
+  }
+  const context = contexts.get(canvas)
+  if (context) {
+    context.gl.render(context.scene, context.camera)
+    return true
+  }
+  return false
+}
+
+// Desenha o instante `time` em todos os canvases de um container. Retorna
+// quantos canvases responderam — zero significa que nada está registrado e o
+// chamador deve cair para o caminho em tempo real.
+export function renderFrameAtTime(container: HTMLElement, time: number): number {
+  const canvases = Array.from(container.querySelectorAll("canvas"))
+  let rendered = 0
+  for (const canvas of canvases) {
+    timeConsumers.get(canvas)?.forEach((consumer) => consumer(time))
+    if (renderCanvas(canvas)) rendered++
+  }
+  return rendered
+}
+
 export function registerCaptureContext(canvas: HTMLCanvasElement, context: CaptureContext) {
   contexts.set(canvas, context)
 }
@@ -165,7 +228,7 @@ export function overrideRenderSize(
   const context = contexts.get(canvas)
   if (!context) return null
 
-  const { gl, scene, camera } = context
+  const { gl, camera } = context
   const prevSize = gl.getSize(new THREE.Vector2())
   const prevPixelRatio = gl.getPixelRatio()
   const maxSize = gl.capabilities.maxTextureSize || 8192
@@ -175,13 +238,15 @@ export function overrideRenderSize(
 
   gl.setPixelRatio(1)
   gl.setSize(target.width, target.height, false)
-  gl.render(scene, camera)
+  // Passa pelo renderizador do canvas: cenas com composição de camadas têm
+  // várias passagens e alvos intermediários que precisam acompanhar o tamanho
+  renderCanvas(canvas)
 
   return () => {
     restoreCamera?.()
     gl.setPixelRatio(prevPixelRatio)
     gl.setSize(prevSize.x, prevSize.y, false)
-    gl.render(scene, camera)
+    renderCanvas(canvas)
   }
 }
 

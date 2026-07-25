@@ -63,7 +63,7 @@ function SortableLayerItem({
       ref={setNodeRef}
       style={style}
       className={`flex items-center p-2 rounded ${
-        isActive ? "bg-gray-700" : "bg-gray-900 hover:bg-gray-800"
+        isActive ? "bg-neutral-700" : "bg-neutral-900 hover:bg-neutral-800"
       }`}
       onClick={onSelect}
     >
@@ -71,7 +71,7 @@ function SortableLayerItem({
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 mr-1 touch-none"
+        className="cursor-grab active:cursor-grabbing text-neutral-500 hover:text-neutral-300 mr-1 touch-none"
         onClick={(e) => e.stopPropagation()}
         title="Arrastar para reordenar"
         aria-label="Arrastar para reordenar"
@@ -83,7 +83,7 @@ function SortableLayerItem({
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 text-gray-400 hover:text-white"
+        className="h-6 w-6 text-neutral-400 hover:text-white"
         onClick={(e) => {
           e.stopPropagation()
           onToggleVisibility()
@@ -102,7 +102,7 @@ function SortableLayerItem({
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 text-gray-400 hover:text-red-500"
+        className="h-6 w-6 text-neutral-400 hover:text-red-500"
         onClick={(e) => {
           e.stopPropagation()
           onRemove()
@@ -160,10 +160,10 @@ export function LayerManager() {
 
   if (!multiLayerMode) {
     return (
-      <div className="mt-4 pt-4 border-t border-gray-800">
+      <div className="mt-4 pt-4 border-t border-neutral-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Layers className="h-4 w-4 mr-2 text-gray-400" />
+            <Layers className="h-4 w-4 mr-2 text-neutral-400" />
             <Label className="text-white">Modo Multi-Camadas</Label>
             <TooltipHelp content="Ative para criar e gerenciar múltiplas camadas de gradiente." />
           </div>
@@ -176,10 +176,10 @@ export function LayerManager() {
   const activeLayer = layers.find((layer) => layer.id === activeLayerId) || layers[0]
 
   return (
-    <div className="mt-4 pt-4 border-t border-gray-800">
+    <div className="mt-4 pt-4 border-t border-neutral-800">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          <Layers className="h-4 w-4 mr-2 text-gray-400" />
+          <Layers className="h-4 w-4 mr-2 text-neutral-400" />
           <Label className="text-white">Modo Multi-Camadas</Label>
           <TooltipHelp content="Desative para voltar ao modo de camada única." />
         </div>
@@ -188,13 +188,13 @@ export function LayerManager() {
 
       <div className="space-y-4">
         {/* Lista de camadas com DnD */}
-        <div className="bg-gray-800 rounded-md p-2">
+        <div className="bg-neutral-800 rounded-md p-2">
           <div className="flex justify-between items-center mb-2">
             <Label className="text-white">Camadas</Label>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-gray-400 hover:text-white"
+              className="h-6 w-6 text-neutral-400 hover:text-white"
               onClick={addLayer}
               title="Adicionar camada"
               aria-label="Adicionar camada"
@@ -260,10 +260,10 @@ export function LayerManager() {
                 value={activeLayer.blendMode}
                 onValueChange={(value) => updateLayer(activeLayer.id, { blendMode: value })}
               >
-                <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                <SelectTrigger className="bg-neutral-900 border-neutral-700 text-white">
                   <SelectValue placeholder="Selecione o modo de mesclagem" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-900 border-gray-700 text-white">
+                <SelectContent className="bg-neutral-900 border-neutral-700 text-white">
                   {Object.entries(blendModes).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -281,10 +281,10 @@ export function LayerManager() {
                   updateLayer(activeLayer.id, { colorScheme: value, isCustomMode: false })
                 }
               >
-                <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                <SelectTrigger className="bg-neutral-900 border-neutral-700 text-white">
                   <SelectValue placeholder="Selecione o esquema de cores" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-900 border-gray-700 text-white max-h-60">
+                <SelectContent className="bg-neutral-900 border-neutral-700 text-white max-h-60">
                   {Object.entries(colorSchemes).map(([key, scheme]) => (
                     <SelectItem key={key} value={key}>
                       <div className="flex items-center">
@@ -324,7 +324,7 @@ export function LayerManager() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-xs text-gray-400 hover:text-white"
+                  className="h-6 px-2 text-xs text-neutral-400 hover:text-white"
                   onClick={() => updateLayer(activeLayer.id, { seed: generateSeed() })}
                   title="Sortear outra forma para esta camada"
                 >

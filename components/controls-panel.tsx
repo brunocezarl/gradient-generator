@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Play, Pause, ImageIcon, ChevronUp, Settings, RefreshCw, Save, Palette, Shuffle, Waves } from "lucide-react"
+import { ImageIcon, RefreshCw, Save, Palette, Shuffle, Waves } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
 import { Label } from "@/components/ui/label"
@@ -34,12 +34,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   // Seletor explícito em vez do store inteiro: o painel não precisa
   // re-renderizar quando histórico, presets ou camadas mudam
   const {
-    isPlaying,
     speed,
     complexity,
     noiseScale,
     colorScheme,
-    menuOpen,
     isCustomMode,
     customColors,
     colorSchemes,
@@ -51,12 +49,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     vibrance,
     blendSpace,
     multiLayerMode,
-    setIsPlaying,
     setSpeed,
     setComplexity,
     setNoiseScale,
     setColorScheme,
-    toggleMenu,
     setCustomMode,
     setCustomColor1,
     setCustomColor2,
@@ -74,12 +70,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     shuffleSeed,
   } = useGradientStore(
     useShallow((state) => ({
-      isPlaying: state.isPlaying,
       speed: state.speed,
       complexity: state.complexity,
       noiseScale: state.noiseScale,
       colorScheme: state.colorScheme,
-      menuOpen: state.menuOpen,
       isCustomMode: state.isCustomMode,
       customColors: state.customColors,
       colorSchemes: state.colorSchemes,
@@ -91,12 +85,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       vibrance: state.vibrance,
       blendSpace: state.blendSpace,
       multiLayerMode: state.multiLayerMode,
-      setIsPlaying: state.setIsPlaying,
       setSpeed: state.setSpeed,
       setComplexity: state.setComplexity,
       setNoiseScale: state.setNoiseScale,
       setColorScheme: state.setColorScheme,
-      toggleMenu: state.toggleMenu,
       setCustomMode: state.setCustomMode,
       setCustomColor1: state.setCustomColor1,
       setCustomColor2: state.setCustomColor2,
@@ -116,40 +108,17 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   )
 
   return (
-    <>
-      {/* Menu Button */}
-      <div className="absolute top-4 left-4 z-50">
-        <Button
-          variant="outline"
-          size="icon"
-          className="bg-black/50 border-gray-700 hover:bg-black/70 text-white"
-          onClick={toggleMenu}
-          aria-label={menuOpen ? "Ocultar controles" : "Mostrar controles"}
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
-      </div>
+    <div className="p-3 space-y-4">
+      <Tabs defaultValue="basic" className="w-full">
 
-      {/* Controls Panel - Made width responsive */}
-      {menuOpen && (
-        <div className="absolute top-16 left-4 z-50 w-72 md:w-80 lg:w-96 bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl overflow-hidden">
-          <div className="p-4 border-b border-gray-800 flex justify-between items-center">
-            <h3 className="text-white font-medium">Controles do Gradiente</h3>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={toggleMenu} aria-label="Fechar painel de controles">
-              <ChevronUp className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="p-4 space-y-4 max-h-[calc(100vh-10rem)] overflow-y-auto"> {/* Added max-height and scroll */}
-            <Tabs defaultValue="basic" className="w-full">
               {/* Updated TabsList for more tabs */}
-              <TabsList className={`grid w-full ${multiLayerMode ? 'grid-cols-5' : 'grid-cols-4'} bg-gray-800 text-xs h-auto p-1`}>
-                <TabsTrigger value="basic" className="text-white data-[state=active]:bg-gray-700 px-2 py-1.5">Básico</TabsTrigger>
-                <TabsTrigger value="colors" className="text-white data-[state=active]:bg-gray-700 px-2 py-1.5">Cores</TabsTrigger>
-                <TabsTrigger value="advanced" className="text-white data-[state=active]:bg-gray-700 px-2 py-1.5">Avançado</TabsTrigger>
-                <TabsTrigger value="presets" className="text-white data-[state=active]:bg-gray-700 px-2 py-1.5">Presets</TabsTrigger>
+              <TabsList className={`grid w-full ${multiLayerMode ? 'grid-cols-5' : 'grid-cols-4'} bg-neutral-800 text-xs h-auto p-1`}>
+                <TabsTrigger value="basic" className="text-white data-[state=active]:bg-neutral-700 px-2 py-1.5">Básico</TabsTrigger>
+                <TabsTrigger value="colors" className="text-white data-[state=active]:bg-neutral-700 px-2 py-1.5">Cores</TabsTrigger>
+                <TabsTrigger value="advanced" className="text-white data-[state=active]:bg-neutral-700 px-2 py-1.5">Avançado</TabsTrigger>
+                <TabsTrigger value="presets" className="text-white data-[state=active]:bg-neutral-700 px-2 py-1.5">Presets</TabsTrigger>
                 {multiLayerMode && (
-                  <TabsTrigger value="layers" className="text-white data-[state=active]:bg-gray-700 px-2 py-1.5">Camadas</TabsTrigger>
+                  <TabsTrigger value="layers" className="text-white data-[state=active]:bg-neutral-700 px-2 py-1.5">Camadas</TabsTrigger>
                 )}
               </TabsList>
 
@@ -161,7 +130,14 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     <Label className="text-white">Velocidade da Animação: {speed.toFixed(1)}</Label>
                     <TooltipHelp content="Controla a velocidade da animação do gradiente. Valores mais altos resultam em movimento mais rápido." />
                   </div>
-                  <Slider value={[speed]} min={0.1} max={3.0} step={0.1} onValueChange={(value) => setSpeed(value[0])} />
+                  <Slider
+                    value={[speed]}
+                    min={0.1}
+                    max={3.0}
+                    step={0.1}
+                    onValueChange={(value) => setSpeed(value[0])}
+                    thumbLabel="Velocidade da animação"
+                  />
                 </div>
 
                 {/* Complexity */}
@@ -176,6 +152,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     max={isMobile ? 6 : 10} // Limit max complexity on mobile devices
                     step={1}
                     onValueChange={(value) => setComplexity(value[0])}
+                    thumbLabel="Complexidade"
                   />
                 </div>
 
@@ -191,23 +168,15 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     max={5.0}
                     step={0.1}
                     onValueChange={(value) => setNoiseScale(value[0])}
+                    thumbLabel="Escala de ruído"
                   />
                 </div>
 
                 {/* Action Buttons */}
                 <div className="pt-2 space-y-3">
                   <Button
-                    variant="outline"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
-                  >
-                    {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                    {isPlaying ? "Pausar Animação" : "Iniciar Animação"}
-                  </Button>
-
-                  <Button
                     onClick={onCaptureImage}
-                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+                    className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
                   >
                     <ImageIcon className="mr-2 h-4 w-4" />
                     Capturar Imagem
@@ -222,7 +191,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                       })
                     }}
                     variant="outline"
-                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+                    className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
                   >
                     <Shuffle className="mr-2 h-4 w-4" />
                     Randomizar
@@ -237,7 +206,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                       })
                     }}
                     variant="outline"
-                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+                    className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
                   >
                     <Waves className="mr-2 h-4 w-4" />
                     Sortear Forma
@@ -254,7 +223,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                       })
                     }}
                     variant="outline"
-                    className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+                    className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Restaurar Padrões
@@ -273,10 +242,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     value={blendSpace}
                     onValueChange={(value) => setBlendSpace(value as ColorBlendSpace)}
                   >
-                    <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                    <SelectTrigger className="bg-neutral-900 border-neutral-700 text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-700 text-white">
+                    <SelectContent className="bg-neutral-900 border-neutral-700 text-white">
                       {Object.entries(colorBlendSpaces).map(([value, label]) => (
                         <SelectItem key={value} value={value}>
                           {label}
@@ -335,10 +304,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     <div className="space-y-2">
                       <Label className="text-white">Esquema de Cores</Label>
                       <Select value={colorScheme} onValueChange={setColorScheme}>
-                        <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                        <SelectTrigger className="bg-neutral-900 border-neutral-700 text-white">
                           <SelectValue placeholder="Selecione um esquema de cores" />
                         </SelectTrigger>
-                        <SelectContent className="bg-gray-900 border-gray-700 text-white max-h-60">
+                        <SelectContent className="bg-neutral-900 border-neutral-700 text-white max-h-60">
                           {Object.entries(colorSchemes).map(([key, scheme]) => (
                             <SelectItem key={key} value={key}>
                               <div className="flex items-center">
@@ -375,7 +344,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                         }
                         setCustomMode(true)
                       }}
-                      className="w-full mt-4 bg-gray-700 hover:bg-gray-600 text-white"
+                      className="w-full mt-4 bg-neutral-700 hover:bg-neutral-600 text-white"
                     >
                       <Palette className="mr-2 h-4 w-4" />
                       Editar Cores
@@ -387,8 +356,8 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
               <TabsContent value="presets" className="mt-4 space-y-4">
                 <PresetGallery />
 
-                <div className="border-t border-gray-800 pt-4 space-y-2">
-                  <p className="text-sm text-gray-400 mb-2">
+                <div className="border-t border-neutral-800 pt-4 space-y-2">
+                  <p className="text-sm text-neutral-400 mb-2">
                     Selecione um preset de animação para aplicar configurações pré-definidas ao seu gradiente.
                   </p>
                   <AnimationPresetsSelector />
@@ -409,6 +378,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     max={1.0}
                     step={0.01}
                     onValueChange={(value) => setFlowIntensity(value[0])}
+                    thumbLabel="Intensidade do fluxo"
                   />
                 </div>
 
@@ -424,6 +394,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     max={1.0}
                     step={0.05}
                     onValueChange={(value) => setVibrance(value[0])}
+                    thumbLabel="Vibrância"
                   />
                 </div>
 
@@ -439,6 +410,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     max={0.2}
                     step={0.01}
                     onValueChange={(value) => setGrainAmount(value[0])}
+                    thumbLabel="Intensidade do grão"
                   />
                 </div>
 
@@ -466,28 +438,30 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                   </div>
                   <div className="flex items-center space-x-4">
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400 mb-1 block">Mínimo</Label>
+                      <Label className="text-xs text-neutral-400 mb-1 block">Mínimo</Label>
                       <Slider
                         value={[thresholdMin]}
                         min={0.1}
                         max={thresholdMax - 0.1}
                         step={0.01}
                         onValueChange={(value) => setThresholdMin(value[0])}
+                        thumbLabel="Limiar mínimo"
                       />
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-400 mb-1 block">Máximo</Label>
+                      <Label className="text-xs text-neutral-400 mb-1 block">Máximo</Label>
                       <Slider
                         value={[thresholdMax]}
                         min={thresholdMin + 0.1}
                         max={0.9}
                         step={0.01}
                         onValueChange={(value) => setThresholdMax(value[0])}
+                        thumbLabel="Limiar máximo"
                       />
                     </div>
                   </div>
                 </div>
-                 <p className="text-xs text-gray-500 mt-2">
+                 <p className="text-xs text-neutral-500 mt-2">
                    Estes controles permitem ajustes finos no comportamento do gradiente. Experimente diferentes combinações para criar efeitos únicos.
                  </p>
               </TabsContent>
@@ -502,7 +476,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
 
              {/* Save Custom Scheme Dialog */}
             <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-              <DialogContent className="bg-gray-900 text-white border-gray-700">
+              <DialogContent className="bg-neutral-900 text-white border-neutral-700">
                 <DialogHeader>
                   <DialogTitle>Salvar Esquema de Cores</DialogTitle>
                 </DialogHeader>
@@ -513,12 +487,12 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     value={schemeName}
                     onChange={(e) => setSchemeName(e.target.value)}
                     placeholder="Meu Esquema Personalizado"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    className="bg-neutral-800 border-neutral-700 text-white"
                   />
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
-                    <Button variant="outline" className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700">
+                    <Button variant="outline" className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700">
                       Cancelar
                     </Button>
                   </DialogClose>
@@ -547,9 +521,6 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   )
 }

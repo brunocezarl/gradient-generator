@@ -45,10 +45,11 @@ export function useDeviceOptimizations() {
     detectQuality()
   }, [isMobile, isLowPowerMode])
 
-  // Retornar configurações otimizadas com base na qualidade
+  // Configurações otimizadas por qualidade. A adaptação é por *resolução*
+  // (pixelRatio) e não por pular frames: meia taxa de quadros deixa a animação
+  // travada, enquanto renderizar menos pixels mantém o movimento fluido.
   return {
     quality,
-    frameSkip: quality === "low" ? 2 : quality === "medium" ? 1 : 0,
     maxComplexity: quality === "low" ? 5 : quality === "medium" ? 8 : 10,
     pixelRatio: quality === "low" ? 1 : quality === "medium" ? 1.5 : 2,
     antialias: quality !== "low",

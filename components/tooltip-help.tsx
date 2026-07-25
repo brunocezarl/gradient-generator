@@ -19,9 +19,9 @@ export function TooltipHelp({ content, side = "top" }: TooltipHelpProps) {
     <TooltipProvider>
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
-          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-300 cursor-help ml-1" />
+          <HelpCircle className="h-4 w-4 text-neutral-400 hover:text-neutral-300 cursor-help ml-1" />
         </TooltipTrigger>
-        <TooltipContent side={side} className="max-w-xs bg-gray-800 text-white border-gray-700">
+        <TooltipContent side={side} className="max-w-xs bg-neutral-800 text-white border-neutral-700">
           <div className="text-sm">{content}</div>
         </TooltipContent>
       </Tooltip>

@@ -1,7 +1,5 @@
 "use client"
 
-import type { CSSProperties } from "react"
-
 // Uma camada do gradiente.
 //
 // A camada controla a *forma* (escala de ruído, fluxo, limiares) e a cor; o
@@ -43,26 +41,6 @@ export const blendModes = {
   softLight: "Luz Suave",
   difference: "Diferença",
   exclusion: "Exclusão",
-}
-
-// Convert blend mode to CSS mix-blend-mode
-export function blendModeToCSS(mode: string): CSSProperties["mixBlendMode"] {
-  const cssMap: Record<string, CSSProperties["mixBlendMode"]> = {
-    normal: "normal",
-    multiply: "multiply",
-    screen: "screen",
-    overlay: "overlay",
-    darken: "darken",
-    lighten: "lighten",
-    colorDodge: "color-dodge",
-    colorBurn: "color-burn",
-    hardLight: "hard-light",
-    softLight: "soft-light",
-    difference: "difference",
-    exclusion: "exclusion",
-  }
-  
-  return cssMap[mode] || "normal"
 }
 
 // Create a new layer with default settings.

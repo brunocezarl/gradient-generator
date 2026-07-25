@@ -10,6 +10,7 @@ import {
   generateSeed,
 } from "@/lib/layer-utils"
 import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
+import { defaultArtboardId, getArtboard } from "@/lib/artboards"
 
 // Define color type
 type GradientColor = [number, number, number]
@@ -39,6 +40,7 @@ export type StateSnapshot = {
   vibrance: number
   blendSpace: ColorBlendSpace
   seed: [number, number]
+  loopDuration: number
   // Camadas fazem parte do snapshot para que criar, remover, reordenar e
   // editar camada sejam ações desfazíveis. Opcionais porque presets salvos
   // antes desta versão não as têm.
@@ -100,6 +102,7 @@ function captureSnapshot(state: GradientStore): StateSnapshot {
     vibrance: state.vibrance,
     blendSpace: state.blendSpace,
     seed: [...state.seed] as [number, number],
+    loopDuration: state.loopDuration,
     multiLayerMode: state.multiLayerMode,
     layers: cloneLayers(state.layers),
   }
@@ -127,6 +130,7 @@ function snapshotToState(
     vibrance: snapshot.vibrance,
     blendSpace: snapshot.blendSpace,
     seed: [...snapshot.seed] as [number, number],
+    loopDuration: snapshot.loopDuration,
   }
 
   if (snapshot.layers && snapshot.layers.length > 0) {
@@ -163,9 +167,17 @@ export type GradientStore = {
   thresholdMax: number
   vibrance: number
   blendSpace: ColorBlendSpace
+  // Duração do loop em segundos de animação. 0 = animação livre (deriva sem
+  // repetir); > 0 faz o desenho voltar exatamente ao início nesse período,
+  // que é o que permite exportar vídeo sem corte.
+  loopDuration: number
   // Deslocamento no campo de ruído: define *qual* forma orgânica é desenhada.
   // Guardado em snapshots e links, então um resultado bom é reproduzível.
   seed: [number, number]
+
+  // Prancheta (proporção de composição e destino da exportação)
+  artboardId: string
+  showSafeAreas: boolean
 
   // Multi-layer support
   multiLayerMode: boolean
@@ -211,7 +223,10 @@ export type GradientStore = {
   setThresholdMax: (value: number) => void
   setVibrance: (value: number) => void
   setBlendSpace: (value: ColorBlendSpace) => void
+  setLoopDuration: (value: number) => void
   shuffleSeed: () => void
+  setArtboard: (id: string) => void
+  setShowSafeAreas: (value: boolean) => void
 
   // Multi-layer actions
   setMultiLayerMode: (value: boolean) => void
@@ -260,7 +275,10 @@ type StoreActions = Pick<
   | "setThresholdMax"
   | "setVibrance"
   | "setBlendSpace"
+  | "setLoopDuration"
   | "shuffleSeed"
+  | "setArtboard"
+  | "setShowSafeAreas"
   | "setMultiLayerMode"
   | "setActiveLayer"
   | "addLayer"
@@ -302,7 +320,11 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   // pixel exportado. Quem quiser saturar mais aumenta conscientemente.
   vibrance: 0,
   blendSpace: "oklab",
+  loopDuration: 0,
   seed: [0, 0],
+
+  artboardId: defaultArtboardId,
+  showSafeAreas: false,
 
   multiLayerMode: false,
   layers: [createDefaultLayer(generateLayerId())],
@@ -416,6 +438,10 @@ function migrateSnapshot(snapshot: unknown): unknown {
         ? source.blendSpace
         : defaultState.blendSpace,
     seed: migrateSeed(source.seed),
+    loopDuration:
+      typeof source.loopDuration === "number" && Number.isFinite(source.loopDuration)
+        ? source.loopDuration
+        : defaultState.loopDuration,
     ...(customColors ? { customColors } : {}),
     ...(Array.isArray(source.layers) ? { layers: source.layers.map(migrateLayer) } : {}),
   }
@@ -433,7 +459,14 @@ export function normalizePersistedState(persisted: unknown): unknown {
   if (typeof state.blendSpace !== "string" || !(state.blendSpace in colorBlendSpaces)) {
     state.blendSpace = defaultState.blendSpace
   }
+  if (typeof state.loopDuration !== "number" || !Number.isFinite(state.loopDuration)) {
+    state.loopDuration = defaultState.loopDuration
+  }
   state.seed = migrateSeed(state.seed)
+  if (typeof state.artboardId !== "string" || getArtboard(state.artboardId).id !== state.artboardId) {
+    state.artboardId = defaultArtboardId
+  }
+  if (typeof state.showSafeAreas !== "boolean") state.showSafeAreas = false
 
   const customColors = migrateColors(state.customColors)
   if (customColors) state.customColors = customColors
@@ -617,10 +650,19 @@ export const useGradientStore = create<GradientStore>()(
         get().pushHistory()
         set({ blendSpace: value })
       },
+      setLoopDuration: (value) => {
+        get().pushHistory()
+        set({ loopDuration: Math.max(0, value) })
+      },
       shuffleSeed: () => {
         get().pushHistory()
         set({ seed: generateSeed() })
       },
+
+      // Prancheta é enquadramento, não parte do visual do gradiente: fica fora
+      // do histórico e dos presets, como o zoom de um editor
+      setArtboard: (id) => set({ artboardId: getArtboard(id).id }),
+      setShowSafeAreas: (value) => set({ showSafeAreas: value }),
 
       // ─── Custom color actions ──────────────────────────────────────────────
 
@@ -679,6 +721,7 @@ export const useGradientStore = create<GradientStore>()(
           thresholdMax: defaultState.thresholdMax,
           vibrance: defaultState.vibrance,
           blendSpace: defaultState.blendSpace,
+          loopDuration: defaultState.loopDuration,
           seed: [...defaultState.seed] as [number, number],
         })
       },
@@ -746,6 +789,8 @@ export const useGradientStore = create<GradientStore>()(
               : "oklab"
         if (settings.seed !== undefined)
           validatedSettings.seed = validateSeed(settings.seed)
+        if (settings.loopDuration !== undefined)
+          validatedSettings.loopDuration = clampNum(settings.loopDuration, 0, 120, 0)
 
         // Camadas (links v2 com multi-camadas ativo): valida cada camada e
         // regenera os ids para não colidir com camadas locais
@@ -947,7 +992,10 @@ export const useGradientStore = create<GradientStore>()(
         thresholdMax: state.thresholdMax,
         vibrance: state.vibrance,
         blendSpace: state.blendSpace,
+        loopDuration: state.loopDuration,
         seed: state.seed,
+        artboardId: state.artboardId,
+        showSafeAreas: state.showSafeAreas,
         multiLayerMode: state.multiLayerMode,
         layers: state.layers,
         activeLayerId: state.activeLayerId,

@@ -89,7 +89,7 @@ export function PresetGallery() {
       </div>
 
       {savedPresets.length === 0 ? (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-neutral-500">
           Nenhum preset salvo ainda. Um preset guarda o visual completo do
           gradiente — cores e todos os parâmetros de animação.
         </p>
@@ -98,7 +98,7 @@ export function PresetGallery() {
           {savedPresets.map((preset) => (
             <div
               key={preset.id}
-              className="group relative rounded-md overflow-hidden border border-gray-700 hover:border-gray-500 transition-colors"
+              className="group relative rounded-md overflow-hidden border border-neutral-700 hover:border-neutral-500 transition-colors"
             >
               <button
                 type="button"
@@ -113,7 +113,7 @@ export function PresetGallery() {
                   className="h-12 w-full"
                   style={{ background: snapshotToGradientCSS(preset.snapshot, colorSchemes) }}
                 />
-                <div className="px-2 py-1.5 bg-gray-900">
+                <div className="px-2 py-1.5 bg-neutral-900">
                   <p className="text-xs text-white truncate">{preset.name}</p>
                 </div>
               </button>
@@ -125,7 +125,7 @@ export function PresetGallery() {
                   deletePreset(preset.id)
                   toast({ title: "Preset Removido", description: preset.name })
                 }}
-                className="absolute top-1 right-1 h-6 w-6 bg-black/60 text-gray-300 hover:text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 h-6 w-6 bg-black/60 text-neutral-300 hover:text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                 aria-label={`Remover preset ${preset.name}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -137,7 +137,7 @@ export function PresetGallery() {
 
       {/* Save Preset Dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700">
+        <DialogContent className="bg-neutral-900 text-white border-neutral-700">
           <DialogHeader>
             <DialogTitle>Salvar Preset</DialogTitle>
           </DialogHeader>
@@ -151,9 +151,9 @@ export function PresetGallery() {
               onChange={(e) => setPresetName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
               placeholder="Meu Gradiente Favorito"
-              className="bg-gray-800 border-gray-700 text-white"
+              className="bg-neutral-800 border-neutral-700 text-white"
             />
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-neutral-400 mt-2">
               Salva cores, velocidade, complexidade, ruído, fluxo, grão e limiares.
             </p>
           </div>
@@ -161,7 +161,7 @@ export function PresetGallery() {
             <DialogClose asChild>
               <Button
                 variant="outline"
-                className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+                className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
               >
                 Cancelar
               </Button>
@@ -191,8 +191,8 @@ export function RandomHistoryStrip() {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <Dices className="h-3.5 w-3.5 text-gray-400" />
-        <Label className="text-xs text-gray-400">Últimos sorteios</Label>
+        <Dices className="h-3.5 w-3.5 text-neutral-400" />
+        <Label className="text-xs text-neutral-400">Últimos sorteios</Label>
       </div>
       <div className="flex gap-1.5 flex-wrap">
         {randomHistory.map((snapshot, index) => (
@@ -206,7 +206,7 @@ export function RandomHistoryStrip() {
                 description: "As configurações deste resultado foram reaplicadas.",
               })
             }}
-            className="h-8 w-8 rounded-md border border-gray-700 hover:border-white hover:scale-110 transition-all"
+            className="h-8 w-8 rounded-md border border-neutral-700 hover:border-white hover:scale-110 transition-all"
             style={{ background: snapshotToGradientCSS(snapshot, colorSchemes) }}
             aria-label={`Restaurar sorteio ${index + 1}`}
             title={`Restaurar sorteio ${index + 1}`}

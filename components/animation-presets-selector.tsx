@@ -227,7 +227,7 @@ export function AnimationPresetsSelector() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+        className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
       >
         <Wand2 className="mr-2 h-4 w-4" />
         Presets de Animação
@@ -240,17 +240,17 @@ export function AnimationPresetsSelector() {
         }
         setOpen(isOpen)
       }}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700 sm:max-w-md">
+        <DialogContent className="bg-neutral-900 text-white border-neutral-700 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Presets de Animação</DialogTitle>
           </DialogHeader>
 
           <Tabs defaultValue="presets" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-gray-800">
-              <TabsTrigger value="presets" className="text-white data-[state=active]:bg-gray-700">
+            <TabsList className="grid w-full grid-cols-2 bg-neutral-800">
+              <TabsTrigger value="presets" className="text-white data-[state=active]:bg-neutral-700">
                 Presets
               </TabsTrigger>
-              <TabsTrigger value="custom" className="text-white data-[state=active]:bg-gray-700">
+              <TabsTrigger value="custom" className="text-white data-[state=active]:bg-neutral-700">
                 Personalizado
               </TabsTrigger>
             </TabsList>
@@ -261,13 +261,13 @@ export function AnimationPresetsSelector() {
                   {Object.entries(animationPresets).map(([id, preset]) => (
                     <div
                       key={id}
-                      className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors"
+                      className="bg-neutral-800 rounded-lg p-4 cursor-pointer hover:bg-neutral-700 transition-colors"
                       onClick={() => handleSelectPreset(id)}
                     >
                       <h3 className="font-medium text-lg mb-1">{preset.name}</h3>
-                      <p className="text-sm text-gray-400 mb-2">{preset.description}</p>
+                      <p className="text-sm text-neutral-400 mb-2">{preset.description}</p>
 
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-400">
+                      <div className="grid grid-cols-3 gap-2 text-xs text-neutral-400">
                         <div>
                           <span className="font-medium">Velocidade:</span> {preset.speed}
                         </div>
@@ -292,7 +292,7 @@ export function AnimationPresetsSelector() {
                     id="preset-name"
                     value={customPreset.name}
                     onChange={(e) => updateCustomPreset("name", e.target.value)}
-                    className="bg-gray-800 border-gray-700 text-white"
+                    className="bg-neutral-800 border-neutral-700 text-white"
                   />
                 </div>
 
@@ -306,7 +306,7 @@ export function AnimationPresetsSelector() {
                     step="0.1"
                     value={customPreset.speed}
                     onChange={(e) => updateCustomPreset("speed", parseFloat(e.target.value))}
-                    className="bg-gray-800 border-gray-700"
+                    className="bg-neutral-800 border-neutral-700"
                   />
                 </div>
 
@@ -320,7 +320,7 @@ export function AnimationPresetsSelector() {
                     step="1"
                     value={customPreset.complexity}
                     onChange={(e) => updateCustomPreset("complexity", parseInt(e.target.value))}
-                    className="bg-gray-800 border-gray-700"
+                    className="bg-neutral-800 border-neutral-700"
                   />
                 </div>
 
@@ -334,7 +334,7 @@ export function AnimationPresetsSelector() {
                     step="0.1"
                     value={customPreset.noiseScale}
                     onChange={(e) => updateCustomPreset("noiseScale", parseFloat(e.target.value))}
-                    className="bg-gray-800 border-gray-700"
+                    className="bg-neutral-800 border-neutral-700"
                   />
                 </div>
 
@@ -376,7 +376,7 @@ export function AnimationPresetsSelector() {
                 }
                 setOpen(false)
               }}
-              className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+              className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
             >
               Fechar
             </Button>

@@ -28,7 +28,6 @@ describe("useDeviceOptimizations", () => {
   it("desktop com 8+ núcleos usa qualidade alta", () => {
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("high")
-    expect(result.current.frameSkip).toBe(0)
     expect(result.current.maxComplexity).toBe(10)
     expect(result.current.pixelRatio).toBe(2)
     expect(result.current.antialias).toBe(true)
@@ -38,7 +37,6 @@ describe("useDeviceOptimizations", () => {
     mockCores(4)
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("medium")
-    expect(result.current.frameSkip).toBe(1)
     expect(result.current.pixelRatio).toBe(1.5)
   })
 
@@ -54,7 +52,6 @@ describe("useDeviceOptimizations", () => {
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("low")
     expect(result.current.isMobile).toBe(true)
-    expect(result.current.frameSkip).toBe(2)
     expect(result.current.pixelRatio).toBe(1)
   })
 

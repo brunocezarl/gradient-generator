@@ -13,9 +13,6 @@ import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 function GradientShader() {
   // Seletores em vez do store inteiro: arrastar um slider não deve
   // re-renderizar toda a árvore de um app que desenha em canvas
-  const isPlaying = useGradientStore((state) => state.isPlaying)
-  const speed = useGradientStore((state) => state.speed)
-
   const params = useGradientStore(
     useShallow((state) => ({
       complexity: state.complexity,
@@ -28,6 +25,7 @@ function GradientShader() {
       vibrance: state.vibrance,
       blendSpace: state.blendSpace,
       seed: state.seed,
+      loopDuration: state.loopDuration,
     }))
   )
 
@@ -42,14 +40,7 @@ function GradientShader() {
     )
   )
 
-  return (
-    <OrganicGradientShader
-      isPlaying={isPlaying}
-      speed={speed}
-      colors={colors}
-      {...params}
-    />
-  )
+  return <OrganicGradientShader colors={colors} {...params} />
 }
 
 export function GradientScene() {

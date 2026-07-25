@@ -20,10 +20,11 @@ interface ExportOptionsProps {
   ) => Promise<void>
 }
 
-// Tamanhos de saída prontos para os destinos mais comuns (redes sociais,
-// wallpapers). "screen" mantém o comportamento original de escalar a tela.
+// Tamanhos de saída. "artboard" (padrão) herda as dimensões da prancheta — o
+// arquivo sai no tamanho que o preview está mostrando; os demais forçam um
+// destino específico sem mexer na prancheta.
 const SIZE_PRESETS: Record<string, { label: string; width?: number; height?: number }> = {
-  screen: { label: "Tela atual (usar escala)" },
+  artboard: { label: "Prancheta atual" },
   fullhd: { label: "Full HD — 1920×1080", width: 1920, height: 1080 },
   uhd4k: { label: "4K — 3840×2160", width: 3840, height: 2160 },
   qhd: { label: "Wallpaper QHD — 2560×1440", width: 2560, height: 1440 },
@@ -36,7 +37,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   const [format, setFormat] = useState("png")
   const [quality, setQuality] = useState(1)
   const [scale, setScale] = useState(1)
-  const [sizePreset, setSizePreset] = useState("screen")
+  const [sizePreset, setSizePreset] = useState("artboard")
   const [isExporting, setIsExporting] = useState(false)
   const [cssCopied, setCssCopied] = useState(false)
   const { toast } = useToast()
@@ -120,14 +121,16 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+        aria-label="Exportar Imagem"
+        size="sm"
+        className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
         <ImageIcon className="mr-2 h-4 w-4" />
-        Exportar Imagem
+        Imagem
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700">
+        <DialogContent className="bg-neutral-900 text-white border-neutral-700">
           <DialogHeader>
             <DialogTitle>Opções de Exportação</DialogTitle>
           </DialogHeader>
@@ -139,14 +142,14 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                 <Code2 className="h-4 w-4" />
                 Exportar CSS
               </Label>
-              <div className="flex items-center gap-2 bg-gray-800 rounded-md px-3 py-2">
+              <div className="flex items-center gap-2 bg-neutral-800 rounded-md px-3 py-2">
                 <code className="text-xs text-green-400 flex-1 truncate font-mono">
                   {generateCSSGradient()}
                 </code>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 shrink-0 text-gray-400 hover:text-white"
+                  className="h-7 w-7 shrink-0 text-neutral-400 hover:text-white"
                   onClick={handleCopyCSS}
                   title="Copiar CSS"
                   aria-label="Copiar CSS"
@@ -158,23 +161,23 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   )}
                 </Button>
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-neutral-400">
                 Aproximação estática: o gradiente animado usa ruído orgânico, que não é
                 representável em CSS puro.
               </p>
             </div>
 
-            <div className="border-t border-gray-700 pt-4 space-y-4">
+            <div className="border-t border-neutral-700 pt-4 space-y-4">
               {/* Formato */}
               <div className="space-y-2">
                 <Label htmlFor="format" className="text-white">
                   Formato
                 </Label>
                 <Select value={format} onValueChange={setFormat}>
-                  <SelectTrigger id="format" className="bg-gray-800 border-gray-700 text-white">
+                  <SelectTrigger id="format" className="bg-neutral-800 border-neutral-700 text-white">
                     <SelectValue placeholder="Selecione o formato" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                  <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
                     <SelectItem value="png">PNG (Sem perdas)</SelectItem>
                     <SelectItem value="jpeg">JPEG (Menor tamanho)</SelectItem>
                     <SelectItem value="webp">WebP (Moderno)</SelectItem>
@@ -192,10 +195,10 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                     value={quality.toString()}
                     onValueChange={(value) => setQuality(Number(value))}
                   >
-                    <SelectTrigger id="quality" className="bg-gray-800 border-gray-700 text-white">
+                    <SelectTrigger id="quality" className="bg-neutral-800 border-neutral-700 text-white">
                       <SelectValue placeholder="Selecione a qualidade" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                    <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
                       <SelectItem value="0.6">Baixa (60%)</SelectItem>
                       <SelectItem value="0.8">Média (80%)</SelectItem>
                       <SelectItem value="0.9">Alta (90%)</SelectItem>
@@ -211,10 +214,10 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   Dimensões
                 </Label>
                 <Select value={sizePreset} onValueChange={setSizePreset}>
-                  <SelectTrigger id="size-preset" className="bg-gray-800 border-gray-700 text-white">
+                  <SelectTrigger id="size-preset" className="bg-neutral-800 border-neutral-700 text-white">
                     <SelectValue placeholder="Selecione as dimensões" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                  <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
                     {Object.entries(SIZE_PRESETS).map(([key, preset]) => (
                       <SelectItem key={key} value={key}>
                         {preset.label}
@@ -225,7 +228,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
               </div>
 
               {/* Escala — apenas quando exportando no tamanho da tela */}
-              {sizePreset === "screen" && (
+              {sizePreset === "artboard" && (
                 <div className="space-y-2">
                   <Label htmlFor="scale" className="text-white">
                     Tamanho
@@ -234,10 +237,10 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                     value={scale.toString()}
                     onValueChange={(value) => setScale(Number(value))}
                   >
-                    <SelectTrigger id="scale" className="bg-gray-800 border-gray-700 text-white">
+                    <SelectTrigger id="scale" className="bg-neutral-800 border-neutral-700 text-white">
                       <SelectValue placeholder="Selecione o tamanho" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                    <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
                       <SelectItem value="0.5">Pequeno (50%)</SelectItem>
                       <SelectItem value="1">Original (100%)</SelectItem>
                       <SelectItem value="2">Grande (200%)</SelectItem>
@@ -247,10 +250,10 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   </Select>
                 </div>
               )}
-              <p className="text-xs text-gray-400">
-                O gradiente é renderizado nativamente na resolução final — sem perda de
-                nitidez por upscaling. Tamanhos acima do limite da GPU são ajustados
-                automaticamente.
+              <p className="text-xs text-neutral-400">
+                O gradiente é renderizado nativamente na resolução final, com a câmera
+                reprojetada na proporção de saída — sem upscaling e sem distorção.
+                Tamanhos acima do limite da GPU são ajustados automaticamente.
               </p>
             </div>
           </div>
@@ -259,7 +262,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
             <DialogClose asChild>
               <Button
                 variant="outline"
-                className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+                className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
               >
                 Cancelar
               </Button>

@@ -105,10 +105,10 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         <Label className="text-white">{label}</Label>
         <div className="flex items-center gap-2">
           {/* Toggle RGB / HSL */}
-          <div className="flex rounded-md overflow-hidden border border-gray-700 text-xs">
+          <div className="flex rounded-md overflow-hidden border border-neutral-700 text-xs">
             <button
               className={`px-2 py-0.5 transition-colors ${
-                mode === "rgb" ? "bg-gray-600 text-white" : "bg-gray-900 text-gray-400 hover:bg-gray-800"
+                mode === "rgb" ? "bg-neutral-600 text-white" : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800"
               }`}
               onClick={() => setMode("rgb")}
             >
@@ -116,7 +116,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
             </button>
             <button
               className={`px-2 py-0.5 transition-colors ${
-                mode === "hsl" ? "bg-gray-600 text-white" : "bg-gray-900 text-gray-400 hover:bg-gray-800"
+                mode === "hsl" ? "bg-neutral-600 text-white" : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800"
               }`}
               onClick={() => setMode("hsl")}
             >
@@ -125,7 +125,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           </div>
           {/* Preview */}
           <div
-            className="w-7 h-7 rounded-full border border-gray-600 flex-shrink-0"
+            className="w-7 h-7 rounded-full border border-neutral-600 flex-shrink-0"
             style={{ backgroundColor: hexColor }}
           />
         </div>
@@ -137,7 +137,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           value={hexInput}
           onChange={(e) => handleHexChange(e.target.value)}
           placeholder="#rrggbb"
-          className={`bg-gray-900 border-gray-700 text-white font-mono text-sm h-8 ${
+          className={`bg-neutral-900 border-neutral-700 text-white font-mono text-sm h-8 ${
             hexError ? "border-red-500" : ""
           }`}
           maxLength={7}
@@ -156,8 +156,8 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           ).map(({ label: ch, value, onChange: onCh }) => (
             <div key={ch} className="space-y-1">
               <div className="flex justify-between">
-                <Label className="text-xs text-gray-400">{ch}</Label>
-                <span className="text-xs text-gray-400">{value}</span>
+                <Label className="text-xs text-neutral-400">{ch}</Label>
+                <span className="text-xs text-neutral-400">{value}</span>
               </div>
               <Slider
                 value={[value]}
@@ -177,8 +177,8 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         <div className="space-y-3">
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-gray-400">H (Matiz)</Label>
-              <span className="text-xs text-gray-400">{hsl[0]}°</span>
+              <Label className="text-xs text-neutral-400">H (Matiz)</Label>
+              <span className="text-xs text-neutral-400">{hsl[0]}°</span>
             </div>
             <Slider
               value={[hsl[0]]}
@@ -191,8 +191,8 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-gray-400">S (Saturação)</Label>
-              <span className="text-xs text-gray-400">{hsl[1]}%</span>
+              <Label className="text-xs text-neutral-400">S (Saturação)</Label>
+              <span className="text-xs text-neutral-400">{hsl[1]}%</span>
             </div>
             <Slider
               value={[hsl[1]]}
@@ -205,8 +205,8 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-gray-400">L (Luminosidade)</Label>
-              <span className="text-xs text-gray-400">{hsl[2]}%</span>
+              <Label className="text-xs text-neutral-400">L (Luminosidade)</Label>
+              <span className="text-xs text-neutral-400">{hsl[2]}%</span>
             </div>
             <Slider
               value={[hsl[2]]}

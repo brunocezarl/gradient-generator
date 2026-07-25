@@ -33,6 +33,7 @@ export interface ShareableGradient {
   vibrance?: number
   blendSpace?: string
   seed?: [number, number]
+  loopDuration?: number
 }
 
 // ─── Codificação compacta ─────────────────────────────────────────────────────
@@ -93,6 +94,7 @@ type PackedGradient = {
   vb?: number // vibrance
   bs?: string // blendSpace
   sd?: number[] // seed
+  ld?: number // loopDuration
 }
 
 function pack(data: ShareableGradient): PackedGradient {
@@ -116,6 +118,7 @@ function pack(data: ShareableGradient): PackedGradient {
   if (data.vibrance !== undefined) packed.vb = round3(data.vibrance)
   if (data.blendSpace !== undefined) packed.bs = data.blendSpace
   if (data.seed !== undefined) packed.sd = data.seed.map(round3)
+  if (data.loopDuration !== undefined) packed.ld = round3(data.loopDuration)
 
   if (data.multiLayerMode && data.layers && data.layers.length > 0) {
     packed.ml = 1
@@ -167,6 +170,7 @@ function unpack(packed: PackedGradient): ShareableGradient {
   if (packed.bs !== undefined) data.blendSpace = packed.bs
   if (packed.sd !== undefined && packed.sd.length >= 2)
     data.seed = [packed.sd[0], packed.sd[1]]
+  if (packed.ld !== undefined) data.loopDuration = packed.ld
 
   if (packed.ml === 1 && Array.isArray(packed.ly)) {
     data.multiLayerMode = true
@@ -216,6 +220,7 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     vibrance: state.vibrance ?? 0,
     blendSpace: state.blendSpace ?? "oklab",
     seed: state.seed ?? [0, 0],
+    loopDuration: state.loopDuration ?? 0,
   }
 
   // Camadas só entram no link quando o modo multi-camadas está ativo — o

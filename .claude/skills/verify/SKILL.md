@@ -30,15 +30,48 @@ const browser = await chromium.launch({
 })
 ```
 
-Fluxos que valem dirigir:
+### Estado determinístico
 
-- **Canvas monta**: `page.locator("canvas").count()` ≥ 1 após ~2s.
+`reducedMotion: "reduce"` no contexto faz o app iniciar pausado com o relógio da
+animação em exatamente 0 — dois renders da mesma configuração ficam comparáveis
+pixel a pixel. Para fixar a configuração, injete o store antes do load:
+
+```js
+await page.addInitScript((value) => {
+  window.localStorage.setItem("gradient-store", value)
+}, JSON.stringify({ state: { /* ... */ }, version: 1 }))
+```
+
+Omitir `version` reproduz o localStorage das versões antigas: o zustand não
+chama `migrate` nesse caso, e a normalização acontece no `merge` do persist.
+
+### Fluxos que valem dirigir
+
+- **Canvas monta**: `page.locator("canvas").count()` ≥ 1 após ~2s. Em
+  multi-camadas o resultado é **1** canvas (a composição usa render targets, não
+  um contexto WebGL por camada).
 - **Estado do store**: leia `JSON.parse(localStorage.getItem("gradient-store")).state`
   para asserções (speed, flowIntensity, randomHistory, savedPresets…).
-- **Exportar imagem**: botão "Exportar Imagem" → dialog → `waitForEvent("download")`;
-  dimensões do PNG baixado: `buf.readUInt32BE(16)` × `buf.readUInt32BE(20)`.
-- **Compartilhar**: botão "Compartilhar Gradiente" → input `#share-url`; abra a
-  URL em um `browser.newContext()` limpo e compare o estado importado.
+- **Prancheta**: o `<canvas>` assume a proporção da prancheta escolhida —
+  `boundingBox()` confirma. Exportar sem tocar em "Dimensões" herda as medidas
+  da prancheta.
+- **Exportar imagem**: botão com aria-label "Exportar Imagem" (texto visível
+  "Imagem") → dialog → botão "Exportar" → `waitForEvent("download")`; dimensões
+  do PNG baixado: `buf.readUInt32BE(16)` × `buf.readUInt32BE(20)`.
+- **Timeline**: o thumb tem nome acessível —
+  `page.getByRole("slider", { name: "Instante da animação" })` aceita foco e
+  setas (`Home`/`End` vão aos extremos). Play/pause: botões com aria-label
+  "Reproduzir animação" / "Pausar animação" (use `exact: true`, o painel tem
+  rótulos parecidos).
+- **Loop perfeito**: com `loopDuration > 0`, o frame em `t=0` (`Home`) é
+  idêntico ao frame em `t=T` (`End`).
+- **Exportar vídeo**: WebCodecs existe no Chromium headless, mas só com **VP9**
+  (não há encoder de software para AVC/H.264 aqui) — o app detecta em runtime e
+  oferece apenas WebM. Duração e dimensões do arquivo se medem carregando o blob
+  em um `<video>` na própria página; comparar o frame de `t=0` com o de um ciclo
+  depois verifica a emenda do loop.
+- **Compartilhar**: botão "Compartilhar" → input `#share-url`; abra a URL em um
+  `browser.newContext()` limpo e compare o estado importado.
 - **UI em português**: seletores por texto usam os rótulos PT-BR
   ("Randomizar", "Restaurar Padrões", aba "Presets").
 

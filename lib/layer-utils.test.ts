@@ -1,25 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { blendModes, blendModeToCSS, createDefaultLayer, generateLayerId } from "@/lib/layer-utils"
-
-describe("blendModeToCSS", () => {
-  it("converte chaves camelCase para valores CSS", () => {
-    expect(blendModeToCSS("colorDodge")).toBe("color-dodge")
-    expect(blendModeToCSS("colorBurn")).toBe("color-burn")
-    expect(blendModeToCSS("hardLight")).toBe("hard-light")
-    expect(blendModeToCSS("softLight")).toBe("soft-light")
-  })
-
-  it("mapeia todos os blend modes disponíveis na UI", () => {
-    for (const mode of Object.keys(blendModes)) {
-      expect(blendModeToCSS(mode)).toBeTruthy()
-    }
-  })
-
-  it("usa 'normal' como fallback para modos desconhecidos", () => {
-    expect(blendModeToCSS("inexistente")).toBe("normal")
-    expect(blendModeToCSS("")).toBe("normal")
-  })
-})
+import { blendModes, createDefaultLayer, generateLayerId } from "@/lib/layer-utils"
 
 describe("createDefaultLayer", () => {
   it("cria camada visível com o id fornecido e limiares coerentes", () => {

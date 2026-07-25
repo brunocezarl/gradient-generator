@@ -758,6 +758,7 @@ describe("presets guardam a composição de camadas", () => {
       vibrance: 0,
       blendSpace: "oklab" as const,
       seed: [0, 0] as [number, number],
+      loopDuration: 0,
     }
 
     useGradientStore.getState().applySnapshot(legacySnapshot)
@@ -920,7 +921,10 @@ describe("migratePersistedState", () => {
     expect(migratePersistedState({}, 0)).toEqual({
       vibrance: 0,
       blendSpace: "oklab",
+      loopDuration: 0,
       seed: [0, 0],
+      artboardId: "free",
+      showSafeAreas: false,
     })
   })
 })

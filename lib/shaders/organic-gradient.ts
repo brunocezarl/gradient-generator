@@ -28,8 +28,11 @@ export const organicGradientFragmentShader = /* glsl */ `
   uniform float uThresholdMin;
   uniform float uThresholdMax;
   uniform float uVibrance;
-  uniform float uOklabMix; // 1.0 = misturar em Oklab, 0.0 = em RGB linear
-  uniform vec2 uSeed;      // deslocamento no campo de ruído
+  uniform float uOklabMix;     // 1.0 = misturar em Oklab, 0.0 = em RGB linear
+  uniform vec2 uSeed;          // deslocamento no campo de ruído
+  uniform float uLoopDuration; // 0 = animação livre; > 0 = período do loop
+
+  const float TAU = 6.28318530718;
 
   varying vec2 vUv;
 
@@ -148,6 +151,13 @@ export const organicGradientFragmentShader = /* glsl */ `
     vec2 noiseUv = uv + uSeed;
     float time = uTime * 0.5;
 
+    // Em modo loop o tempo percorre um círculo no campo de ruído em vez de
+    // derivar em linha reta: ao completar a volta o desenho volta a ser
+    // exatamente o mesmo, o que permite vídeo sem corte. O raio acompanha a
+    // duração para que a sensação de velocidade seja a mesma do modo livre.
+    bool looping = uLoopDuration > 0.0;
+    float theta = looping ? TAU * (uTime / uLoopDuration) : 0.0;
+
     // Somar oitavas de ruído: a complexidade define quantas entram
     float noise = 0.0;
     float maxLayers = min(max(1.0, uComplexity * 1.5), 10.0);
@@ -158,11 +168,16 @@ export const organicGradientFragmentShader = /* glsl */ `
       // Direção do fluxo vinda do curl noise
       vec2 flow = curl(noiseUv.x * i * uNoiseScale, noiseUv.y * i * uNoiseScale) * uFlowIntensity;
 
+      float modulation = looping ? sin(theta * i) : sin(time * i * 0.5);
+      vec2 phase = looping
+        ? vec2(cos(theta * i), sin(theta * i)) * (0.024 * i * uLoopDuration)
+        : vec2(time * i * 0.3);
+
       // Animar as coordenadas ao longo do fluxo
-      vec2 animatedUV = noiseUv + flow * (sin(time * i * 0.5) * 0.2);
+      vec2 animatedUV = noiseUv + flow * (modulation * 0.2);
 
       // Frequências mais altas pesam menos
-      noise += snoise(animatedUV * i * uNoiseScale + time * i * 0.3) * (1.0 / i);
+      noise += snoise(animatedUV * i * uNoiseScale + phase) * (1.0 / i);
     }
 
     // Normalizar para 0-1

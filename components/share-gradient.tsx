@@ -77,24 +77,25 @@ export function ShareGradient() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+        size="sm"
+        className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
         <Share className="mr-2 h-4 w-4" />
-        Compartilhar Gradiente
+        Compartilhar
       </Button>
       
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700 sm:max-w-md">
+        <DialogContent className="bg-neutral-900 text-white border-neutral-700 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Compartilhar Gradiente</DialogTitle>
           </DialogHeader>
           
           <Tabs defaultValue="link" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-800">
-              <TabsTrigger value="link" className="text-white data-[state=active]:bg-gray-700">
+            <TabsList className="grid w-full grid-cols-2 bg-neutral-800">
+              <TabsTrigger value="link" className="text-white data-[state=active]:bg-neutral-700">
                 Link
               </TabsTrigger>
-              <TabsTrigger value="qrcode" className="text-white data-[state=active]:bg-gray-700">
+              <TabsTrigger value="qrcode" className="text-white data-[state=active]:bg-neutral-700">
                 QR Code
               </TabsTrigger>
             </TabsList>
@@ -107,7 +108,7 @@ export function ShareGradient() {
                     id="share-url"
                     value={shareableURL}
                     readOnly
-                    className="bg-gray-800 border-gray-700 text-white flex-1"
+                    className="bg-neutral-800 border-neutral-700 text-white flex-1"
                     onClick={(e) => (e.target as HTMLInputElement).select()}
                   />
                   <Button
@@ -136,7 +137,7 @@ export function ShareGradient() {
               <div className="flex justify-center p-4 bg-white rounded-md">
                 <QRCodeSVG value={shareableURL} size={200} />
               </div>
-              <p className="text-sm text-gray-400 text-center">
+              <p className="text-sm text-neutral-400 text-center">
                 Escaneie o código QR com a câmera do seu dispositivo para abrir este gradiente.
               </p>
             </TabsContent>
@@ -145,7 +146,7 @@ export function ShareGradient() {
           <DialogFooter>
             <Button
               onClick={() => setOpen(false)}
-              className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+              className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
             >
               Fechar
             </Button>
