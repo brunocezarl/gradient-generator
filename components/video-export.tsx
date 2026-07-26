@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogBody,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
@@ -200,133 +201,135 @@ export function VideoExport({ containerRef }: VideoExportProps) {
             <DialogTitle>Export Video</DialogTitle>
           </DialogHeader>
 
-          {unsupported ? (
-            <p className="py-4 text-sm text-neutral-300">
-This browser does not expose the WebCodecs API, which is required to record with
-              an exact frame rate and duration. Update the browser, or export images instead.
-            </p>
-          ) : isRecording ? (
-            <div className="py-6 space-y-4">
-              <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-blue-500 h-full transition-[width] duration-150"
-                  style={{ width: `${Math.round(progress * 100)}%` }}
-                />
-              </div>
-              <p className="text-sm text-neutral-300 text-center">
-                Rendering frame {Math.round(progress * plan.frameCount)} of{" "}
-                {plan.frameCount}
+          <DialogBody>
+            {unsupported ? (
+              <p className="text-sm text-neutral-300">
+  This browser does not expose the WebCodecs API, which is required to record with
+                an exact frame rate and duration. Update the browser, or export images instead.
               </p>
-              <p className="text-xs text-neutral-500 text-center">
-Each frame is drawn at an exact instant of the animation: recording can take
-                longer than the video lasts, without dropping a single frame.
-              </p>
-            </div>
-          ) : (
-            <div className="py-4 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="video-filename" className="text-white">
-                  File name
-                </Label>
-                <Input
-                  id="video-filename"
-                  value={filename}
-                  onChange={(event) => setFilename(event.target.value)}
-                  className="bg-neutral-800 border-neutral-700 text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="video-resolution" className="text-white">
-                    Resolution
-                  </Label>
-                  <Select value={resolution} onValueChange={setResolution}>
-                    <SelectTrigger
-                      id="video-resolution"
-                      className="bg-neutral-800 border-neutral-700 text-white"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
-                      {RESOLUTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            ) : isRecording ? (
+              <div className="py-2 space-y-4">
+                <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-blue-500 h-full transition-[width] duration-150"
+                    style={{ width: `${Math.round(progress * 100)}%` }}
+                  />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="video-format" className="text-white">
-                    Format
-                  </Label>
-                  <Select
-                    value={format}
-                    onValueChange={(value) => setFormat(value as VideoFormat)}
-                  >
-                    <SelectTrigger
-                      id="video-format"
-                      className="bg-neutral-800 border-neutral-700 text-white"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
-                      {(availableFormats ?? (["mp4", "webm"] as VideoFormat[])).map(
-                        (value) => (
-                          <SelectItem key={value} value={value}>
-                            {value === "mp4" ? "MP4 (H.264)" : "WebM (VP9)"}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-white">Duration: {duration}s</Label>
-                <Slider
-                  value={[duration]}
-                  min={1}
-                  max={30}
-                  step={1}
-                  onValueChange={(value) => setDuration(value[0])}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-white">Frame rate: {fps} fps</Label>
-                <Slider
-                  value={[fps]}
-                  min={12}
-                  max={60}
-                  step={6}
-                  onValueChange={(value) => setFps(value[0])}
-                />
-              </div>
-
-              <div className="rounded-md bg-neutral-800/60 p-3 space-y-1.5 text-xs text-neutral-300">
-                <p className="flex items-center gap-1.5">
-                  <Info className="h-3.5 w-3.5 shrink-0" />
-                  {size.width}×{size.height} · {plan.frameCount} frames ·{" "}
-                  {plan.videoDuration.toFixed(1)}s · ~{bitrate} Mbps
+                <p className="text-sm text-neutral-300 text-center">
+                  Rendering frame {Math.round(progress * plan.frameCount)} of{" "}
+                  {plan.frameCount}
                 </p>
-                {plan.loopExact ? (
-                  <p className="flex items-center gap-1.5 text-green-400">
-                    <Repeat className="h-3.5 w-3.5 shrink-0" />
-Closed loop: {loopCycles} complete cycle(s), the seam does not show.
-                  </p>
-                ) : (
-                  <p className="text-neutral-400">
-With no loop set the animation drifts without repeating, so the seam in the
-                    video shows. Set a loop on the timeline for a file that runs continuously.
-                  </p>
-                )}
+                <p className="text-xs text-neutral-500 text-center">
+  Each frame is drawn at an exact instant of the animation: recording can take
+                  longer than the video lasts, without dropping a single frame.
+                </p>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="video-filename" className="text-white">
+                    File name
+                  </Label>
+                  <Input
+                    id="video-filename"
+                    value={filename}
+                    onChange={(event) => setFilename(event.target.value)}
+                    className="bg-neutral-800 border-neutral-700 text-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="video-resolution" className="text-white">
+                      Resolution
+                    </Label>
+                    <Select value={resolution} onValueChange={setResolution}>
+                      <SelectTrigger
+                        id="video-resolution"
+                        className="bg-neutral-800 border-neutral-700 text-white"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
+                        {RESOLUTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="video-format" className="text-white">
+                      Format
+                    </Label>
+                    <Select
+                      value={format}
+                      onValueChange={(value) => setFormat(value as VideoFormat)}
+                    >
+                      <SelectTrigger
+                        id="video-format"
+                        className="bg-neutral-800 border-neutral-700 text-white"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
+                        {(availableFormats ?? (["mp4", "webm"] as VideoFormat[])).map(
+                          (value) => (
+                            <SelectItem key={value} value={value}>
+                              {value === "mp4" ? "MP4 (H.264)" : "WebM (VP9)"}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white">Duration: {duration}s</Label>
+                  <Slider
+                    value={[duration]}
+                    min={1}
+                    max={30}
+                    step={1}
+                    onValueChange={(value) => setDuration(value[0])}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white">Frame rate: {fps} fps</Label>
+                  <Slider
+                    value={[fps]}
+                    min={12}
+                    max={60}
+                    step={6}
+                    onValueChange={(value) => setFps(value[0])}
+                  />
+                </div>
+
+                <div className="rounded-md bg-neutral-800/60 p-3 space-y-1.5 text-xs text-neutral-300">
+                  <p className="flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5 shrink-0" />
+                    {size.width}×{size.height} · {plan.frameCount} frames ·{" "}
+                    {plan.videoDuration.toFixed(1)}s · ~{bitrate} Mbps
+                  </p>
+                  {plan.loopExact ? (
+                    <p className="flex items-center gap-1.5 text-green-400">
+                      <Repeat className="h-3.5 w-3.5 shrink-0" />
+  Closed loop: {loopCycles} complete cycle(s), the seam does not show.
+                    </p>
+                  ) : (
+                    <p className="text-neutral-400">
+  With no loop set the animation drifts without repeating, so the seam in the
+                      video shows. Set a loop on the timeline for a file that runs continuously.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogBody>
 
           <DialogFooter>
             {isRecording ? (
