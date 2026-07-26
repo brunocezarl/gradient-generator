@@ -5,11 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { ImageIcon, Loader2, Code2, Copy, Check } from "lucide-react"
+import { ImageIcon, Loader2, Code2, Copy, Check, Download } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useShallow } from "zustand/react/shallow"
-import { useGradientStore, resolveActiveColors } from "@/lib/store"
-import { rgbToHex } from "@/lib/utils"
+import { useGradientStore, resolveActiveStops } from "@/lib/store"
+import { stopsToCss } from "@/lib/color-stops"
+import {
+  generateTokens,
+  tokenFormatExtensions,
+  tokenFormatLabels,
+  type TokenFormat,
+} from "@/lib/tokens"
 
 interface ExportOptionsProps {
   onExport: (
@@ -42,47 +48,36 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
   const [cssCopied, setCssCopied] = useState(false)
   const { toast } = useToast()
 
-  const { colorScheme, colorSchemes, isCustomMode, customColors, blendSpace } =
+  const [tokenFormat, setTokenFormat] = useState<TokenFormat>("css")
+
+  const { colorScheme, colorSchemes, isCustomMode, customStops, blendSpace } =
     useGradientStore(
       useShallow((state) => ({
         colorScheme: state.colorScheme,
         colorSchemes: state.colorSchemes,
         isCustomMode: state.isCustomMode,
-        customColors: state.customColors,
+        customStops: state.customStops,
         blendSpace: state.blendSpace,
       }))
     )
 
-  // ─── Gerar CSS ─────────────────────────────────────────────────────────────
+  const stops = resolveActiveStops({ isCustomMode, customStops, colorScheme, colorSchemes })
+  const schemeName = isCustomMode
+    ? "gradient"
+    : colorSchemes[colorScheme]?.name ?? colorScheme
 
-  const generateCSSGradient = (): string => {
-    const { color1: c1, color2: c2, color3: c3 } = resolveActiveColors({
-      isCustomMode,
-      customColors,
-      colorScheme,
-      colorSchemes,
-    })
+  // ─── Tokens ────────────────────────────────────────────────────────────────
 
-    const toHex = (c: [number, number, number]) =>
-      rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
+  const tokens = generateTokens(tokenFormat, { stops, blendSpace, name: schemeName })
 
-    const h1 = toHex(c1)
-    const h2 = toHex(c2)
-    const h3 = toHex(c3)
-
-    // O espaço de interpolação acompanha o do render: sem `in oklab` o CSS
-    // misturaria em sRGB e produziria um meio de gradiente diferente do canvas
-    const interpolation = blendSpace === "oklab" ? " in oklab" : " in srgb-linear"
-
-    return `background: linear-gradient(135deg${interpolation}, ${h1} 0%, ${h2} 50%, ${h3} 100%);`
-  }
-
-  const handleCopyCSS = async () => {
-    const css = generateCSSGradient()
+  const copyTokens = async () => {
     try {
-      await navigator.clipboard.writeText(css)
+      await navigator.clipboard.writeText(tokens)
       setCssCopied(true)
-      toast({ title: "CSS Copiado!", description: css })
+      toast({
+        title: "Copiado!",
+        description: `${tokenFormatLabels[tokenFormat]} na área de transferência.`,
+      })
       setTimeout(() => setCssCopied(false), 2000)
     } catch {
       toast({
@@ -91,6 +86,18 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
         variant: "destructive",
       })
     }
+  }
+
+  const downloadTokens = () => {
+    const blob = new Blob([tokens], { type: "text/plain;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `paleta.${tokenFormatExtensions[tokenFormat]}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   // ─── Exportar imagem ────────────────────────────────────────────────────────
@@ -136,23 +143,37 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
           </DialogHeader>
 
           <div className="py-4 space-y-4">
-            {/* Copiar CSS */}
+            {/* Tokens da paleta */}
             <div className="space-y-2">
               <Label className="text-white flex items-center gap-1">
                 <Code2 className="h-4 w-4" />
-                Exportar CSS
+                Tokens da paleta
               </Label>
-              <div className="flex items-center gap-2 bg-neutral-800 rounded-md px-3 py-2">
-                <code className="text-xs text-green-400 flex-1 truncate font-mono">
-                  {generateCSSGradient()}
-                </code>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={tokenFormat}
+                  onValueChange={(value) => setTokenFormat(value as TokenFormat)}
+                >
+                  <SelectTrigger
+                    id="token-format"
+                    className="h-8 flex-1 bg-neutral-800 border-neutral-700 text-white text-xs"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
+                    {(Object.keys(tokenFormatLabels) as TokenFormat[]).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {tokenFormatLabels[value]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-neutral-400 hover:text-white"
-                  onClick={handleCopyCSS}
-                  title="Copiar CSS"
-                  aria-label="Copiar CSS"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
+                  onClick={copyTokens}
+                  aria-label="Copiar tokens"
                 >
                   {cssCopied ? (
                     <Check className="h-4 w-4 text-green-400" />
@@ -160,10 +181,22 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                     <Copy className="h-4 w-4" />
                   )}
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
+                  onClick={downloadTokens}
+                  aria-label="Baixar tokens"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
               </div>
+              <pre className="max-h-32 overflow-auto rounded-md bg-neutral-800 px-3 py-2 text-[10px] leading-relaxed text-green-400 font-mono">
+                {tokens}
+              </pre>
               <p className="text-xs text-neutral-400">
-                Aproximação estática: o gradiente animado usa ruído orgânico, que não é
-                representável em CSS puro.
+                As {stops.length} paradas com posição, matiz/croma/luminosidade em OKLCH e o
+                gradiente CSS no mesmo espaço de interpolação do render.
               </p>
             </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,32 +12,96 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { Save, Trash2, Dices } from "lucide-react"
+import { Save, Trash2, Dices, Download, Upload } from "lucide-react"
 import {
   useGradientStore,
-  resolveActiveColors,
+  resolveActiveStops,
   StateSnapshot,
   GradientStore,
 } from "@/lib/store"
-import { rgbToHex } from "@/lib/utils"
+import { stopsToCss } from "@/lib/color-stops"
+import { disposeThumbnailRenderer, renderThumbnail } from "@/lib/thumbnail"
 import { useToast } from "@/components/ui/use-toast"
 
-// Gera a pré-visualização CSS de um snapshot (aproximação estática do shader)
+// Gradiente CSS das paradas de um snapshot, no mesmo espaço de interpolação do
+// render. Usado como preview instantâneo enquanto a miniatura renderizada pelo
+// shader não está pronta.
 export function snapshotToGradientCSS(
   snapshot: StateSnapshot,
   colorSchemes: GradientStore["colorSchemes"],
 ): string {
-  const { color1, color2, color3 } = resolveActiveColors({
+  const stops = resolveActiveStops({
     isCustomMode: snapshot.isCustomMode,
-    customColors: snapshot.customColors,
+    customStops: snapshot.customStops,
     colorScheme: snapshot.colorScheme,
     colorSchemes,
   })
-  const hex = (c: number[]) =>
-    rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
-  // Mesmo espaço de interpolação do render, para a miniatura não mentir
-  const interpolation = snapshot.blendSpace === "linear" ? " in srgb-linear" : " in oklab"
-  return `linear-gradient(135deg${interpolation}, ${hex(color1)}, ${hex(color2)}, ${hex(color3)})`
+  return stopsToCss(stops, snapshot.blendSpace)
+}
+
+/**
+ * Miniaturas renderizadas pelo shader, com o CSS como preview imediato.
+ *
+ * O render acontece uma vez por preset e fica em cache: a galeria é uma lista de
+ * imagens estáticas, não N canvases vivos.
+ */
+function useSnapshotThumbnails(
+  presets: readonly { id: string; snapshot: StateSnapshot }[],
+  colorSchemes: GradientStore["colorSchemes"]
+) {
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const cache = useRef<Map<string, string>>(new Map())
+
+  const signature = presets.map((preset) => preset.id).join("|")
+
+  useEffect(() => {
+    let cancelled = false
+    const pending = presets.filter((preset) => !cache.current.has(preset.id))
+    if (pending.length === 0) return
+
+    // Um frame por preset, cedendo o controle entre eles: abrir a galeria com
+    // 30 presets não pode travar a interface
+    const render = (index: number) => {
+      if (cancelled || index >= pending.length) return
+      const preset = pending[index]
+      const snapshot = preset.snapshot
+      const dataUrl = renderThumbnail({
+        stops: resolveActiveStops({
+          isCustomMode: snapshot.isCustomMode,
+          customStops: snapshot.customStops,
+          colorScheme: snapshot.colorScheme,
+          colorSchemes,
+        }),
+        complexity: snapshot.complexity,
+        noiseScale: snapshot.noiseScale,
+        flowIntensity: snapshot.flowIntensity,
+        grainAmount: snapshot.grainAmount,
+        grainScale: snapshot.grainScale,
+        thresholdMin: snapshot.thresholdMin,
+        thresholdMax: snapshot.thresholdMax,
+        vibrance: snapshot.vibrance,
+        blendSpace: snapshot.blendSpace,
+        seed: snapshot.seed,
+        loopDuration: snapshot.loopDuration,
+      })
+
+      if (dataUrl) {
+        cache.current.set(preset.id, dataUrl)
+        setThumbnails((current) => ({ ...current, [preset.id]: dataUrl }))
+      }
+      requestAnimationFrame(() => render(index + 1))
+    }
+
+    requestAnimationFrame(() => render(0))
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, colorSchemes])
+
+  useEffect(() => () => disposeThumbnailRenderer(), [])
+
+  return thumbnails
 }
 
 // ─── Galeria de presets completos ────────────────────────────────────────────
@@ -54,6 +118,43 @@ export function PresetGallery() {
   const saveCurrentPreset = useGradientStore((state) => state.saveCurrentPreset)
   const applyPreset = useGradientStore((state) => state.applyPreset)
   const deletePreset = useGradientStore((state) => state.deletePreset)
+  const exportLibrary = useGradientStore((state) => state.exportLibrary)
+  const importLibrary = useGradientStore((state) => state.importLibrary)
+
+  const thumbnails = useSnapshotThumbnails(savedPresets, colorSchemes)
+  const importRef = useRef<HTMLInputElement>(null)
+
+  const handleExportLibrary = () => {
+    const blob = new Blob([exportLibrary()], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `biblioteca-gradientes-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast({
+      title: "Biblioteca exportada",
+      description: `${savedPresets.length} preset(s) e ${Object.keys(colorSchemes).length} esquema(s).`,
+    })
+  }
+
+  const handleImportLibrary = async (file: File) => {
+    try {
+      const { presets, schemes } = importLibrary(await file.text())
+      toast({
+        title: "Biblioteca importada",
+        description: `${presets} preset(s) e ${schemes} esquema(s) adicionados.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Não foi possível importar",
+        description: error instanceof Error ? error.message : "Arquivo inválido.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleSave = () => {
     const name = presetName.trim()
@@ -78,15 +179,51 @@ export function PresetGallery() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Label className="text-white">Meus Presets</Label>
-        <Button
-          size="sm"
-          onClick={() => setSaveDialogOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white h-8"
-        >
-          <Save className="mr-2 h-3.5 w-3.5" />
-          Salvar atual
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-neutral-400 hover:text-white"
+            onClick={handleExportLibrary}
+            disabled={savedPresets.length === 0}
+            title="Exportar biblioteca (JSON)"
+            aria-label="Exportar biblioteca"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-neutral-400 hover:text-white"
+            onClick={() => importRef.current?.click()}
+            title="Importar biblioteca (JSON)"
+            aria-label="Importar biblioteca"
+          >
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setSaveDialogOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white h-8"
+          >
+            <Save className="mr-2 h-3.5 w-3.5" />
+            Salvar atual
+          </Button>
+        </div>
       </div>
+
+      <input
+        ref={importRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        aria-label="Arquivo de biblioteca para importar"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) handleImportLibrary(file)
+          event.target.value = ""
+        }}
+      />
 
       {savedPresets.length === 0 ? (
         <p className="text-xs text-neutral-500">
@@ -109,9 +246,19 @@ export function PresetGallery() {
                 className="w-full text-left"
                 aria-label={`Aplicar preset ${preset.name}`}
               >
+                {/* Miniatura renderizada pelo shader; o gradiente CSS aparece
+                    antes dela ficar pronta e serve de fallback se o navegador
+                    não conceder outro contexto WebGL */}
                 <div
-                  className="h-12 w-full"
-                  style={{ background: snapshotToGradientCSS(preset.snapshot, colorSchemes) }}
+                  className="h-16 w-full bg-cover bg-center"
+                  style={{
+                    backgroundImage: thumbnails[preset.id]
+                      ? `url(${thumbnails[preset.id]})`
+                      : undefined,
+                    background: thumbnails[preset.id]
+                      ? `url(${thumbnails[preset.id]}) center/cover`
+                      : snapshotToGradientCSS(preset.snapshot, colorSchemes),
+                  }}
                 />
                 <div className="px-2 py-1.5 bg-neutral-900">
                   <p className="text-xs text-white truncate">{preset.name}</p>

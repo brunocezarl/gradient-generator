@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { Canvas } from "@react-three/fiber"
 import { useShallow } from "zustand/react/shallow"
-import { useGradientStore, resolveActiveColors } from "@/lib/store"
+import { useGradientStore, resolveActiveStops } from "@/lib/store"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
 import { OrganicGradientShader } from "@/components/organic-gradient-shader"
@@ -29,18 +29,16 @@ function GradientShader() {
     }))
   )
 
-  const colors = useGradientStore(
-    useShallow((state) =>
-      resolveActiveColors({
-        isCustomMode: state.isCustomMode,
-        customColors: state.customColors,
-        colorScheme: state.colorScheme,
-        colorSchemes: state.colorSchemes,
-      })
-    )
+  const stops = useGradientStore((state) =>
+    resolveActiveStops({
+      isCustomMode: state.isCustomMode,
+      customStops: state.customStops,
+      colorScheme: state.colorScheme,
+      colorSchemes: state.colorSchemes,
+    })
   )
 
-  return <OrganicGradientShader colors={colors} {...params} />
+  return <OrganicGradientShader stops={stops} {...params} />
 }
 
 export function GradientScene() {

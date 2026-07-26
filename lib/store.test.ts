@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import {
   useGradientStore,
-  resolveActiveColors,
+  resolveActiveStops,
   migratePersistedState,
   normalizePersistedState,
   PERSIST_VERSION,
@@ -24,7 +24,7 @@ beforeEach(() => {
   useGradientStore.setState(
     {
       ...initialState,
-      customColors: { ...initialState.customColors },
+      customStops: initialState.customStops.map((stop) => ({ ...stop })),
       colorSchemes: { ...initialState.colorSchemes },
       layers: [...initialState.layers],
       past: [],
@@ -177,7 +177,7 @@ describe("importSettings", () => {
     expect(useGradientStore.getState().colorScheme).toBe("redBlue")
   })
 
-  it("valida e limita as cores customizadas; usa fallback para color3 ausente", () => {
+  it("converte links de três cores em paradas, saturando valores fora de 0-1", () => {
     useGradientStore.getState().importSettings({
       speed: 1,
       complexity: 3,
@@ -187,10 +187,10 @@ describe("importSettings", () => {
       customColors: { color1: [5, -1, 0.5], color2: [0.1, 0.2, 0.3] },
     })
 
-    const { customColors } = useGradientStore.getState()
-    expect(customColors.color1).toEqual([1, 0, 0.5])
-    expect(customColors.color2).toEqual([0.1, 0.2, 0.3])
-    expect(customColors.color3).toEqual([0.5, 0.0, 0.5])
+    const { customStops } = useGradientStore.getState()
+    expect(customStops).toHaveLength(2)
+    expect(customStops[0]).toEqual({ color: [1, 0, 0.5], position: 0 })
+    expect(customStops[1]).toEqual({ color: [0.1, 0.2, 0.3], position: 1 })
   })
 
   it("rejeita cores malformadas", () => {
@@ -200,13 +200,13 @@ describe("importSettings", () => {
       noiseScale: 2,
       colorScheme: "redBlue",
       isCustomMode: true,
-      // @ts-expect-error — simula payload externo inválido
-      customColors: { color1: "vermelho", color2: [0.1] },
+      // Payload externo inválido: um link editado à mão
+      customColors: { color1: "vermelho" as unknown as number[], color2: [0.1] },
     })
 
-    const { customColors } = useGradientStore.getState()
-    expect(customColors.color1).toEqual([0.9, 0.1, 0.1])
-    expect(customColors.color2).toEqual([0.0, 0.0, 0.9])
+    // Sem cores válidas no link, o padrão do app é preservado
+    const { customStops } = useGradientStore.getState()
+    expect(customStops).toEqual(initialState.customStops)
   })
 
   it("aplica parâmetros avançados com clamping (links v2)", () => {
@@ -275,7 +275,10 @@ describe("importSettings", () => {
           visible: false,
           colorScheme: "neon",
           isCustomMode: true,
-          customColors: { color1: [1, 0, 0], color2: [0, 0, 1], color3: [0, 1, 0] },
+          customStops: [
+            { color: [1, 0, 0] as [number, number, number], position: 0 },
+            { color: [0, 0, 1] as [number, number, number], position: 1 },
+          ],
           noiseScale: 3,
           flowIntensity: 0.6,
           thresholdMin: 0.3,
@@ -298,27 +301,27 @@ describe("importSettings", () => {
   })
 })
 
-describe("resolveActiveColors", () => {
+describe("resolveActiveStops", () => {
   it("retorna as cores customizadas em modo custom", () => {
     const state = useGradientStore.getState()
-    expect(resolveActiveColors({ ...state, isCustomMode: true })).toBe(state.customColors)
+    expect(resolveActiveStops({ ...state, isCustomMode: true })).toBe(state.customStops)
   })
 
   it("resolve o esquema nomeado", () => {
     const state = useGradientStore.getState()
-    expect(resolveActiveColors({ ...state, isCustomMode: false, colorScheme: "neon" })).toBe(
-      state.colorSchemes.neon
+    expect(resolveActiveStops({ ...state, isCustomMode: false, colorScheme: "neon" })).toBe(
+      state.colorSchemes.neon.stops
     )
   })
 
   it("usa fallback para esquema inexistente", () => {
     const state = useGradientStore.getState()
-    const resolved = resolveActiveColors({
+    const resolved = resolveActiveStops({
       ...state,
       isCustomMode: false,
       colorScheme: "nao_existe",
     })
-    expect(resolved).toBe(state.colorSchemes.redBlue)
+    expect(resolved).toBe(state.colorSchemes.redBlue.stops)
   })
 })
 
@@ -388,16 +391,16 @@ describe("applyAnimationPreset", () => {
 
 describe("saveCustomScheme", () => {
   it("salva uma cópia isolada das cores customizadas", () => {
-    useGradientStore.getState().setCustomColor1([0.2, 0.3, 0.4])
+    useGradientStore.getState().setStopColor(0, [0.2, 0.3, 0.4])
     useGradientStore.getState().saveCustomScheme("Congelado")
     const savedKey = useGradientStore.getState().colorScheme
 
     // Editar as cores customizadas depois não pode alterar o esquema salvo
     advance(2000)
-    useGradientStore.getState().setCustomColor1([0.9, 0.9, 0.9])
+    useGradientStore.getState().setStopColor(0, [0.9, 0.9, 0.9])
 
     const saved = useGradientStore.getState().colorSchemes[savedKey]
-    expect(saved.color1).toEqual([0.2, 0.3, 0.4])
+    expect(saved.stops[0].color).toEqual([0.2, 0.3, 0.4])
     expect(saved.name).toBe("Congelado")
   })
 })
@@ -494,7 +497,7 @@ describe("histórico do randomizador", () => {
     useGradientStore.getState().applySnapshot(rolled)
     const state = useGradientStore.getState()
     expect(state.speed).toBe(rolled.speed)
-    expect(state.customColors.color1).toEqual(rolled.customColors.color1)
+    expect(state.customStops[0].color).toEqual(rolled.customStops[0].color)
 
     useGradientStore.getState().undo()
     expect(useGradientStore.getState().speed).toBe(1.0)
@@ -745,11 +748,11 @@ describe("presets guardam a composição de camadas", () => {
       noiseScale: 3,
       colorScheme: "neon",
       isCustomMode: false,
-      customColors: {
-        color1: [1, 0, 0] as [number, number, number],
-        color2: [0, 1, 0] as [number, number, number],
-        color3: [0, 0, 1] as [number, number, number],
-      },
+      customStops: [
+        { color: [1, 0, 0] as [number, number, number], position: 0 },
+        { color: [0, 1, 0] as [number, number, number], position: 0.5 },
+        { color: [0, 0, 1] as [number, number, number], position: 1 },
+      ],
       flowIntensity: 0.5,
       grainAmount: 0.1,
       grainScale: 400,
@@ -856,25 +859,34 @@ describe("migratePersistedState", () => {
     expect(migrated.colorScheme).toBe("custom_123")
   })
 
-  it("dá aos esquemas de 2 cores uma 3ª parada igual à segunda", () => {
+  it("converte esquemas de três cores em paradas uniformes", () => {
     const migrated = migratePersistedState(v0State(), 0) as {
-      colorSchemes: Record<string, { color2: number[]; color3: number[]; name?: string }>
-      customColors: { color2: number[]; color3: number[] }
+      colorSchemes: Record<string, { stops: { color: number[]; position: number }[]; name?: string }>
+      customStops: { color: number[]; position: number }[]
     }
-    // color3 = color2 mantém exatamente a aparência de duas cores que o
-    // usuário havia salvo
-    expect(migrated.colorSchemes.custom_123.color3).toEqual([0.8, 0.2, 0.1])
-    expect(migrated.colorSchemes.custom_123.name).toBe("Meu")
-    expect(migrated.colorSchemes.redBlue.color3).toEqual([0, 0, 0.9])
-    expect(migrated.customColors.color3).toEqual([0, 0, 1])
+    // Duas cores viram paradas em 0 e 1 — a mesma aparência que o usuário salvou
+    const scheme = migrated.colorSchemes.custom_123
+    expect(scheme.name).toBe("Meu")
+    expect(scheme.stops).toEqual([
+      { color: [0.2, 0.4, 0.6], position: 0 },
+      { color: [0.8, 0.2, 0.1], position: 1 },
+    ])
+    expect(migrated.customStops).toEqual([
+      { color: [1, 0, 0], position: 0 },
+      { color: [0, 0, 1], position: 1 },
+    ])
   })
 
-  it("dá seed e 3ª cor às camadas persistidas", () => {
+  it("dá seed e paradas às camadas persistidas", () => {
     const migrated = migratePersistedState(v0State(), 0) as {
-      layers: Array<{ seed: number[]; customColors: { color3: number[] } }>
+      layers: Array<{ seed: number[]; customStops: { color: number[] }[]; customColors?: unknown }>
     }
     expect(migrated.layers[0].seed).toEqual([0, 0])
-    expect(migrated.layers[0].customColors.color3).toEqual([0, 1, 1])
+    expect(migrated.layers[0].customStops.map((stop) => stop.color)).toEqual([
+      [1, 1, 0],
+      [0, 1, 1],
+    ])
+    expect(migrated.layers[0].customColors).toBeUndefined()
   })
 
   it("migra snapshots de presets salvos e do histórico do randomizador", () => {
@@ -887,10 +899,16 @@ describe("migratePersistedState", () => {
     expect(snapshot.vibrance).toBe(0)
     expect(snapshot.blendSpace).toBe("oklab")
     expect(snapshot.seed).toEqual([0, 0])
-    expect((snapshot.customColors as { color3: number[] }).color3).toEqual([0, 0, 1])
+    expect((snapshot.customStops as { color: number[] }[]).map((stop) => stop.color)).toEqual([
+      [1, 0, 0],
+      [0, 0, 1],
+    ])
     expect(migrated.randomHistory[0].seed).toEqual([0, 0])
-    expect((migrated.randomHistory[0].customColors as { color3: number[] }).color3).toEqual([
-      0.4, 0.5, 0.6,
+    expect(
+      (migrated.randomHistory[0].customStops as { color: number[] }[]).map((stop) => stop.color)
+    ).toEqual([
+      [0.1, 0.2, 0.3],
+      [0.4, 0.5, 0.6],
     ])
   })
 
@@ -925,6 +943,7 @@ describe("migratePersistedState", () => {
       seed: [0, 0],
       artboardId: "free",
       showSafeAreas: false,
+      customStops: initialState.customStops,
     })
   })
 })
@@ -944,16 +963,22 @@ describe("normalizePersistedState", () => {
       vibrance: number
       blendSpace: string
       seed: number[]
-      colorSchemes: Record<string, { color3: number[] }>
-      customColors: { color3: number[] }
+      colorSchemes: Record<string, { stops: { color: number[]; position: number }[] }>
+      customStops: { color: number[]; position: number }[]
       layers: Array<{ seed: number[] }>
     }
 
     expect(migrated.vibrance).toBe(0)
     expect(migrated.blendSpace).toBe("oklab")
     expect(migrated.seed).toEqual([0, 0])
-    expect(migrated.colorSchemes.meu.color3).toEqual([0.5, 0.6, 0.7])
-    expect(migrated.customColors.color3).toEqual([0, 0, 1])
+    expect(migrated.colorSchemes.meu.stops).toEqual([
+      { color: [0.2, 0.3, 0.4], position: 0 },
+      { color: [0.5, 0.6, 0.7], position: 1 },
+    ])
+    expect(migrated.customStops).toEqual([
+      { color: [1, 0, 0], position: 0 },
+      { color: [0, 0, 1], position: 1 },
+    ])
     expect(migrated.layers[0].seed).toEqual([0, 0])
   })
 
@@ -981,4 +1006,160 @@ const v0StateForNormalize = () => ({
   customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
   colorSchemes: { meu: { color1: [0.2, 0.3, 0.4], color2: [0.5, 0.6, 0.7] } },
   layers: [{ id: "layer_1", colorScheme: "meu" }],
+})
+
+describe("biblioteca (import/export)", () => {
+  it("exporta e reimporta presets e esquemas", () => {
+    useGradientStore.getState().saveCustomScheme("Meu Esquema")
+    useGradientStore.getState().saveCurrentPreset("Meu Preset")
+
+    const json = useGradientStore.getState().exportLibrary()
+
+    // Estado limpo: importar tem de reconstruir a biblioteca
+    useGradientStore.setState({ savedPresets: [], colorSchemes: initialState.colorSchemes })
+
+    const result = useGradientStore.getState().importLibrary(json)
+    expect(result.presets).toBe(1)
+    expect(result.schemes).toBeGreaterThanOrEqual(1)
+
+    const state = useGradientStore.getState()
+    expect(state.savedPresets[0].name).toBe("Meu Preset")
+    expect(Object.values(state.colorSchemes).some((s) => s.name === "Meu Esquema")).toBe(true)
+  })
+
+  it("importar duas vezes não colide ids", () => {
+    useGradientStore.getState().saveCurrentPreset("Preset")
+    const json = useGradientStore.getState().exportLibrary()
+    useGradientStore.setState({ savedPresets: [] })
+
+    useGradientStore.getState().importLibrary(json)
+    useGradientStore.getState().importLibrary(json)
+
+    const ids = useGradientStore.getState().savedPresets.map((preset) => preset.id)
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  it("migra presets exportados no formato de três cores", () => {
+    const legacyFile = JSON.stringify({
+      format: "gradient-generator-library",
+      version: 1,
+      presets: [
+        {
+          id: "antigo",
+          name: "Preset Antigo",
+          createdAt: 1,
+          snapshot: {
+            speed: 1,
+            complexity: 3,
+            noiseScale: 2,
+            colorScheme: "redBlue",
+            isCustomMode: true,
+            customColors: { color1: [1, 0, 0], color2: [0, 1, 0], color3: [0, 0, 1] },
+            flowIntensity: 0.3,
+            grainAmount: 0.05,
+            grainScale: 500,
+            thresholdMin: 0.3,
+            thresholdMax: 0.7,
+          },
+        },
+      ],
+      colorSchemes: {
+        antigo: { color1: [0.2, 0.3, 0.4], color2: [0.5, 0.6, 0.7], name: "Esquema Antigo" },
+      },
+    })
+
+    useGradientStore.setState({ savedPresets: [] })
+    const result = useGradientStore.getState().importLibrary(legacyFile)
+    expect(result.presets).toBe(1)
+
+    const state = useGradientStore.getState()
+    const imported = state.savedPresets[0].snapshot
+    expect(imported.customStops.map((stop) => stop.color)).toEqual([
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ])
+    expect(imported.vibrance).toBe(0)
+    expect(imported.blendSpace).toBe("oklab")
+    expect(state.colorSchemes.antigo.stops).toEqual([
+      { color: [0.2, 0.3, 0.4], position: 0 },
+      { color: [0.5, 0.6, 0.7], position: 1 },
+    ])
+  })
+
+  it("propaga erro de arquivo inválido", () => {
+    expect(() => useGradientStore.getState().importLibrary("{}")).toThrow()
+  })
+})
+
+describe("paradas de cor", () => {
+  it("adiciona parada no maior intervalo e remove pela posição", () => {
+    const store = useGradientStore.getState()
+    expect(store.customStops).toHaveLength(3)
+
+    store.addStop()
+    expect(useGradientStore.getState().customStops).toHaveLength(4)
+
+    useGradientStore.getState().removeStop(1)
+    expect(useGradientStore.getState().customStops).toHaveLength(3)
+  })
+
+  it("respeita mínimo e máximo", () => {
+    useGradientStore.setState({
+      customStops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+    })
+    useGradientStore.getState().removeStop(0)
+    expect(useGradientStore.getState().customStops).toHaveLength(2)
+
+    for (let i = 0; i < 12; i++) {
+      advance(2000)
+      useGradientStore.getState().addStop()
+    }
+    expect(useGradientStore.getState().customStops).toHaveLength(8)
+  })
+
+  it("adicionar e remover parada são desfazíveis", () => {
+    useGradientStore.getState().addStop()
+    expect(useGradientStore.getState().customStops).toHaveLength(4)
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().customStops).toHaveLength(3)
+  })
+
+  it("setStops ordena e valida a paleta recebida", () => {
+    useGradientStore.getState().setStops([
+      { color: [0, 1, 0], position: 0.9 },
+      { color: [1, 0, 0], position: 0.1 },
+      { color: [5, -1, 0.5], position: 2 },
+    ])
+    const stops = useGradientStore.getState().customStops
+    expect(stops.map((stop) => stop.position)).toEqual([0.1, 0.9, 1])
+    expect(stops[2].color).toEqual([1, 0, 0.5])
+  })
+
+  it("mover uma parada não reordena a lista (arraste estável)", () => {
+    advance(2000)
+    useGradientStore.getState().setStopPosition(0, 1)
+    const stops = useGradientStore.getState().customStops
+    expect(stops[0].position).toBe(1)
+    expect(stops[0].color).toEqual(initialState.customStops[0].color)
+  })
+
+  it("randomize produz uma paleta com croma perceptível", () => {
+    for (let i = 0; i < 10; i++) {
+      advance(2000)
+      useGradientStore.getState().randomize()
+      const stops = useGradientStore.getState().customStops
+      expect(stops.length).toBeGreaterThanOrEqual(2)
+      // Sorteio em OKLCH: nada de cinza-lama como o sorteio em RGB produzia
+      const saturated = stops.some((stop) => {
+        const [r, g, b] = stop.color
+        return Math.max(r, g, b) - Math.min(r, g, b) > 0.05
+      })
+      expect(saturated).toBe(true)
+    }
+  })
 })

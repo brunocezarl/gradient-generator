@@ -6,7 +6,13 @@ import { Toaster } from "@/components/toaster"
 export const metadata = {
   title: "Gerador de Gradientes Orgânicos",
   description:
-    "Crie gradientes animados em HD com formas orgânicas para sistemas de marca. Exporte como imagem, vídeo ou CSS.",
+    "Crie gradientes animados em HD com formas orgânicas para sistemas de marca. Exporte como imagem, vídeo, tokens ou CSS.",
+  openGraph: {
+    title: "Gerador de Gradientes Orgânicos",
+    description:
+      "Gradientes animados em WebGL com cor fiel, loop perfeito e exportação em imagem, vídeo e tokens.",
+    type: "website",
+  },
 }
 
 export default function RootLayout({

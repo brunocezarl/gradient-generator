@@ -16,11 +16,11 @@ describe("createShareableURL / parseShareableURL", () => {
       noiseScale: 3.5,
       colorScheme: "neon",
       isCustomMode: true,
-      customColors: {
-        color1: [0.1, 0.2, 0.3],
-        color2: [0.4, 0.5, 0.6],
-        color3: [0.7, 0.8, 0.9],
-      },
+      customStops: [
+        { color: [0.1, 0.2, 0.3], position: 0 },
+        { color: [0.4, 0.5, 0.6], position: 0.4 },
+        { color: [0.7, 0.8, 0.9], position: 1 },
+      ],
     })
 
     const parsed = parseShareableURL(url)
@@ -30,7 +30,12 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.noiseScale).toBe(3.5)
     expect(parsed!.colorScheme).toBe("neon")
     expect(parsed!.isCustomMode).toBe(true)
-    expect(parsed!.customColors.color3).toEqual([0.7, 0.8, 0.9])
+    // Paradas viajam com posição, não só a cor
+    expect(parsed!.stops).toEqual([
+      { color: [0.1, 0.2, 0.3], position: 0 },
+      { color: [0.4, 0.5, 0.6], position: 0.4 },
+      { color: [0.7, 0.8, 0.9], position: 1 },
+    ])
   })
 
   it("faz round-trip dos parâmetros avançados", () => {
@@ -74,7 +79,11 @@ describe("createShareableURL / parseShareableURL", () => {
         visible: false,
         colorScheme: "redBlue",
         isCustomMode: true,
-        customColors: { color1: [1, 0, 0], color2: [0, 0, 1], color3: [0, 1, 0] },
+        customStops: [
+          { color: [1, 0, 0], position: 0 },
+          { color: [0, 0, 1], position: 0.25 },
+          { color: [0, 1, 0], position: 1 },
+        ],
         noiseScale: 3.0,
         flowIntensity: 0.6,
         thresholdMin: 0.3,
@@ -94,11 +103,11 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.layers![0].blendMode).toBe("screen")
     expect(parsed!.layers![0].opacity).toBe(0.8)
     expect(parsed!.layers![1].visible).toBe(false)
-    expect(parsed!.layers![1].customColors).toEqual({
-      color1: [1, 0, 0],
-      color2: [0, 0, 1],
-      color3: [0, 1, 0],
-    })
+    expect(parsed!.layers![1].customStops).toEqual([
+      { color: [1, 0, 0], position: 0 },
+      { color: [0, 0, 1], position: 0.25 },
+      { color: [0, 1, 0], position: 1 },
+    ])
     // O seed viaja no link: a forma do ruído é reproduzida, não só as cores
     expect(parsed!.layers![0].seed).toEqual([12.5, 7.25])
   })
@@ -135,7 +144,11 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed).not.toBeNull()
     expect(parsed!.speed).toBe(1.0)
     expect(parsed!.colorScheme).toBe("redBlue")
-    expect(parsed!.customColors.color3).toEqual([0.5, 0.0, 0.5])
+    expect(parsed!.stops!).toEqual([
+      { color: [0.9, 0.1, 0.1], position: 0 },
+      { color: [0.0, 0.0, 0.9], position: 0.5 },
+      { color: [0.5, 0.0, 0.5], position: 1 },
+    ])
     expect(parsed!.flowIntensity).toBe(0.3)
     expect(parsed!.thresholdMax).toBe(0.7)
   })
@@ -184,7 +197,7 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed).not.toBeNull()
     expect(parsed!.speed).toBe(1.5)
     expect(parsed!.colorScheme).toBe("neon")
-    expect(parsed!.customColors.color1).toEqual([0.1, 0.2, 0.3])
+    expect(parsed!.customColors!.color1).toEqual([0.1, 0.2, 0.3])
     // Campos v2 simplesmente não existem em links antigos
     expect(parsed!.flowIntensity).toBeUndefined()
   })

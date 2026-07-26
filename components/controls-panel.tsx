@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { useGradientStore } from "@/lib/store"
-import { ColorPicker } from "@/components/color-picker"
+import { StopsEditor } from "@/components/stops-editor"
+import { StopDots } from "@/components/gradient-swatch"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { AnimationPresetsSelector } from "@/components/animation-presets-selector"
 import { PresetGallery, RandomHistoryStrip } from "@/components/preset-gallery"
@@ -39,7 +40,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     noiseScale,
     colorScheme,
     isCustomMode,
-    customColors,
+    customStops,
     colorSchemes,
     flowIntensity,
     grainAmount,
@@ -54,9 +55,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     setNoiseScale,
     setColorScheme,
     setCustomMode,
-    setCustomColor1,
-    setCustomColor2,
-    setCustomColor3,
+    setStops,
     saveCustomScheme,
     resetToDefaults,
     randomize,
@@ -75,7 +74,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       noiseScale: state.noiseScale,
       colorScheme: state.colorScheme,
       isCustomMode: state.isCustomMode,
-      customColors: state.customColors,
+      customStops: state.customStops,
       colorSchemes: state.colorSchemes,
       flowIntensity: state.flowIntensity,
       grainAmount: state.grainAmount,
@@ -90,9 +89,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       setNoiseScale: state.setNoiseScale,
       setColorScheme: state.setColorScheme,
       setCustomMode: state.setCustomMode,
-      setCustomColor1: state.setCustomColor1,
-      setCustomColor2: state.setCustomColor2,
-      setCustomColor3: state.setCustomColor3,
+      setStops: state.setStops,
       saveCustomScheme: state.saveCustomScheme,
       resetToDefaults: state.resetToDefaults,
       randomize: state.randomize,
@@ -268,36 +265,16 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                 </div>
 
                 {isCustomMode ? (
-                  <>
-                    {/* Custom Color Pickers */}
-                    <div className="space-y-4 mt-4">
-                      <ColorPicker
-                        label="Cor 1"
-                        color={customColors.color1}
-                        onChange={setCustomColor1}
-                      />
-
-                      <ColorPicker
-                        label="Cor 2"
-                        color={customColors.color2}
-                        onChange={setCustomColor2}
-                      />
-
-                      <ColorPicker
-                        label="Cor 3"
-                        color={customColors.color3}
-                        onChange={setCustomColor3}
-                      />
-
-                      <Button
-                        onClick={() => setSaveDialogOpen(true)}
-                        className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <Save className="mr-2 h-4 w-4" />
-                        Salvar Esquema
-                      </Button>
-                    </div>
-                  </>
+                  <div className="mt-4">
+                    <StopsEditor />
+                    <Button
+                      onClick={() => setSaveDialogOpen(true)}
+                      className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      Salvar Esquema
+                    </Button>
+                  </div>
                 ) : (
                   <>
                     {/* Color Scheme Selector */}
@@ -311,20 +288,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                           {Object.entries(colorSchemes).map(([key, scheme]) => (
                             <SelectItem key={key} value={key}>
                               <div className="flex items-center">
-                                <div className="flex mr-2">
-                                  <div
-                                    className="w-3 h-3 rounded-full mr-1"
-                                    style={{
-                                      backgroundColor: `rgb(${Math.round(scheme.color1[0] * 255)}, ${Math.round(scheme.color1[1] * 255)}, ${Math.round(scheme.color1[2] * 255)})`
-                                    }}
-                                  />
-                                  <div
-                                    className="w-3 h-3 rounded-full"
-                                    style={{
-                                      backgroundColor: `rgb(${Math.round(scheme.color2[0] * 255)}, ${Math.round(scheme.color2[1] * 255)}, ${Math.round(scheme.color2[2] * 255)})`
-                                    }}
-                                  />
-                                </div>
+                                <StopDots stops={scheme.stops} />
                                 {scheme.name || key}
                               </div>
                             </SelectItem>
@@ -335,13 +299,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
 
                     <Button
                       onClick={() => {
-                        // Copy current scheme to custom colors
+                        // Levar o esquema atual para o modo personalizado, para
+                        // editar a partir dele em vez de começar do zero
                         const currentScheme = colorSchemes[colorScheme]
-                        if (currentScheme) {
-                          setCustomColor1(currentScheme.color1)
-                          setCustomColor2(currentScheme.color2)
-                          setCustomColor3(currentScheme.color3)
-                        }
+                        if (currentScheme) setStops(currentScheme.stops)
                         setCustomMode(true)
                       }}
                       className="w-full mt-4 bg-neutral-700 hover:bg-neutral-600 text-white"

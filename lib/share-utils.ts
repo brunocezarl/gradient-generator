@@ -2,6 +2,7 @@
 
 import { GradientStore } from "@/lib/store"
 import type { GradientLayer } from "@/lib/layer-utils"
+import { stopsFromColors, type ColorStop } from "@/lib/color-stops"
 
 // Camada compartilhável: uma GradientLayer sem o id (ids são regenerados na
 // importação para não colidir com camadas existentes no cliente de destino)
@@ -14,11 +15,14 @@ export interface ShareableGradient {
   noiseScale: number
   colorScheme: string
   isCustomMode: boolean
-  customColors: {
+  // Formato de três cores (v1/v2), mantido só para leitura de links antigos
+  customColors?: {
     color1: number[]
     color2: number[]
     color3?: number[]
   }
+  // Paradas com posição (v3)
+  stops?: ColorStop[]
   // Parâmetros avançados (v2) — opcionais para compatibilidade com links antigos
   flowIntensity?: number
   grainAmount?: number
@@ -64,9 +68,10 @@ type PackedLayer = {
   h: 0 | 1 // visible (hidden flag invertido)
   cs: string // colorScheme
   cm: 0 | 1 // isCustomMode
-  k1?: number[] // customColors.color1
-  k2?: number[] // customColors.color2
-  k3?: number[] // customColors.color3
+  k1?: number[] // customColors.color1 (leitura de links v2)
+  k2?: number[]
+  k3?: number[]
+  st?: number[][] // paradas: [r, g, b, posição]
   n: number // noiseScale
   f: number // flowIntensity
   tn: number // thresholdMin
@@ -81,9 +86,10 @@ type PackedGradient = {
   n: number // noiseScale
   cs: string // colorScheme
   cm: 0 | 1 // isCustomMode
-  k1: number[] // customColors.color1
-  k2: number[]
-  k3: number[]
+  k1?: number[] // customColors.color1 (leitura de links v2)
+  k2?: number[]
+  k3?: number[]
+  st?: number[][] // paradas: [r, g, b, posição]
   f?: number // flowIntensity
   ga?: number // grainAmount
   gs?: number // grainScale
@@ -105,9 +111,9 @@ function pack(data: ShareableGradient): PackedGradient {
     n: round3(data.noiseScale),
     cs: data.colorScheme,
     cm: data.isCustomMode ? 1 : 0,
-    k1: roundColor(data.customColors.color1),
-    k2: roundColor(data.customColors.color2),
-    k3: roundColor(data.customColors.color3 ?? [0.5, 0.0, 0.5]),
+    // Paradas com posição. Links v2 e anteriores traziam k1/k2/k3 — a leitura
+    // ainda aceita esse formato, a escrita não usa mais.
+    st: (data.stops ?? []).map((stop) => [...roundColor(stop.color), round3(stop.position)]),
   }
 
   if (data.flowIntensity !== undefined) packed.f = round3(data.flowIntensity)
@@ -134,10 +140,11 @@ function pack(data: ShareableGradient): PackedGradient {
         tn: round3(layer.thresholdMin),
         tx: round3(layer.thresholdMax),
       }
-      if (layer.customColors) {
-        pl.k1 = roundColor(layer.customColors.color1)
-        pl.k2 = roundColor(layer.customColors.color2)
-        pl.k3 = roundColor(layer.customColors.color3)
+      if (layer.customStops) {
+        pl.st = layer.customStops.map((stop) => [
+          ...roundColor(stop.color),
+          round3(stop.position),
+        ])
       }
       if (layer.seed) pl.sd = layer.seed.map(round3)
       return pl
@@ -154,11 +161,16 @@ function unpack(packed: PackedGradient): ShareableGradient {
     noiseScale: packed.n,
     colorScheme: packed.cs,
     isCustomMode: packed.cm === 1,
-    customColors: {
-      color1: packed.k1,
-      color2: packed.k2,
-      color3: packed.k3,
-    },
+  }
+
+  if (packed.st !== undefined) {
+    data.stops = packed.st.map((stop) => ({
+      color: [stop[0] ?? 0, stop[1] ?? 0, stop[2] ?? 0],
+      position: stop[3] ?? 0,
+    }))
+  } else if (packed.k1 && packed.k2) {
+    // Link v2: três cores sem posição
+    data.customColors = { color1: packed.k1, color2: packed.k2, color3: packed.k3 }
   }
 
   if (packed.f !== undefined) data.flowIntensity = packed.f
@@ -180,9 +192,13 @@ function unpack(packed: PackedGradient): ShareableGradient {
       visible: pl.h === 1,
       colorScheme: pl.cs,
       isCustomMode: pl.cm === 1,
-      customColors:
-        pl.k1 && pl.k2
-          ? { color1: pl.k1, color2: pl.k2, color3: pl.k3 ?? pl.k2 }
+      customStops: pl.st
+        ? pl.st.map((stop) => ({
+            color: [stop[0] ?? 0, stop[1] ?? 0, stop[2] ?? 0] as [number, number, number],
+            position: stop[3] ?? 0,
+          }))
+        : pl.k1 && pl.k2
+          ? stopsFromColors([pl.k1, pl.k2, pl.k3 ?? pl.k2])
           : undefined,
       noiseScale: pl.n,
       flowIntensity: pl.f,
@@ -207,11 +223,11 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     noiseScale: state.noiseScale ?? 2.0,
     colorScheme: state.colorScheme || "redBlue",
     isCustomMode: state.isCustomMode ?? false,
-    customColors: state.customColors ?? {
-      color1: [0.9, 0.1, 0.1],
-      color2: [0.0, 0.0, 0.9],
-      color3: [0.5, 0.0, 0.5],
-    },
+    stops: state.customStops ?? stopsFromColors([
+      [0.9, 0.1, 0.1],
+      [0.0, 0.0, 0.9],
+      [0.5, 0.0, 0.5],
+    ]),
     flowIntensity: state.flowIntensity ?? 0.3,
     grainAmount: state.grainAmount ?? 0.05,
     grainScale: state.grainScale ?? 500.0,

@@ -1,5 +1,7 @@
 "use client"
 
+import type { ColorStop } from "@/lib/color-stops"
+
 // Uma camada do gradiente.
 //
 // A camada controla a *forma* (escala de ruído, fluxo, limiares) e a cor; o
@@ -12,11 +14,7 @@ export interface GradientLayer {
   blendMode: string
   visible: boolean
   colorScheme: string
-  customColors?: {
-    color1: number[]
-    color2: number[]
-    color3: number[]
-  }
+  customStops?: ColorStop[]
   isCustomMode: boolean
   noiseScale: number
   flowIntensity: number

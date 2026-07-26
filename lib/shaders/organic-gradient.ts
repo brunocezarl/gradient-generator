@@ -14,14 +14,19 @@ export const organicGradientVertexShader = /* glsl */ `
   }
 `
 
+export const MAX_COLOR_STOPS = 8
+
 export const organicGradientFragmentShader = /* glsl */ `
+  #define MAX_STOPS ${MAX_COLOR_STOPS}
+
   uniform float uTime;
   uniform float uComplexity;
   uniform float uNoiseScale;
-  // Cores em RGB linear (a conversão de sRGB acontece no JS, ver lib/color.ts)
-  uniform vec3 uColor1;
-  uniform vec3 uColor2;
-  uniform vec3 uColor3;
+  // Paradas de cor: cores em RGB linear (a conversão de sRGB acontece no JS,
+  // ver lib/color.ts) e posições em 0-1, ordenadas
+  uniform vec3 uStopColors[MAX_STOPS];
+  uniform float uStopPositions[MAX_STOPS];
+  uniform int uStopCount;
   uniform float uFlowIntensity;
   uniform float uGrainAmount;
   uniform float uGrainScale;
@@ -131,6 +136,29 @@ export const organicGradientFragmentShader = /* glsl */ `
     return mix(vec3(luminance), color, 1.0 + amount);
   }
 
+  // Cor do gradiente na posição t (0-1), percorrendo as paradas.
+  //
+  // A última parada cuja posição já foi ultrapassada vence: para segmentos
+  // anteriores a interpolação local satura em 1 e o resultado é sobrescrito
+  // pelo segmento seguinte. Nos extremos o resultado é exatamente a cor
+  // escolhida, então o HEX do picker sobrevive intacto até o pixel exportado.
+  vec3 gradientColor(float t) {
+    vec3 color = uStopColors[0];
+
+    for (int i = 0; i < MAX_STOPS - 1; i++) {
+      if (i + 1 >= uStopCount) break;
+
+      float from = uStopPositions[i];
+      float to = uStopPositions[i + 1];
+      float local = clamp((t - from) / max(to - from, 1e-5), 0.0, 1.0);
+      vec3 segment = blendColors(uStopColors[i], uStopColors[i + 1], local);
+
+      color = t >= from ? segment : color;
+    }
+
+    return color;
+  }
+
   // ─── Dither ────────────────────────────────────────────────────────────────
 
   float hash12(vec2 p) {
@@ -186,12 +214,7 @@ export const organicGradientFragmentShader = /* glsl */ `
     // Formas orgânicas pelo limiar ajustável
     float shape = smoothstep(uThresholdMin, uThresholdMax, noise);
 
-    // Três paradas de cor: 1 → 2 na primeira metade, 2 → 3 na segunda.
-    // Nos extremos (shape 0 ou 1) o resultado é exatamente a cor escolhida,
-    // então o HEX do picker sobrevive intacto até o pixel exportado.
-    vec3 color = shape < 0.5
-      ? blendColors(uColor1, uColor2, clamp(shape * 2.0, 0.0, 1.0))
-      : blendColors(uColor2, uColor3, clamp(shape * 2.0 - 1.0, 0.0, 1.0));
+    vec3 color = gradientColor(shape);
 
     color = applyVibrance(color, uVibrance);
 

@@ -6,6 +6,7 @@ import * as THREE from "three"
 import { useShallow } from "zustand/react/shallow"
 import { useGradientStore } from "@/lib/store"
 import type { GradientLayer } from "@/lib/layer-utils"
+import type { ColorStop } from "@/lib/color-stops"
 import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
@@ -49,7 +50,7 @@ function LayeredComposition({
     blendSpace: "oklab" | "linear"
     loopDuration: number
   }
-  colorSchemes: Record<string, { color1: number[]; color2: number[]; color3: number[] }>
+  colorSchemes: Record<string, { stops: ColorStop[] }>
 }) {
   const gl = useThree((state) => state.gl)
   const camera = useThree((state) => state.camera)
@@ -175,9 +176,9 @@ function LayeredComposition({
     [gl, renderComposition]
   )
 
-  const layerColors = (layer: GradientLayer) => {
-    if (layer.isCustomMode && layer.customColors) return layer.customColors
-    return colorSchemes[layer.colorScheme] ?? colorSchemes.redBlue
+  const layerStops = (layer: GradientLayer): ColorStop[] => {
+    if (layer.isCustomMode && layer.customStops) return layer.customStops
+    return (colorSchemes[layer.colorScheme] ?? colorSchemes.redBlue).stops
   }
 
   return (
@@ -192,7 +193,7 @@ function LayeredComposition({
             vibrance={globals.vibrance}
             blendSpace={globals.blendSpace}
             loopDuration={globals.loopDuration}
-            colors={layerColors(layer)}
+            stops={layerStops(layer)}
             noiseScale={layer.noiseScale}
             flowIntensity={layer.flowIntensity}
             thresholdMin={layer.thresholdMin}

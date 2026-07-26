@@ -2,24 +2,22 @@
 
 import { useRef, useMemo, useEffect } from "react"
 import { useFrame, useThree } from "@react-three/fiber"
-import type * as THREE from "three"
+import * as THREE from "three"
 import {
+  MAX_COLOR_STOPS,
   organicGradientFragmentShader,
   organicGradientVertexShader,
 } from "@/lib/shaders/organic-gradient"
 import { srgbTripletToLinear, type ColorBlendSpace } from "@/lib/color"
+import { sortStops, type ColorStop } from "@/lib/color-stops"
 import { playback } from "@/lib/playback"
 import { registerTimeConsumer } from "@/lib/capture"
 
 export interface OrganicGradientParams {
   complexity: number
   noiseScale: number
-  // Cores em sRGB 0-1, como saem do color picker
-  colors: {
-    color1: number[]
-    color2: number[]
-    color3: number[]
-  }
+  /** Paradas de cor em sRGB, como saem do color picker */
+  stops: ColorStop[]
   flowIntensity: number
   grainAmount: number
   grainScale: number
@@ -32,13 +30,50 @@ export interface OrganicGradientParams {
   loopDuration: number
 }
 
+interface StopUniforms {
+  uStopColors: { value: THREE.Vector3[] }
+  uStopPositions: { value: number[] }
+  uStopCount: { value: number }
+}
+
+function createStopUniforms(): StopUniforms {
+  return {
+    uStopColors: {
+      value: Array.from({ length: MAX_COLOR_STOPS }, () => new THREE.Vector3()),
+    },
+    uStopPositions: { value: new Array(MAX_COLOR_STOPS).fill(0) },
+    uStopCount: { value: 2 },
+  }
+}
+
+// Escreve as paradas nos uniforms.
+//
+// A ordenação acontece aqui, não no estado: reordenar a lista no meio de um
+// arraste faria o slider pular para outra parada na mão do usuário, enquanto o
+// shader precisa das posições crescentes. As posições não usadas repetem a
+// última parada, mantendo o array preenchido.
+function writeStopUniforms(uniforms: StopUniforms, stops: readonly ColorStop[]) {
+  const sorted = sortStops(stops)
+  const count = Math.min(Math.max(sorted.length, 2), MAX_COLOR_STOPS)
+
+  for (let index = 0; index < MAX_COLOR_STOPS; index++) {
+    const stop = sorted[Math.min(index, sorted.length - 1)]
+    if (!stop) continue
+    const [r, g, b] = srgbTripletToLinear(stop.color)
+    uniforms.uStopColors.value[index].set(r, g, b)
+    uniforms.uStopPositions.value[index] = stop.position
+  }
+
+  uniforms.uStopCount.value = count
+}
+
 // Único componente de shader do app: a cena simples e cada camada do modo
 // multi-camadas renderizam por aqui, garantindo que a mesma configuração
 // produza a mesma imagem nos dois modos.
 export function OrganicGradientShader({
   complexity,
   noiseScale,
-  colors,
+  stops,
   flowIntensity,
   grainAmount,
   grainScale,
@@ -55,14 +90,14 @@ export function OrganicGradientShader({
 
   // Valores iniciais apenas — as atualizações acontecem no effect abaixo, sem
   // recriar o material (recriar recompila o shader e pisca a tela)
-  const uniforms = useMemo(
-    () => ({
+  const uniforms = useMemo(() => {
+    const stopUniforms = createStopUniforms()
+    writeStopUniforms(stopUniforms, stops)
+    return {
       uTime: { value: 0 },
       uComplexity: { value: complexity },
       uNoiseScale: { value: noiseScale },
-      uColor1: { value: srgbTripletToLinear(colors.color1) },
-      uColor2: { value: srgbTripletToLinear(colors.color2) },
-      uColor3: { value: srgbTripletToLinear(colors.color3) },
+      ...stopUniforms,
       uFlowIntensity: { value: flowIntensity },
       uGrainAmount: { value: grainAmount },
       uGrainScale: { value: grainScale },
@@ -72,10 +107,9 @@ export function OrganicGradientShader({
       uOklabMix: { value: blendSpace === "oklab" ? 1 : 0 },
       uSeed: { value: [seed[0], seed[1]] },
       uLoopDuration: { value: loopDuration },
-    }),
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
+  }, [])
 
   useEffect(() => {
     const material = meshRef.current?.material as THREE.ShaderMaterial | undefined
@@ -83,9 +117,7 @@ export function OrganicGradientShader({
 
     material.uniforms.uComplexity.value = complexity
     material.uniforms.uNoiseScale.value = noiseScale
-    material.uniforms.uColor1.value = srgbTripletToLinear(colors.color1)
-    material.uniforms.uColor2.value = srgbTripletToLinear(colors.color2)
-    material.uniforms.uColor3.value = srgbTripletToLinear(colors.color3)
+    writeStopUniforms(material.uniforms as unknown as StopUniforms, stops)
     material.uniforms.uFlowIntensity.value = flowIntensity
     material.uniforms.uGrainAmount.value = grainAmount
     material.uniforms.uGrainScale.value = grainScale
@@ -102,7 +134,7 @@ export function OrganicGradientShader({
   }, [
     complexity,
     noiseScale,
-    colors,
+    stops,
     flowIntensity,
     grainAmount,
     grainScale,

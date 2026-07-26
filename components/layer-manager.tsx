@@ -9,6 +9,7 @@ import { Layers, Plus, Trash2, Eye, EyeOff, GripVertical, Waves } from "lucide-r
 import { useShallow } from "zustand/react/shallow"
 import { useGradientStore } from "@/lib/store"
 import { blendModes, generateSeed } from "@/lib/layer-utils"
+import { StopDots } from "@/components/gradient-swatch"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -288,26 +289,7 @@ export function LayerManager() {
                   {Object.entries(colorSchemes).map(([key, scheme]) => (
                     <SelectItem key={key} value={key}>
                       <div className="flex items-center">
-                        <div className="flex mr-2">
-                          <div
-                            className="w-3 h-3 rounded-full mr-1"
-                            style={{
-                              backgroundColor: `rgb(${Math.round(scheme.color1[0] * 255)}, ${Math.round(scheme.color1[1] * 255)}, ${Math.round(scheme.color1[2] * 255)})`,
-                            }}
-                          />
-                          <div
-                            className="w-3 h-3 rounded-full mr-1"
-                            style={{
-                              backgroundColor: `rgb(${Math.round(scheme.color2[0] * 255)}, ${Math.round(scheme.color2[1] * 255)}, ${Math.round(scheme.color2[2] * 255)})`,
-                            }}
-                          />
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{
-                              backgroundColor: `rgb(${Math.round(scheme.color3[0] * 255)}, ${Math.round(scheme.color3[1] * 255)}, ${Math.round(scheme.color3[2] * 255)})`,
-                            }}
-                          />
-                        </div>
+                        <StopDots stops={scheme.stops} />
                         {scheme.name || key}
                       </div>
                     </SelectItem>

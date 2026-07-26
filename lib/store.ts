@@ -11,15 +11,28 @@ import {
 } from "@/lib/layer-utils"
 import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
 import { defaultArtboardId, getArtboard } from "@/lib/artboards"
+import { oklchToSrgb, randomPalette } from "@/lib/oklch"
+import { parseLibrary, serializeLibrary } from "@/lib/library"
+import {
+  cloneStops,
+  insertStop,
+  legacyColorsToStops,
+  normalizeStops,
+  removeStopAt,
+  sortStops,
+  stopsFromColors,
+  updateStopColor,
+  updateStopPosition,
+  type ColorStop,
+} from "@/lib/color-stops"
 
 // Define color type
 type GradientColor = [number, number, number]
 
-// Define color scheme type (agora com 3 cores)
+// Esquema de cores: paradas com posição (antes eram três cores fixas em 0,
+// 0.5 e 1)
 export type ColorScheme = {
-  color1: GradientColor
-  color2: GradientColor
-  color3: GradientColor
+  stops: ColorStop[]
   name?: string
 }
 
@@ -31,7 +44,7 @@ export type StateSnapshot = {
   noiseScale: number
   colorScheme: string
   isCustomMode: boolean
-  customColors: ColorScheme
+  customStops: ColorStop[]
   flowIntensity: number
   grainAmount: number
   grainScale: number
@@ -58,31 +71,28 @@ export type GradientPreset = {
 
 const RANDOM_HISTORY_LIMIT = 10
 
+// Contador monotônico para ids: `Date.now()` sozinho colide quando duas
+// criações caem no mesmo milissegundo (importar a mesma biblioteca duas vezes
+// seguidas, por exemplo)
+let idCounter = 0
+function nextId(prefix: string): string {
+  idCounter += 1
+  return `${prefix}_${Date.now()}_${idCounter}`
+}
+
 // Coalescência de histórico: edições contínuas (arrastar um slider) geram um
 // único snapshot em vez de um por evento de mudança
 const HISTORY_COALESCE_MS = 1000
 let lastHistoryKey: string | null = null
 let lastHistoryTime = 0
 
-function cloneColors(colors: ColorScheme): ColorScheme {
-  return {
-    color1: [...colors.color1] as GradientColor,
-    color2: [...colors.color2] as GradientColor,
-    color3: [...colors.color3] as GradientColor,
-  }
-}
+
 
 function cloneLayers(layers: GradientLayer[]): GradientLayer[] {
   return layers.map((layer) => ({
     ...layer,
     seed: [...layer.seed] as [number, number],
-    customColors: layer.customColors
-      ? {
-          color1: [...layer.customColors.color1],
-          color2: [...layer.customColors.color2],
-          color3: [...layer.customColors.color3],
-        }
-      : undefined,
+    customStops: layer.customStops ? cloneStops(layer.customStops) : undefined,
   }))
 }
 
@@ -93,7 +103,7 @@ function captureSnapshot(state: GradientStore): StateSnapshot {
     noiseScale: state.noiseScale,
     colorScheme: state.colorScheme,
     isCustomMode: state.isCustomMode,
-    customColors: cloneColors(state.customColors),
+    customStops: cloneStops(state.customStops),
     flowIntensity: state.flowIntensity,
     grainAmount: state.grainAmount,
     grainScale: state.grainScale,
@@ -121,7 +131,7 @@ function snapshotToState(
     noiseScale: snapshot.noiseScale,
     colorScheme: snapshot.colorScheme,
     isCustomMode: snapshot.isCustomMode,
-    customColors: cloneColors(snapshot.customColors),
+    customStops: cloneStops(snapshot.customStops),
     flowIntensity: snapshot.flowIntensity,
     grainAmount: snapshot.grainAmount,
     grainScale: snapshot.grainScale,
@@ -156,7 +166,7 @@ export type GradientStore = {
   colorScheme: string
   menuOpen: boolean
   isCustomMode: boolean
-  customColors: ColorScheme
+  customStops: ColorStop[]
 
   // Advanced parameters
   advancedMode: boolean
@@ -205,9 +215,11 @@ export type GradientStore = {
   setColorScheme: (value: string) => void
   toggleMenu: () => void
   setCustomMode: (value: boolean) => void
-  setCustomColor1: (color: GradientColor) => void
-  setCustomColor2: (color: GradientColor) => void
-  setCustomColor3: (color: GradientColor) => void
+  setStopColor: (index: number, color: GradientColor) => void
+  setStopPosition: (index: number, position: number) => void
+  setStops: (stops: ColorStop[]) => void
+  addStop: () => void
+  removeStop: (index: number) => void
   saveCustomScheme: (name: string) => void
   resetToDefaults: () => void
   importSettings: (settings: ShareableGradient) => void
@@ -244,6 +256,8 @@ export type GradientStore = {
 
   // Preset e histórico do randomizador
   saveCurrentPreset: (name: string) => void
+  exportLibrary: () => string
+  importLibrary: (json: string) => { presets: number; schemes: number }
   applyPreset: (id: string) => void
   deletePreset: (id: string) => void
   applySnapshot: (snapshot: StateSnapshot) => void
@@ -259,9 +273,11 @@ type StoreActions = Pick<
   | "setColorScheme"
   | "toggleMenu"
   | "setCustomMode"
-  | "setCustomColor1"
-  | "setCustomColor2"
-  | "setCustomColor3"
+  | "setStopColor"
+  | "setStopPosition"
+  | "setStops"
+  | "addStop"
+  | "removeStop"
   | "saveCustomScheme"
   | "resetToDefaults"
   | "importSettings"
@@ -290,6 +306,8 @@ type StoreActions = Pick<
   | "undo"
   | "redo"
   | "saveCurrentPreset"
+  | "exportLibrary"
+  | "importLibrary"
   | "applyPreset"
   | "deletePreset"
   | "applySnapshot"
@@ -304,11 +322,11 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   colorScheme: "redBlue",
   menuOpen: true,
   isCustomMode: false,
-  customColors: {
-    color1: [0.9, 0.1, 0.1] as GradientColor,
-    color2: [0.0, 0.0, 0.9] as GradientColor,
-    color3: [0.5, 0.0, 0.5] as GradientColor,
-  },
+  customStops: stopsFromColors([
+    [0.9, 0.1, 0.1],
+    [0.0, 0.0, 0.9],
+    [0.5, 0.0, 0.5],
+  ]),
 
   advancedMode: false,
   flowIntensity: 0.3,
@@ -336,52 +354,64 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   savedPresets: [],
   randomHistory: [],
 
+  // Esquemas padrão. As posições uniformes reproduzem a distribuição do
+  // shader de três cores, então a aparência histórica é preservada.
   colorSchemes: {
     redBlue: {
-      color1: [0.9, 0.1, 0.1],
-      color2: [0.0, 0.0, 0.9],
-      color3: [0.5, 0.0, 0.5],
+      stops: stopsFromColors([
+        [0.9, 0.1, 0.1],
+        [0.0, 0.0, 0.9],
+        [0.5, 0.0, 0.5],
+      ]),
       name: "Vermelho & Azul",
     },
     greenPurple: {
-      color1: [0.1, 0.9, 0.1],
-      color2: [0.7, 0.0, 0.7],
-      color3: [0.0, 0.4, 0.8],
+      stops: stopsFromColors([
+        [0.1, 0.9, 0.1],
+        [0.7, 0.0, 0.7],
+        [0.0, 0.4, 0.8],
+      ]),
       name: "Verde & Roxo",
     },
     multiColor: {
-      color1: [1.0, 0.2, 0.8],
-      color2: [0.1, 0.9, 1.0],
-      color3: [0.5, 1.0, 0.2],
+      stops: stopsFromColors([
+        [1.0, 0.2, 0.8],
+        [0.1, 0.9, 1.0],
+        [0.5, 1.0, 0.2],
+      ]),
       name: "Multi Cor",
     },
     neon: {
-      color1: [1.0, 0.6, 0.0],
-      color2: [0.0, 1.0, 1.0],
-      color3: [0.8, 0.0, 1.0],
+      stops: stopsFromColors([
+        [1.0, 0.6, 0.0],
+        [0.0, 1.0, 1.0],
+        [0.8, 0.0, 1.0],
+      ]),
       name: "Neon",
     },
     yellowPink: {
-      color1: [1.0, 0.9, 0.1],
-      color2: [1.0, 0.1, 0.5],
-      color3: [1.0, 0.5, 0.1],
+      stops: stopsFromColors([
+        [1.0, 0.9, 0.1],
+        [1.0, 0.1, 0.5],
+        [1.0, 0.5, 0.1],
+      ]),
       name: "Amarelo & Rosa",
     },
   },
 }
 
-// Resolve o esquema de cores ativo com fallback seguro — o nome do esquema
-// pode vir de uma URL compartilhada ou de um store persistido apontando para
-// um esquema que não existe mais
-export function resolveActiveColors(
-  state: Pick<GradientStore, "isCustomMode" | "customColors" | "colorScheme" | "colorSchemes">
-): ColorScheme {
-  if (state.isCustomMode) return state.customColors
-  return (
+// Resolve as paradas de cor ativas com fallback seguro — o nome do esquema
+// pode vir de uma URL compartilhada ou de um store persistido apontando para um
+// esquema que não existe mais
+export function resolveActiveStops(
+  state: Pick<GradientStore, "isCustomMode" | "customStops" | "colorScheme" | "colorSchemes">
+): ColorStop[] {
+  if (state.isCustomMode) return state.customStops
+  const scheme =
     state.colorSchemes[state.colorScheme] ??
     state.colorSchemes.redBlue ??
     defaultState.colorSchemes.redBlue
-  )
+  return scheme.stops
 }
 
 // ─── Migração da persistência ────────────────────────────────────────────────
@@ -401,35 +431,42 @@ function migrateSeed(seed: unknown): [number, number] {
     : [0, 0]
 }
 
-// Esquemas gravados antes da 3ª parada de cor recebem `color3 = color2`,
-// preservando exatamente a aparência de duas cores que o usuário salvou
-function migrateColors(colors: unknown): ColorScheme | undefined {
-  if (!colors || typeof colors !== "object") return undefined
-  const source = colors as Record<string, unknown>
-  const color1 = source.color1 as GradientColor | undefined
-  const color2 = source.color2 as GradientColor | undefined
-  if (!Array.isArray(color1) || !Array.isArray(color2)) return undefined
-  const color3 = Array.isArray(source.color3)
-    ? (source.color3 as GradientColor)
-    : ([...color2] as GradientColor)
-  return { ...source, color1, color2, color3 } as ColorScheme
+// Esquemas gravados no formato de três cores (color1/color2/color3) viram
+// paradas em 0, 0.5 e 1 — a mesma distribuição que o shader antigo usava
+function migrateScheme(scheme: unknown): ColorScheme | undefined {
+  if (!scheme || typeof scheme !== "object") return undefined
+  const source = scheme as Record<string, unknown>
+
+  const legacy = legacyColorsToStops(source as never)
+  const stops = normalizeStops(source.stops, legacy ?? [])
+  if (stops.length < 2) return undefined
+
+  return typeof source.name === "string" ? { stops, name: source.name } : { stops }
 }
 
 function migrateLayer(layer: unknown): unknown {
   if (!layer || typeof layer !== "object") return layer
   const source = layer as Record<string, unknown>
-  const customColors = migrateColors(source.customColors)
-  return {
+  const legacy = legacyColorsToStops(source.customColors as never)
+  const stops = source.customStops ?? legacy ?? undefined
+
+  const migrated: Record<string, unknown> = {
     ...source,
     seed: migrateSeed(source.seed),
-    ...(customColors ? { customColors } : {}),
   }
+  delete migrated.customColors
+  if (stops) migrated.customStops = normalizeStops(stops, legacy ?? [])
+  return migrated
 }
 
 function migrateSnapshot(snapshot: unknown): unknown {
   if (!snapshot || typeof snapshot !== "object") return snapshot
   const source = snapshot as Record<string, unknown>
-  const customColors = migrateColors(source.customColors)
+  const legacy = legacyColorsToStops(source.customColors as never)
+  const customStops = normalizeStops(
+    source.customStops ?? legacy,
+    legacy ?? defaultState.customStops
+  )
   return {
     ...source,
     vibrance: typeof source.vibrance === "number" ? source.vibrance : defaultState.vibrance,
@@ -442,7 +479,8 @@ function migrateSnapshot(snapshot: unknown): unknown {
       typeof source.loopDuration === "number" && Number.isFinite(source.loopDuration)
         ? source.loopDuration
         : defaultState.loopDuration,
-    ...(customColors ? { customColors } : {}),
+    customStops,
+    customColors: undefined,
     ...(Array.isArray(source.layers) ? { layers: source.layers.map(migrateLayer) } : {}),
   }
 }
@@ -468,14 +506,18 @@ export function normalizePersistedState(persisted: unknown): unknown {
   }
   if (typeof state.showSafeAreas !== "boolean") state.showSafeAreas = false
 
-  const customColors = migrateColors(state.customColors)
-  if (customColors) state.customColors = customColors
+  const legacyStops = legacyColorsToStops(state.customColors as never)
+  state.customStops = normalizeStops(
+    state.customStops ?? legacyStops,
+    legacyStops ?? defaultState.customStops
+  )
+  delete state.customColors
 
   if (state.colorSchemes && typeof state.colorSchemes === "object") {
     state.colorSchemes = Object.fromEntries(
       Object.entries(state.colorSchemes as Record<string, unknown>).flatMap(
         ([key, scheme]) => {
-          const migrated = migrateColors(scheme)
+          const migrated = migrateScheme(scheme)
           return migrated ? [[key, migrated]] : []
         }
       )
@@ -573,7 +615,7 @@ export const useGradientStore = create<GradientStore>()(
       saveCurrentPreset: (name) =>
         set((state) => {
           const preset: GradientPreset = {
-            id: `preset_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            id: nextId("preset"),
             name,
             createdAt: Date.now(),
             snapshot: captureSnapshot(state),
@@ -590,6 +632,42 @@ export const useGradientStore = create<GradientStore>()(
         set((state) => ({
           savedPresets: state.savedPresets.filter((p) => p.id !== id),
         })),
+
+      exportLibrary: () => serializeLibrary(get().savedPresets, get().colorSchemes),
+
+      // Presets e esquemas do arquivo passam pela mesma normalização de um
+      // localStorage antigo: um arquivo exportado por uma versão anterior é
+      // migrado em vez de rejeitado
+      importLibrary: (json) => {
+        const { presets, colorSchemes } = parseLibrary(json)
+
+        const importedPresets = presets.map((preset) => {
+          const source = preset as GradientPreset
+          return {
+            ...source,
+            // Ids novos: importar duas vezes não sobrescreve nem colide
+            id: nextId("preset"),
+            snapshot: migrateSnapshot(source.snapshot) as StateSnapshot,
+          }
+        })
+
+        const importedSchemes = Object.fromEntries(
+          Object.entries(colorSchemes).flatMap(([key, scheme]) => {
+            const migrated = migrateScheme(scheme)
+            return migrated ? [[key, migrated]] : []
+          })
+        )
+
+        set((state) => ({
+          savedPresets: [...importedPresets, ...state.savedPresets],
+          colorSchemes: { ...state.colorSchemes, ...importedSchemes },
+        }))
+
+        return {
+          presets: importedPresets.length,
+          schemes: Object.keys(importedSchemes).length,
+        }
+      },
 
       // ─── Animation parameters ─────────────────────────────────────────────
 
@@ -664,32 +742,46 @@ export const useGradientStore = create<GradientStore>()(
       setArtboard: (id) => set({ artboardId: getArtboard(id).id }),
       setShowSafeAreas: (value) => set({ showSafeAreas: value }),
 
-      // ─── Custom color actions ──────────────────────────────────────────────
+      // ─── Paradas de cor ────────────────────────────────────────────────────
 
-      setCustomColor1: (color) => {
-        recordEdit("customColor1")
-        set((state) => ({ customColors: { ...state.customColors, color1: color } }))
+      setStopColor: (index, color) => {
+        recordEdit(`stopColor:${index}`)
+        set((state) => ({ customStops: updateStopColor(state.customStops, index, color) }))
       },
 
-      setCustomColor2: (color) => {
-        recordEdit("customColor2")
-        set((state) => ({ customColors: { ...state.customColors, color2: color } }))
+      setStopPosition: (index, position) => {
+        recordEdit(`stopPosition:${index}`)
+        set((state) => ({
+          customStops: updateStopPosition(state.customStops, index, position),
+        }))
       },
 
-      setCustomColor3: (color) => {
-        recordEdit("customColor3")
-        set((state) => ({ customColors: { ...state.customColors, color3: color } }))
+      // Usado por harmonias, extração de paleta e presets: substitui a paleta
+      // inteira de uma vez, um único passo no histórico
+      setStops: (stops) => {
+        get().pushHistory()
+        set({ customStops: sortStops(normalizeStops(stops, get().customStops)) })
+      },
+
+      addStop: () => {
+        get().pushHistory()
+        set((state) => ({ customStops: insertStop(state.customStops) }))
+      },
+
+      removeStop: (index) => {
+        get().pushHistory()
+        set((state) => ({ customStops: removeStopAt(state.customStops, index) }))
       },
 
       // ─── Save custom scheme ────────────────────────────────────────────────
 
       saveCustomScheme: (name) =>
         set((state) => {
-          const key = `custom_${Date.now()}`
+          const key = nextId("custom")
           return {
             colorSchemes: {
               ...state.colorSchemes,
-              [key]: { ...state.customColors, name },
+              [key]: { stops: cloneStops(state.customStops), name },
             },
             colorScheme: key,
             isCustomMode: false,
@@ -709,11 +801,7 @@ export const useGradientStore = create<GradientStore>()(
           noiseScale: defaultState.noiseScale,
           colorScheme: defaultState.colorScheme,
           isCustomMode: defaultState.isCustomMode,
-          customColors: {
-            color1: [...defaultState.customColors.color1] as GradientColor,
-            color2: [...defaultState.customColors.color2] as GradientColor,
-            color3: [...defaultState.customColors.color3] as GradientColor,
-          },
+          customStops: cloneStops(defaultState.customStops),
           flowIntensity: defaultState.flowIntensity,
           grainAmount: defaultState.grainAmount,
           grainScale: defaultState.grainScale,
@@ -729,15 +817,6 @@ export const useGradientStore = create<GradientStore>()(
       // ─── Import settings ───────────────────────────────────────────────────
 
       importSettings: (settings: ShareableGradient) => {
-        const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1)
-        const validateColor = (
-          color: number[] | undefined,
-          fallback: GradientColor
-        ): GradientColor =>
-          Array.isArray(color) && color.length >= 3 && color.every((c) => typeof c === "number")
-            ? [clamp01(color[0]), clamp01(color[1]), clamp01(color[2])]
-            : fallback
-
         // URLs compartilhadas podem referenciar um esquema que não existe
         // neste cliente (ex.: esquema custom de outro usuário)
         const colorScheme =
@@ -759,11 +838,11 @@ export const useGradientStore = create<GradientStore>()(
           noiseScale: Math.min(Math.max(settings.noiseScale, 0.5), 5.0),
           colorScheme,
           isCustomMode: Boolean(settings.isCustomMode),
-          customColors: {
-            color1: validateColor(settings.customColors?.color1, [0.9, 0.1, 0.1]),
-            color2: validateColor(settings.customColors?.color2, [0.0, 0.0, 0.9]),
-            color3: validateColor(settings.customColors?.color3, [0.5, 0.0, 0.5]),
-          },
+          // Links v3 trazem paradas com posição; os anteriores só três cores
+          customStops: normalizeStops(
+            settings.stops ?? legacyColorsToStops(settings.customColors),
+            defaultState.customStops
+          ),
         }
 
         // Parâmetros avançados (links v2) — links antigos não os incluem,
@@ -807,13 +886,13 @@ export const useGradientStore = create<GradientStore>()(
                 ? layer.colorScheme
                 : "redBlue",
             isCustomMode: Boolean(layer?.isCustomMode),
-            customColors: layer?.customColors
-              ? {
-                  color1: validateColor(layer.customColors.color1, [0.9, 0.1, 0.1]),
-                  color2: validateColor(layer.customColors.color2, [0.0, 0.0, 0.9]),
-                  color3: validateColor(layer.customColors.color3, [0.5, 0.0, 0.5]),
-                }
-              : undefined,
+            // Camadas de links v2 traziam três cores; v3 traz paradas
+            customStops: (() => {
+              const source = layer as Record<string, unknown> | undefined
+              const legacy = legacyColorsToStops(source?.customColors as never)
+              const stops = source?.customStops ?? legacy
+              return stops ? normalizeStops(stops, defaultState.customStops) : undefined
+            })(),
             noiseScale: clampNum(layer?.noiseScale, 0.5, 5.0, 2.0),
             flowIntensity: clampNum(layer?.flowIntensity, 0.1, 1.0, 0.3),
             thresholdMin: clampNum(layer?.thresholdMin, 0.1, 0.8, 0.3),
@@ -851,14 +930,14 @@ export const useGradientStore = create<GradientStore>()(
         const rand = (min: number, max: number) => Math.random() * (max - min) + min
         const randInt = (min: number, max: number) =>
           Math.floor(Math.random() * (max - min + 1)) + min
-        const randColor = (): GradientColor => [
-          Math.random(),
-          Math.random(),
-          Math.random(),
-        ]
 
         const tMin = rand(0.1, 0.45)
         const tMax = Math.min(0.9, tMin + rand(0.2, 0.5))
+
+        // Paleta sorteada em OKLCH por harmonia: sortear R, G e B
+        // independentemente cai quase sempre em cores dessaturadas e sem
+        // relação entre si — visualmente, lama
+        const palette = randomPalette({ count: randInt(2, 4) })
 
         set({
           speed: parseFloat(rand(0.2, 2.5).toFixed(1)),
@@ -871,11 +950,7 @@ export const useGradientStore = create<GradientStore>()(
           // Sortear também a forma, não só as cores e o ritmo
           seed: generateSeed(),
           isCustomMode: true,
-          customColors: {
-            color1: randColor(),
-            color2: randColor(),
-            color3: randColor(),
-          },
+          customStops: stopsFromColors(palette.map(oklchToSrgb)),
         })
 
         // Guarda o resultado no histórico do randomizador para que um bom
@@ -983,7 +1058,7 @@ export const useGradientStore = create<GradientStore>()(
         noiseScale: state.noiseScale,
         colorScheme: state.colorScheme,
         isCustomMode: state.isCustomMode,
-        customColors: state.customColors,
+        customStops: state.customStops,
         colorSchemes: state.colorSchemes,
         flowIntensity: state.flowIntensity,
         grainAmount: state.grainAmount,

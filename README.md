@@ -19,8 +19,17 @@ ruído simplex e curl noise, renderizado via React Three Fiber.
   RGB linear, com codificação sRGB na saída — o HEX escolhido no picker é
   exatamente o pixel exportado. Dither triangular sub-quantização elimina o
   banding típico de gradientes suaves em 8 bits
-- **Esquemas de cores** prontos (3 cores) + modo personalizado com color picker
-  RGB/HSL/HEX e salvamento de esquemas próprios
+- **De 2 a 8 paradas de cor**, cada uma com posição própria ao longo do
+  gradiente
+- **Color picker em OKLCH**, RGB, HSL ou HEX: mexer em luminosidade ou croma em
+  OKLCH não desloca o matiz (clarear um vermelho em HSL puxa para rosa), e o
+  slider de croma respeita o teto real do sRGB para aquela cor
+- **Harmonias** (análoga, complementar, complementar dividida, tríade,
+  monocromática) derivadas da primeira parada, mantendo as posições
+- **Paleta extraída de uma imagem** de referência, por clusterização em Oklab
+- **Contraste WCAG** do texto branco e preto no pior caso ao longo do gradiente
+- **Esquemas de cores** prontos + modo personalizado com salvamento de esquemas
+  próprios
 - **Forma reproduzível**: o *seed* do campo de ruído entra em presets, histórico
   e links — "Sortear Forma" troca o desenho mantendo cores e ritmo
 - **Multi-camadas** em um único contexto WebGL: cada camada é renderizada em um
@@ -30,13 +39,16 @@ ruído simplex e curl noise, renderizado via React Three Fiber.
 - **Presets de animação** e gerador aleatório com **histórico dos últimos
   sorteios** (clique numa miniatura para restaurar um bom resultado)
 - **Presets completos** salvos pelo usuário: cores + todos os parâmetros de
-  animação, com galeria de miniaturas
+  animação, com galeria de miniaturas **renderizadas pelo shader** (duas
+  configurações com as mesmas cores e formas diferentes aparecem diferentes) e
+  **biblioteca portátil** em JSON (exportar/importar)
 - **Undo/Redo** (Ctrl+Z / Ctrl+Y) com coalescência de edições contínuas,
   cobrindo também criar, remover, editar e reordenar camadas
 - **Exportação**: imagem (PNG/JPEG/WebP) na prancheta atual, em dimensões
   prontas ou com escala de até 8×; vídeo determinístico (MP4/H.264 ou WebM/VP9)
   renderizado quadro a quadro com timestamps explícitos — taxa de quadros e
-  duração exatas, independentes do desempenho da GPU — e CSS estático aproximado
+  duração exatas, independentes do desempenho da GPU — e **tokens da paleta**
+  (JSON de design tokens com OKLCH, CSS custom properties, config Tailwind e SVG)
 - **Compartilhamento** por URL compacta que reproduz o gradiente completo —
   incluindo parâmetros avançados (fluxo, grão, limiares) e camadas
 - **Atalhos de teclado**: `Espaço` play/pause, `R` reset, `S` salvar imagem,
@@ -76,6 +88,7 @@ app/          # rotas e layout (App Router)
 components/   # componentes da aplicação + components/ui (shadcn)
 hooks/        # hooks (atalhos de teclado, fullscreen, otimizações de dispositivo)
 lib/          # store Zustand, presets, cor, captura e compartilhamento
+              # (color-stops, oklch, palette-extract, tokens, library)
 lib/shaders/  # fonte única do GLSL (gradiente + composição de camadas)
 ```
 
@@ -101,3 +114,11 @@ lib/shaders/  # fonte única do GLSL (gradiente + composição de camadas)
   circular no campo de ruído (`theta = 2π·t/T`), periódico por construção. O
   quadro que fecharia o ciclo é idêntico ao primeiro e por isso não é gravado —
   evita um quadro duplicado na emenda.
+- **Paradas de cor**: o shader recebe arrays de até 8 paradas (cores em linear +
+  posições). A ordenação acontece na escrita dos uniforms, não no estado:
+  reordenar a lista no meio de um arraste faria o slider pular de parada na mão
+  do usuário, enquanto o shader precisa das posições crescentes.
+- **OKLCH**: `lib/oklch.ts` faz as conversões, o clamp de gamut por busca binária
+  no croma (preservando matiz e luminosidade), as harmonias e o contraste WCAG.
+  O randomizador sorteia nesses eixos — sortear R, G e B independentemente
+  produz quase sempre cores dessaturadas e sem relação entre si.
