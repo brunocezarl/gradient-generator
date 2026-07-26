@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Wand2, Play, Pause, Save } from "lucide-react"
 import { useGradientStore } from "@/lib/store"
@@ -245,8 +244,16 @@ export function AnimationPresetsSelector() {
             <DialogTitle>Animation Presets</DialogTitle>
           </DialogHeader>
 
-          <Tabs defaultValue="presets" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-neutral-800">
+          {/* The tab strip stays put and the active panel takes the leftover
+              height, so the list scrolls within the dialog instead of pushing
+              the footer off screen. */}
+          <Tabs
+            defaultValue="presets"
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <TabsList className="grid w-full shrink-0 grid-cols-2 bg-neutral-800">
               <TabsTrigger value="presets" className="text-white data-[state=active]:bg-neutral-700">
                 Presets
               </TabsTrigger>
@@ -255,36 +262,40 @@ export function AnimationPresetsSelector() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="presets" className="mt-4">
-              <ScrollArea className="h-[60vh] md:h-[400px] pr-4">
-                <div className="grid grid-cols-1 gap-3">
-                  {Object.entries(animationPresets).map(([id, preset]) => (
-                    <div
-                      key={id}
-                      className="bg-neutral-800 rounded-lg p-4 cursor-pointer hover:bg-neutral-700 transition-colors"
-                      onClick={() => handleSelectPreset(id)}
-                    >
-                      <h3 className="font-medium text-lg mb-1">{preset.name}</h3>
-                      <p className="text-sm text-neutral-400 mb-2">{preset.description}</p>
+            <TabsContent
+              value="presets"
+              className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+            >
+              <div className="grid grid-cols-1 gap-3">
+                {Object.entries(animationPresets).map(([id, preset]) => (
+                  <div
+                    key={id}
+                    className="bg-neutral-800 rounded-lg p-4 cursor-pointer hover:bg-neutral-700 transition-colors"
+                    onClick={() => handleSelectPreset(id)}
+                  >
+                    <h3 className="font-medium text-lg mb-1">{preset.name}</h3>
+                    <p className="text-sm text-neutral-400 mb-2">{preset.description}</p>
 
-                      <div className="grid grid-cols-3 gap-2 text-xs text-neutral-400">
-                        <div>
-                          <span className="font-medium">Speed:</span> {preset.speed}
-                        </div>
-                        <div>
-                          <span className="font-medium">Complexity:</span> {preset.complexity}
-                        </div>
-                        <div>
-                          <span className="font-medium">Scale:</span> {preset.noiseScale}
-                        </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-neutral-400">
+                      <div>
+                        <span className="font-medium">Speed:</span> {preset.speed}
+                      </div>
+                      <div>
+                        <span className="font-medium">Complexity:</span> {preset.complexity}
+                      </div>
+                      <div>
+                        <span className="font-medium">Scale:</span> {preset.noiseScale}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                  </div>
+                ))}
+              </div>
             </TabsContent>
 
-            <TabsContent value="custom" className="mt-4 space-y-4">
+            <TabsContent
+              value="custom"
+              className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1"
+            >
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="preset-name">Preset name</Label>

@@ -4,7 +4,15 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { ImageIcon, Loader2, Code2, Copy, Check, Download } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useShallow } from "zustand/react/shallow"
@@ -142,7 +150,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
             <DialogTitle>Export Options</DialogTitle>
           </DialogHeader>
 
-          <div className="py-4 space-y-4">
+          <DialogBody className="space-y-4">
             {/* Palette tokens */}
             <div className="space-y-2">
               <Label className="text-white flex items-center gap-1">
@@ -191,7 +199,12 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   <Download className="h-4 w-4" />
                 </Button>
               </div>
-              <pre className="max-h-32 overflow-auto rounded-md bg-neutral-800 px-3 py-2 text-[10px] leading-relaxed text-green-400 font-mono">
+              {/* Wrapping (instead of a second, horizontal scrollbar) keeps the
+                  long gradient declaration readable in full. */}
+              <pre
+                tabIndex={0}
+                className="max-h-56 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-neutral-800 px-3 py-2 text-[10px] leading-relaxed text-green-400 font-mono"
+              >
                 {tokens}
               </pre>
               <p className="text-xs text-neutral-400">
@@ -289,7 +302,7 @@ The gradient is rendered natively at the final resolution, with the camera
                 above the GPU limit are clamped automatically.
               </p>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <DialogClose asChild>
