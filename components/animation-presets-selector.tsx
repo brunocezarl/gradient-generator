@@ -41,10 +41,10 @@ export function AnimationPresetsSelector() {
     thresholdMax: 0.7
   })
 
-  // Referência para o timer de preview
+  // Reference to the preview timer
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Obter estado e ações do store
+  // State and actions from the store
   const {
     applyAnimationPreset,
     saveCustomScheme,
@@ -56,7 +56,7 @@ export function AnimationPresetsSelector() {
     setGrainAmount,
     setThresholdMin,
     setThresholdMax,
-    // Valores atuais para restaurar após o preview
+    // Current values, to restore after the preview
     speed: currentSpeed,
     complexity: currentComplexity,
     noiseScale: currentNoiseScale,
@@ -69,7 +69,7 @@ export function AnimationPresetsSelector() {
 
   const { toast } = useToast()
 
-  // Salvar os valores originais para restaurar após o preview
+  // Keep the original values so the preview can be rolled back
   const originalValuesRef = useRef({
     speed: currentSpeed,
     complexity: currentComplexity,
@@ -81,7 +81,7 @@ export function AnimationPresetsSelector() {
     thresholdMax: currentThresholdMax
   })
 
-  // Atualizar valores originais quando o diálogo é aberto
+  // Refresh the original values when the dialog opens
   useEffect(() => {
     if (open) {
       originalValuesRef.current = {
@@ -98,7 +98,7 @@ export function AnimationPresetsSelector() {
   }, [open, currentSpeed, currentComplexity, currentNoiseScale, currentColorScheme,
       currentFlowIntensity, currentGrainAmount, currentThresholdMin, currentThresholdMax])
 
-  // Limpar o timer de preview quando o componente é desmontado
+  // Clear the preview timer when the component unmounts
   useEffect(() => {
     return () => {
       if (previewTimerRef.current) {
@@ -107,7 +107,7 @@ export function AnimationPresetsSelector() {
     }
   }, [])
 
-  // Aplicar preset e fechar o diálogo
+  // Apply the preset and close the dialog
   const handleSelectPreset = (presetId: string) => {
     applyAnimationPreset(presetId)
     setOpen(false)
@@ -118,7 +118,7 @@ export function AnimationPresetsSelector() {
     })
   }
 
-  // Função para iniciar o preview
+  // Start the preview
   const startPreview = () => {
     // Salvar os valores atuais
     originalValuesRef.current = {
@@ -156,13 +156,13 @@ export function AnimationPresetsSelector() {
 
     setPreviewActive(true)
 
-    // Configurar um timer para restaurar os valores originais após 5 segundos
+    // Restore the original values after five seconds
     previewTimerRef.current = setTimeout(() => {
       stopPreview()
     }, 5000)
   }
 
-  // Função para parar o preview
+  // Stop the preview
   const stopPreview = () => {
     // Restaurar os valores originais
     setSpeed(originalValuesRef.current.speed)
@@ -183,7 +183,7 @@ export function AnimationPresetsSelector() {
     }
   }
 
-  // Função para salvar o preset personalizado
+  // Save the custom preset
   const saveCustomPreset = () => {
     // Aplicar os valores do preset personalizado permanentemente
     setSpeed(customPreset.speed)
@@ -227,31 +227,31 @@ export function AnimationPresetsSelector() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="w-full bg-gray-900 text-white border-gray-700 hover:bg-gray-800"
+        className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
       >
         <Wand2 className="mr-2 h-4 w-4" />
-        Presets de Animação
+        Animation Presets
       </Button>
 
       <Dialog open={open} onOpenChange={(isOpen) => {
-        // Se estiver fechando o diálogo e o preview estiver ativo, pare o preview
+        // Closing the dialog while a preview runs stops the preview
         if (!isOpen && previewActive) {
           stopPreview()
         }
         setOpen(isOpen)
       }}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700 sm:max-w-md">
+        <DialogContent className="bg-neutral-900 text-white border-neutral-700 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Presets de Animação</DialogTitle>
+            <DialogTitle>Animation Presets</DialogTitle>
           </DialogHeader>
 
           <Tabs defaultValue="presets" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-gray-800">
-              <TabsTrigger value="presets" className="text-white data-[state=active]:bg-gray-700">
+            <TabsList className="grid w-full grid-cols-2 bg-neutral-800">
+              <TabsTrigger value="presets" className="text-white data-[state=active]:bg-neutral-700">
                 Presets
               </TabsTrigger>
-              <TabsTrigger value="custom" className="text-white data-[state=active]:bg-gray-700">
-                Personalizado
+              <TabsTrigger value="custom" className="text-white data-[state=active]:bg-neutral-700">
+                Custom
               </TabsTrigger>
             </TabsList>
 
@@ -261,21 +261,21 @@ export function AnimationPresetsSelector() {
                   {Object.entries(animationPresets).map(([id, preset]) => (
                     <div
                       key={id}
-                      className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors"
+                      className="bg-neutral-800 rounded-lg p-4 cursor-pointer hover:bg-neutral-700 transition-colors"
                       onClick={() => handleSelectPreset(id)}
                     >
                       <h3 className="font-medium text-lg mb-1">{preset.name}</h3>
-                      <p className="text-sm text-gray-400 mb-2">{preset.description}</p>
+                      <p className="text-sm text-neutral-400 mb-2">{preset.description}</p>
 
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-400">
+                      <div className="grid grid-cols-3 gap-2 text-xs text-neutral-400">
                         <div>
-                          <span className="font-medium">Velocidade:</span> {preset.speed}
+                          <span className="font-medium">Speed:</span> {preset.speed}
                         </div>
                         <div>
-                          <span className="font-medium">Complexidade:</span> {preset.complexity}
+                          <span className="font-medium">Complexity:</span> {preset.complexity}
                         </div>
                         <div>
-                          <span className="font-medium">Escala:</span> {preset.noiseScale}
+                          <span className="font-medium">Scale:</span> {preset.noiseScale}
                         </div>
                       </div>
                     </div>
@@ -287,17 +287,17 @@ export function AnimationPresetsSelector() {
             <TabsContent value="custom" className="mt-4 space-y-4">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="preset-name">Nome do Preset</Label>
+                  <Label htmlFor="preset-name">Preset name</Label>
                   <Input
                     id="preset-name"
                     value={customPreset.name}
                     onChange={(e) => updateCustomPreset("name", e.target.value)}
-                    className="bg-gray-800 border-gray-700 text-white"
+                    className="bg-neutral-800 border-neutral-700 text-white"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="preset-speed">Velocidade: {customPreset.speed.toFixed(1)}</Label>
+                  <Label htmlFor="preset-speed">Speed: {customPreset.speed.toFixed(1)}</Label>
                   <Input
                     id="preset-speed"
                     type="range"
@@ -306,12 +306,12 @@ export function AnimationPresetsSelector() {
                     step="0.1"
                     value={customPreset.speed}
                     onChange={(e) => updateCustomPreset("speed", parseFloat(e.target.value))}
-                    className="bg-gray-800 border-gray-700"
+                    className="bg-neutral-800 border-neutral-700"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="preset-complexity">Complexidade: {customPreset.complexity}</Label>
+                  <Label htmlFor="preset-complexity">Complexity: {customPreset.complexity}</Label>
                   <Input
                     id="preset-complexity"
                     type="range"
@@ -320,12 +320,12 @@ export function AnimationPresetsSelector() {
                     step="1"
                     value={customPreset.complexity}
                     onChange={(e) => updateCustomPreset("complexity", parseInt(e.target.value))}
-                    className="bg-gray-800 border-gray-700"
+                    className="bg-neutral-800 border-neutral-700"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="preset-noiseScale">Escala de Ruído: {customPreset.noiseScale.toFixed(1)}</Label>
+                  <Label htmlFor="preset-noiseScale">Noise Scale: {customPreset.noiseScale.toFixed(1)}</Label>
                   <Input
                     id="preset-noiseScale"
                     type="range"
@@ -334,7 +334,7 @@ export function AnimationPresetsSelector() {
                     step="0.1"
                     value={customPreset.noiseScale}
                     onChange={(e) => updateCustomPreset("noiseScale", parseFloat(e.target.value))}
-                    className="bg-gray-800 border-gray-700"
+                    className="bg-neutral-800 border-neutral-700"
                   />
                 </div>
 
@@ -346,7 +346,7 @@ export function AnimationPresetsSelector() {
                     {previewActive ? (
                       <>
                         <Pause className="mr-2 h-4 w-4" />
-                        Parar Preview
+                        Stop preview
                       </>
                     ) : (
                       <>
@@ -361,7 +361,7 @@ export function AnimationPresetsSelector() {
                     className="bg-green-600 hover:bg-green-700 flex-1"
                   >
                     <Save className="mr-2 h-4 w-4" />
-                    Aplicar
+                    Apply
                   </Button>
                 </div>
               </div>
@@ -376,9 +376,9 @@ export function AnimationPresetsSelector() {
                 }
                 setOpen(false)
               }}
-              className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+              className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
             >
-              Fechar
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

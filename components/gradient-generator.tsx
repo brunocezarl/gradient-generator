@@ -10,14 +10,26 @@ import { VideoExport } from "@/components/video-export"
 import { ShareGradient } from "@/components/share-gradient"
 import { FullscreenButton } from "@/components/fullscreen-button"
 import { MultiLayerGradient } from "@/components/multi-layer-gradient"
-import { LayerManager } from "@/components/layer-manager"
+import { Artboard } from "@/components/artboard"
+import { TimelineBar } from "@/components/timeline-bar"
 import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { useGradientStore } from "@/lib/store"
 import { exportCompositeImage } from "@/lib/capture"
+import { getArtboard, isFreeArtboard } from "@/lib/artboards"
 import { useToast } from "@/components/ui/use-toast"
 import { useFullscreen } from "@/hooks/use-fullscreen"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
+import { usePlaybackDriver } from "@/hooks/use-playback-driver"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -25,40 +37,52 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Keyboard } from "lucide-react"
+import { Keyboard, PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import { artboards } from "@/lib/artboards"
 
-// ─── Tabela de atalhos exibida no dialog ─────────────────────────────────────
+// ─── Shortcut table shown in the dialog ──────────────────────────────────────
 const SHORTCUTS = [
-  { key: "Espaço", desc: "Play / Pausar animação" },
-  { key: "R", desc: "Restaurar configurações padrão" },
-  { key: "S", desc: "Salvar / Capturar imagem" },
-  { key: "F", desc: "Alternar tela cheia" },
-  { key: "Ctrl + Z", desc: "Desfazer última ação" },
-  { key: "Ctrl + Y", desc: "Refazer última ação" },
+  { key: "Space", desc: "Play / pause the animation" },
+  { key: "R", desc: "Restore default settings" },
+  { key: "S", desc: "Save / capture an image" },
+  { key: "F", desc: "Toggle full screen (clean preview)" },
+  { key: "Ctrl + Z", desc: "Undo the last action" },
+  { key: "Ctrl + Y", desc: "Redo the last action" },
 ]
 
 export default function GradientGenerator() {
-  const containerRef = useRef<HTMLDivElement>(null)
+  // Points only at the artboard: exporting scans the canvases inside it, and full
+  // screen shows the art without the app chrome
+  const artboardRef = useRef<HTMLDivElement>(null)
   const isWebGLSupported = useWebGLSupport()
   const { toast } = useToast()
 
   const multiLayerMode = useGradientStore((state) => state.multiLayerMode)
+  const sidebarOpen = useGradientStore((state) => state.menuOpen)
+  const toggleSidebar = useGradientStore((state) => state.toggleMenu)
   const isPlaying = useGradientStore((state) => state.isPlaying)
   const setIsPlaying = useGradientStore((state) => state.setIsPlaying)
   const resetToDefaults = useGradientStore((state) => state.resetToDefaults)
   const undo = useGradientStore((state) => state.undo)
   const redo = useGradientStore((state) => state.redo)
+  const artboardId = useGradientStore((state) => state.artboardId)
+  const setArtboard = useGradientStore((state) => state.setArtboard)
+  const showSafeAreas = useGradientStore((state) => state.showSafeAreas)
+  const setShowSafeAreas = useGradientStore((state) => state.setShowSafeAreas)
 
   const { toggleFullscreen } = useFullscreen()
 
-  // Respeitar preferência de movimento reduzido: iniciar pausado
+  // The single animation clock (lib/playback.ts)
+  usePlaybackDriver()
+
+  // Respect the reduced-motion preference: start paused
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       useGradientStore.getState().setIsPlaying(false)
     }
   }, [])
 
-  // ─── Captura de imagem ────────────────────────────────────────────────────
+  // ─── Image capture ────────────────────────────────────────────────────────
 
   const captureImage = useCallback(
     async (
@@ -68,30 +92,39 @@ export default function GradientGenerator() {
       size?: { width: number; height: number },
     ) => {
       try {
-        if (!containerRef.current) return
-        const canvas = containerRef.current.querySelector("canvas")
+        if (!artboardRef.current) return
+        const canvas = artboardRef.current.querySelector("canvas")
         if (!canvas) {
           toast({
-            title: "Erro",
-            description: "Não foi possível encontrar o canvas para capturar a imagem.",
+            title: "Error",
+            description: "Could not find a canvas to capture the image from.",
             variant: "destructive",
           })
           return
         }
 
-        toast({ title: "Processando", description: "Preparando a imagem para download..." })
+        toast({ title: "Working", description: "Preparing the image for download…" })
 
         let mimeType = "image/png"
         if (format === "jpeg") mimeType = "image/jpeg"
         if (format === "webp") mimeType = "image/webp"
 
-        // Re-renderiza cada camada nativamente na resolução final (sem
-        // upscaling) e compõe com opacidade/blend modes; usa Blob em vez de
-        // dataURL para suportar arquivos grandes (4K/8K) sem estourar memória
-        const blob = await exportCompositeImage(containerRef.current, {
+        // With no explicit dimensions the artboard decides: the file comes out at
+        // the size the preview is showing
+        const artboard = getArtboard(useGradientStore.getState().artboardId)
+        const target =
+          size ??
+          (isFreeArtboard(artboard)
+            ? undefined
+            : { width: artboard.width, height: artboard.height })
+
+        // Re-renders each layer natively at the final resolution (no upscaling)
+        // and composes with opacity/blend modes; uses a Blob instead of a dataURL
+        // so large files (4K/8K) do not blow up memory
+        const blob = await exportCompositeImage(artboardRef.current, {
           scale,
-          width: size?.width,
-          height: size?.height,
+          width: target?.width,
+          height: target?.height,
           mimeType,
           quality,
         })
@@ -105,12 +138,12 @@ export default function GradientGenerator() {
         document.body.removeChild(link)
         setTimeout(() => URL.revokeObjectURL(url), 1000)
 
-        toast({ title: "Sucesso!", description: "Imagem exportada com sucesso." })
+        toast({ title: "Done", description: "Image exported successfully." })
       } catch (error) {
         console.error("Error capturing image:", error)
         toast({
-          title: "Erro",
-          description: "Ocorreu um erro ao exportar a imagem.",
+          title: "Error",
+          description: "Something went wrong while exporting the image.",
           variant: "destructive",
         })
         throw error
@@ -119,26 +152,26 @@ export default function GradientGenerator() {
     [toast]
   )
 
-  // ─── Atalhos de teclado ───────────────────────────────────────────────────
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
 
   useKeyboardShortcuts({
     onPlayPause: () => setIsPlaying(!isPlaying),
     onReset: () => {
       resetToDefaults()
       toast({
-        title: "Configurações Resetadas",
-        description: "Todas as configurações foram restauradas para os valores padrão.",
+        title: "Settings reset",
+        description: "Every setting is back to its default value.",
       })
     },
-    onFullscreen: () => toggleFullscreen(containerRef.current ?? undefined),
+    onFullscreen: () => toggleFullscreen(artboardRef.current ?? undefined),
     onSave: () => captureImage(),
     onUndo: () => {
       undo()
-      toast({ title: "Desfeito", description: "Última ação desfeita." })
+      toast({ title: "Undone", description: "Last action undone." })
     },
     onRedo: () => {
       redo()
-      toast({ title: "Refeito", description: "Ação refeita." })
+      toast({ title: "Redone", description: "Action redone." })
     },
   })
 
@@ -147,87 +180,143 @@ export default function GradientGenerator() {
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-screen overflow-hidden">
-      {/* Gradient Scene */}
-      <ErrorBoundary
-        fallback={
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
-            <div className="text-center p-6">
-              <h2 className="text-xl font-bold mb-2">Algo deu errado</h2>
-              <p className="mb-4">Ocorreu um erro ao renderizar o gradiente.</p>
-              <button
-                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
-                onClick={() => window.location.reload()}
-              >
-                Tentar novamente
-              </button>
-            </div>
-          </div>
-        }
-      >
-        <div className="absolute inset-0">
-          {multiLayerMode ? <MultiLayerGradient /> : <GradientScene />}
-        </div>
-      </ErrorBoundary>
+    <div className="flex flex-col h-screen w-full bg-neutral-950 text-white overflow-hidden">
+      {/* ─── Top bar ────────────────────────────────────────────────────── */}
+      <header className="flex items-center gap-2 px-3 py-2 border-b border-neutral-800 bg-neutral-950 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
+          onClick={toggleSidebar}
+          title={sidebarOpen ? "Hide controls" : "Show controls"}
+          aria-label={sidebarOpen ? "Hide controls" : "Show controls"}
+        >
+          {sidebarOpen ? (
+            <PanelLeftClose className="h-4 w-4" />
+          ) : (
+            <PanelLeftOpen className="h-4 w-4" />
+          )}
+        </Button>
 
-      {/* Controls */}
-      <div className="absolute top-0 left-0 z-40 flex flex-col">
-        <ControlsPanel onCaptureImage={() => captureImage()} />
-      </div>
+        <h1 className="text-sm font-medium tracking-tight mr-2 hidden sm:block">
+          Organic Gradients
+        </h1>
 
-      {/* Export e Vídeo — canto inferior direito */}
-      <div className="absolute bottom-4 right-4 z-40 w-64 space-y-2">
-        <ExportOptions onExport={captureImage} />
-        <VideoExport containerRef={containerRef} />
-        <ShareGradient />
-      </div>
-
-      {/* Layer Manager — canto inferior esquerdo (em telas pequenas fica
-          disponível apenas na aba "Camadas" do painel de controles, para não
-          sobrepor os botões de exportação) */}
-      {multiLayerMode && (
-        <div className="absolute bottom-4 left-4 z-40 w-72 hidden md:block bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg shadow-xl p-4">
-          <LayerManager />
-        </div>
-      )}
-
-      {/* Fullscreen — canto superior direito */}
-      <div className="absolute top-4 right-4 z-40">
-        <FullscreenButton targetRef={containerRef} />
-      </div>
-
-      {/* Botão de Ajuda (atalhos) — canto inferior esquerdo (acima do layer manager se ativo) */}
-      <div
-        className={`absolute z-40 left-4 ${multiLayerMode ? "bottom-4 md:bottom-[calc(1rem+theme(spacing.4)+280px)]" : "bottom-4"}`}
-      >
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="bg-black/50 border-gray-700 hover:bg-black/70 text-white"
-              title="Atalhos de teclado"
-              aria-label="Atalhos de teclado"
+        {/* Artboard: sets the preview ratio and the file size */}
+        <div className="flex items-center gap-2">
+          <Select value={artboardId} onValueChange={setArtboard}>
+            <SelectTrigger
+              className="h-8 w-[190px] md:w-[230px] bg-neutral-900 border-neutral-700 text-white text-xs"
+              aria-label="Artboard"
             >
-              <Keyboard className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-gray-900 text-white border-gray-700">
-            <DialogHeader>
-              <DialogTitle>Atalhos de Teclado</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-2 py-2">
-              {SHORTCUTS.map(({ key, desc }) => (
-                <div key={key} className="flex items-center justify-between py-1 border-b border-gray-800">
-                  <span className="text-gray-300 text-sm">{desc}</span>
-                  <kbd className="px-2 py-1 bg-gray-800 rounded text-xs font-mono text-white border border-gray-600">
-                    {key}
-                  </kbd>
-                </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-neutral-900 border-neutral-700 text-white max-h-72">
+              {artboards.map((artboard) => (
+                <SelectItem key={artboard.id} value={artboard.id}>
+                  {artboard.label}
+                </SelectItem>
               ))}
-            </div>
-          </DialogContent>
-        </Dialog>
+            </SelectContent>
+          </Select>
+
+          <div className="hidden md:flex items-center gap-2">
+            <Switch
+              id="safe-areas"
+              checked={showSafeAreas}
+              onCheckedChange={setShowSafeAreas}
+            />
+            <Label htmlFor="safe-areas" className="text-xs text-neutral-400">
+              Guides
+            </Label>
+          </div>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2">
+            <ExportOptions onExport={captureImage} />
+            <VideoExport containerRef={artboardRef} />
+            <ShareGradient />
+          </div>
+
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
+                title="Keyboard shortcuts"
+                aria-label="Keyboard shortcuts"
+              >
+                <Keyboard className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-neutral-900 text-white border-neutral-700">
+              <DialogHeader>
+                <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                {SHORTCUTS.map(({ key, desc }) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between py-1 border-b border-neutral-800"
+                  >
+                    <span className="text-neutral-300 text-sm">{desc}</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs font-mono text-white border border-neutral-600">
+                      {key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <FullscreenButton targetRef={artboardRef} />
+        </div>
+      </header>
+
+      {/* ─── Body: controls + artboard ─────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0">
+        {sidebarOpen && (
+          <aside className="w-72 lg:w-80 shrink-0 border-r border-neutral-800 bg-neutral-950 overflow-y-auto">
+            <ControlsPanel onCaptureImage={() => captureImage()} />
+          </aside>
+        )}
+
+        <main className="flex flex-col flex-1 min-w-0">
+          <ErrorBoundary
+            fallback={
+              <div className="flex-1 flex items-center justify-center bg-neutral-900 text-white">
+                <div className="text-center p-6">
+                  <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
+                  <p className="mb-4">An error occurred while rendering the gradient.</p>
+                  <button
+                    className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+                    onClick={() => window.location.reload()}
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            }
+          >
+            <Artboard ref={artboardRef}>
+              {multiLayerMode ? <MultiLayerGradient /> : <GradientScene />}
+            </Artboard>
+          </ErrorBoundary>
+
+          <TimelineBar />
+
+          {/* Export also in the footer on narrow screens, where the top bar runs
+              out of room */}
+          <div className="sm:hidden flex gap-2 p-2 border-t border-neutral-800">
+            <ExportOptions onExport={captureImage} />
+            <VideoExport containerRef={artboardRef} />
+            <ShareGradient />
+          </div>
+        </main>
       </div>
     </div>
   )

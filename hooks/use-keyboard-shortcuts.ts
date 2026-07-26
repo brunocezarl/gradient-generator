@@ -18,7 +18,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
 
-      // Ignorar quando o foco está em campos de texto
+      // Ignore while focus is in a text field
       if (INPUT_TAGS.has(target.tagName) || target.isContentEditable) return
 
       const ctrl = e.ctrlKey || e.metaKey

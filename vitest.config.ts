@@ -8,8 +8,8 @@ export default defineConfig({
     },
   },
   test: {
-    // Ambiente padrão é node; testes que precisam de DOM declaram
-    // `// @vitest-environment happy-dom` no topo do arquivo
+    // Default environment is node; tests that need a DOM declare
+    // `// @vitest-environment happy-dom` at the top of the file
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
     include: ["lib/**/*.test.ts", "hooks/**/*.test.ts"],

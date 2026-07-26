@@ -9,18 +9,18 @@ beforeAll(() => {
 })
 
 describe("createShareableURL / parseShareableURL", () => {
-  it("faz round-trip dos parâmetros do gradiente", () => {
+  it("round-trips the gradient parameters", () => {
     const url = createShareableURL({
       speed: 2.5,
       complexity: 7,
       noiseScale: 3.5,
       colorScheme: "neon",
       isCustomMode: true,
-      customColors: {
-        color1: [0.1, 0.2, 0.3],
-        color2: [0.4, 0.5, 0.6],
-        color3: [0.7, 0.8, 0.9],
-      },
+      customStops: [
+        { color: [0.1, 0.2, 0.3], position: 0 },
+        { color: [0.4, 0.5, 0.6], position: 0.4 },
+        { color: [0.7, 0.8, 0.9], position: 1 },
+      ],
     })
 
     const parsed = parseShareableURL(url)
@@ -30,10 +30,15 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.noiseScale).toBe(3.5)
     expect(parsed!.colorScheme).toBe("neon")
     expect(parsed!.isCustomMode).toBe(true)
-    expect(parsed!.customColors.color3).toEqual([0.7, 0.8, 0.9])
+    // Stops travel with their positions, not just the color
+    expect(parsed!.stops).toEqual([
+      { color: [0.1, 0.2, 0.3], position: 0 },
+      { color: [0.4, 0.5, 0.6], position: 0.4 },
+      { color: [0.7, 0.8, 0.9], position: 1 },
+    ])
   })
 
-  it("faz round-trip dos parâmetros avançados", () => {
+  it("round-trips the advanced parameters", () => {
     const url = createShareableURL({
       speed: 1.0,
       flowIntensity: 0.75,
@@ -52,7 +57,7 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.thresholdMax).toBe(0.85)
   })
 
-  it("inclui camadas quando o modo multi-camadas está ativo", () => {
+  it("includes layers when multi-layer mode is on", () => {
     const layers: GradientLayer[] = [
       {
         id: "layer_1",
@@ -65,6 +70,7 @@ describe("createShareableURL / parseShareableURL", () => {
         flowIntensity: 0.4,
         thresholdMin: 0.2,
         thresholdMax: 0.8,
+        seed: [12.5, 7.25],
       },
       {
         id: "layer_2",
@@ -73,11 +79,16 @@ describe("createShareableURL / parseShareableURL", () => {
         visible: false,
         colorScheme: "redBlue",
         isCustomMode: true,
-        customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+        customStops: [
+          { color: [1, 0, 0], position: 0 },
+          { color: [0, 0, 1], position: 0.25 },
+          { color: [0, 1, 0], position: 1 },
+        ],
         noiseScale: 3.0,
         flowIntensity: 0.6,
         thresholdMin: 0.3,
         thresholdMax: 0.7,
+        seed: [0, 0],
       },
     ]
 
@@ -87,18 +98,21 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed).not.toBeNull()
     expect(parsed!.multiLayerMode).toBe(true)
     expect(parsed!.layers).toHaveLength(2)
-    // ids não são compartilhados — são regenerados na importação
+    // ids are not shared — they get regenerated on import
     expect(parsed!.layers![0]).not.toHaveProperty("id")
     expect(parsed!.layers![0].blendMode).toBe("screen")
     expect(parsed!.layers![0].opacity).toBe(0.8)
     expect(parsed!.layers![1].visible).toBe(false)
-    expect(parsed!.layers![1].customColors).toEqual({
-      color1: [1, 0, 0],
-      color2: [0, 0, 1],
-    })
+    expect(parsed!.layers![1].customStops).toEqual([
+      { color: [1, 0, 0], position: 0 },
+      { color: [0, 0, 1], position: 0.25 },
+      { color: [0, 1, 0], position: 1 },
+    ])
+    // The seed travels in the link: the noise shape is reproduced, not just colors
+    expect(parsed!.layers![0].seed).toEqual([12.5, 7.25])
   })
 
-  it("não inclui camadas quando o modo multi-camadas está inativo", () => {
+  it("omits layers when multi-layer mode is off", () => {
     const url = createShareableURL({
       multiLayerMode: false,
       layers: [
@@ -113,6 +127,7 @@ describe("createShareableURL / parseShareableURL", () => {
           flowIntensity: 0.3,
           thresholdMin: 0.3,
           thresholdMax: 0.7,
+          seed: [0, 0],
         },
       ],
     })
@@ -123,18 +138,22 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.layers).toBeUndefined()
   })
 
-  it("usa valores padrão para campos ausentes", () => {
+  it("uses defaults for missing fields", () => {
     const url = createShareableURL({})
     const parsed = parseShareableURL(url)
     expect(parsed).not.toBeNull()
     expect(parsed!.speed).toBe(1.0)
     expect(parsed!.colorScheme).toBe("redBlue")
-    expect(parsed!.customColors.color3).toEqual([0.5, 0.0, 0.5])
+    expect(parsed!.stops!).toEqual([
+      { color: [0.9, 0.1, 0.1], position: 0 },
+      { color: [0.0, 0.0, 0.9], position: 0.5 },
+      { color: [0.5, 0.0, 0.5], position: 1 },
+    ])
     expect(parsed!.flowIntensity).toBe(0.3)
     expect(parsed!.thresholdMax).toBe(0.7)
   })
 
-  it("preserva valores falsy legítimos (0 não vira o padrão)", () => {
+  it("preserves legitimate falsy values (0 does not become the default)", () => {
     const url = createShareableURL({
       speed: 0,
       complexity: 0,
@@ -152,15 +171,15 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed!.grainAmount).toBe(0)
   })
 
-  it("gera URLs compactas (query base64url, sem JSON cru)", () => {
+  it("produces compact URLs (base64url query, no raw JSON)", () => {
     const url = createShareableURL({})
     expect(url).toContain("?g=")
     expect(url).not.toContain("%7B") // "{" url-encoded do formato antigo
-    // Compacto o suficiente para colar em chats sem quebrar
+    // Compact enough to paste into a chat without breaking
     expect(url.length).toBeLessThan(400)
   })
 
-  it("ainda lê o formato legado (?gradient=<JSON url-encoded>)", () => {
+  it("still reads the legacy format (?gradient=<url-encoded JSON>)", () => {
     const legacy = {
       speed: 1.5,
       complexity: 4,
@@ -178,16 +197,16 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed).not.toBeNull()
     expect(parsed!.speed).toBe(1.5)
     expect(parsed!.colorScheme).toBe("neon")
-    expect(parsed!.customColors.color1).toEqual([0.1, 0.2, 0.3])
-    // Campos v2 simplesmente não existem em links antigos
+    expect(parsed!.customColors!.color1).toEqual([0.1, 0.2, 0.3])
+    // v2 fields simply do not exist in older links
     expect(parsed!.flowIntensity).toBeUndefined()
   })
 
-  it("retorna null para URL sem parâmetro de gradiente", () => {
+  it("returns null for a URL with no gradient parameter", () => {
     expect(parseShareableURL("https://gradients.example/")).toBeNull()
   })
 
-  it("retorna null para dados corrompidos", () => {
+  it("returns null for corrupted data", () => {
     expect(parseShareableURL("https://gradients.example/?gradient=%7Bnao-e-json")).toBeNull()
     expect(parseShareableURL("https://gradients.example/?g=!!!nao-e-base64!!!")).toBeNull()
   })

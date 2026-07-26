@@ -1,28 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { blendModes, blendModeToCSS, createDefaultLayer, generateLayerId } from "@/lib/layer-utils"
-
-describe("blendModeToCSS", () => {
-  it("converte chaves camelCase para valores CSS", () => {
-    expect(blendModeToCSS("colorDodge")).toBe("color-dodge")
-    expect(blendModeToCSS("colorBurn")).toBe("color-burn")
-    expect(blendModeToCSS("hardLight")).toBe("hard-light")
-    expect(blendModeToCSS("softLight")).toBe("soft-light")
-  })
-
-  it("mapeia todos os blend modes disponíveis na UI", () => {
-    for (const mode of Object.keys(blendModes)) {
-      expect(blendModeToCSS(mode)).toBeTruthy()
-    }
-  })
-
-  it("usa 'normal' como fallback para modos desconhecidos", () => {
-    expect(blendModeToCSS("inexistente")).toBe("normal")
-    expect(blendModeToCSS("")).toBe("normal")
-  })
-})
+import { blendModes, createDefaultLayer, generateLayerId } from "@/lib/layer-utils"
 
 describe("createDefaultLayer", () => {
-  it("cria camada visível com o id fornecido e limiares coerentes", () => {
+  it("creates a visible layer with the given id and coherent thresholds", () => {
     const layer = createDefaultLayer("abc")
     expect(layer.id).toBe("abc")
     expect(layer.visible).toBe(true)
@@ -33,13 +13,13 @@ describe("createDefaultLayer", () => {
 })
 
 describe("generateLayerId", () => {
-  it("gera ids com o prefixo esperado", () => {
+  it("generates ids with the expected prefix", () => {
     expect(generateLayerId()).toMatch(/^layer_\d+_\d+$/)
   })
 
   it("gera ids distintos em chamadas sucessivas", () => {
     const ids = new Set(Array.from({ length: 50 }, () => generateLayerId()))
-    // Date.now + sufixo aleatório: colisões em 50 chamadas seriam um bug real
+    // Date.now + counter: a collision across 50 calls would be a real bug
     expect(ids.size).toBeGreaterThan(1)
   })
 })

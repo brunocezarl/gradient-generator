@@ -3,8 +3,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import { renderHook, act } from "@testing-library/react"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
-// Mock controlável de matchMedia: permite definir o valor inicial e
-// disparar mudanças manualmente
+// Controllable matchMedia mock: lets a test set the initial value and fire
+// changes manually
 type Listener = (event: { matches: boolean }) => void
 
 function mockMatchMedia(initialMatches: boolean) {
@@ -36,7 +36,7 @@ describe("useMediaQuery", () => {
     expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 768px)")
   })
 
-  it("reage a mudanças da media query", () => {
+  it("reacts to media query changes", () => {
     const { fireChange } = mockMatchMedia(false)
     const { result } = renderHook(() => useMediaQuery("(max-width: 768px)"))
     expect(result.current).toBe(false)

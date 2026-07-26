@@ -11,22 +11,22 @@ export function useDeviceOptimizations() {
   const isLowPowerMode = useMediaQuery("(prefers-reduced-motion: reduce)")
 
   useEffect(() => {
-    // Detectar a qualidade do dispositivo com base em heurísticas
+    // Detect device quality from heuristics
     const detectQuality = () => {
-      // Verificar se estamos em um dispositivo móvel
+      // Check whether we are on a mobile device
       if (isMobile) {
-        // Dispositivos móveis começam com qualidade baixa por padrão
+        // Mobile devices start at low quality by default
         setQuality("low")
         return
       }
 
-      // Verificar se o usuário prefere movimento reduzido
+      // Check whether the user prefers reduced motion
       if (isLowPowerMode) {
         setQuality("low")
         return
       }
 
-      // Verificar o número de núcleos lógicos da CPU (se disponível)
+      // Check the number of logical CPU cores (when available)
       if (navigator.hardwareConcurrency) {
         if (navigator.hardwareConcurrency >= 8) {
           setQuality("high")
@@ -38,17 +38,18 @@ export function useDeviceOptimizations() {
         return
       }
 
-      // Fallback para qualidade média se não conseguirmos determinar
+      // Fall back to medium quality when we cannot tell
       setQuality("medium")
     }
 
     detectQuality()
   }, [isMobile, isLowPowerMode])
 
-  // Retornar configurações otimizadas com base na qualidade
+  // Quality-based settings. Adaptation happens through *resolution* (pixelRatio)
+  // rather than skipping frames: half the frame rate makes the animation stutter,
+  // while rendering fewer pixels keeps the motion fluid.
   return {
     quality,
-    frameSkip: quality === "low" ? 2 : quality === "medium" ? 1 : 0,
     maxComplexity: quality === "low" ? 5 : quality === "medium" ? 8 : 10,
     pixelRatio: quality === "low" ? 1 : quality === "medium" ? 1.5 : 2,
     antialias: quality !== "low",

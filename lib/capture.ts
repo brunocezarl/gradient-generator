@@ -1,8 +1,8 @@
 import * as THREE from "three"
 
-// Registro dos renderers WebGL ativos (um por <Canvas> do react-three-fiber),
-// permitindo re-renderizar a cena na resolução de exportação em vez de
-// apenas redimensionar os pixels exibidos na tela (que gera borrão).
+// Registry of live WebGL renderers (one per react-three-fiber <Canvas>), so the
+// scene can be re-rendered at export resolution instead of just resizing the
+// pixels already on screen (which blurs).
 export interface CaptureContext {
   gl: THREE.WebGLRenderer
   scene: THREE.Scene
@@ -10,6 +10,69 @@ export interface CaptureContext {
 }
 
 const contexts = new Map<HTMLCanvasElement, CaptureContext>()
+
+// Time consumers: each shader material registers how to apply an instant of the
+// animation. Outside the render loop, this is what allows drawing a *specific*
+// instant instead of whichever one the browser happened to call rAF on.
+export type TimeConsumer = (time: number) => void
+
+const timeConsumers = new Map<HTMLCanvasElement, Set<TimeConsumer>>()
+
+export function registerTimeConsumer(
+  canvas: HTMLCanvasElement,
+  consumer: TimeConsumer,
+): () => void {
+  const set = timeConsumers.get(canvas) ?? new Set<TimeConsumer>()
+  set.add(consumer)
+  timeConsumers.set(canvas, set)
+  return () => {
+    set.delete(consumer)
+    if (set.size === 0) timeConsumers.delete(canvas)
+  }
+}
+
+// Canvas renderer. Multi-pass scenes (layer compositing) register their own; a
+// simple scene falls back to gl.render.
+export type FrameRenderer = () => void
+
+const frameRenderers = new Map<HTMLCanvasElement, FrameRenderer>()
+
+export function registerFrameRenderer(
+  canvas: HTMLCanvasElement,
+  render: FrameRenderer,
+): () => void {
+  frameRenderers.set(canvas, render)
+  return () => {
+    if (frameRenderers.get(canvas) === render) frameRenderers.delete(canvas)
+  }
+}
+
+function renderCanvas(canvas: HTMLCanvasElement): boolean {
+  const renderer = frameRenderers.get(canvas)
+  if (renderer) {
+    renderer()
+    return true
+  }
+  const context = contexts.get(canvas)
+  if (context) {
+    context.gl.render(context.scene, context.camera)
+    return true
+  }
+  return false
+}
+
+// Draws instant `time` on every canvas inside a container. Returns how many
+// canvases responded — zero means nothing is registered and the caller should
+// fall back to the real-time path.
+export function renderFrameAtTime(container: HTMLElement, time: number): number {
+  const canvases = Array.from(container.querySelectorAll("canvas"))
+  let rendered = 0
+  for (const canvas of canvases) {
+    timeConsumers.get(canvas)?.forEach((consumer) => consumer(time))
+    if (renderCanvas(canvas)) rendered++
+  }
+  return rendered
+}
 
 export function registerCaptureContext(canvas: HTMLCanvasElement, context: CaptureContext) {
   contexts.set(canvas, context)
@@ -23,7 +86,7 @@ export function getCaptureContext(canvas: HTMLCanvasElement): CaptureContext | n
   return contexts.get(canvas) ?? null
 }
 
-// ─── Helpers puros ────────────────────────────────────────────────────────────
+// ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 const COMPOSITE_BLEND_MODES: ReadonlySet<string> = new Set([
   "multiply",
@@ -43,8 +106,8 @@ const COMPOSITE_BLEND_MODES: ReadonlySet<string> = new Set([
   "luminosity",
 ])
 
-// Converte um valor CSS de mix-blend-mode para o globalCompositeOperation
-// equivalente do canvas 2D (os nomes coincidem, exceto "normal")
+// Converts a CSS mix-blend-mode value to the equivalent canvas 2D
+// globalCompositeOperation (names match, except "normal")
 export function cssBlendToComposite(blend: string | undefined): GlobalCompositeOperation {
   if (blend && COMPOSITE_BLEND_MODES.has(blend)) {
     return blend as GlobalCompositeOperation
@@ -52,7 +115,7 @@ export function cssBlendToComposite(blend: string | undefined): GlobalCompositeO
   return "source-over"
 }
 
-// Limita as dimensões ao tamanho máximo suportado pela GPU, preservando a proporção
+// Clamps dimensions to the GPU maximum, preserving aspect ratio
 export function clampToMaxSize(
   width: number,
   height: number,
@@ -67,8 +130,8 @@ export function clampToMaxSize(
   }
 }
 
-// Bitrate recomendado (Mbps) para vídeo: gradientes com ruído orgânico têm
-// alta entropia e precisam de mais bits por pixel que vídeo comum
+// Recommended video bitrate (Mbps): organic-noise gradients are high entropy and
+// need more bits per pixel than ordinary footage
 export function recommendBitrateMbps(
   width: number,
   height: number,
@@ -80,11 +143,10 @@ export function recommendBitrateMbps(
   return Math.min(50, Math.max(2, Math.round(mbps)))
 }
 
-// ─── Composição de camadas ───────────────────────────────────────────────────
+// ─── Layer compositing ───────────────────────────────────────────────────────
 
-// Lê a opacidade e o blend mode efetivos de um canvas subindo até `root`
-// (no modo multi-camadas cada canvas fica dentro de um div com opacity e
-// mix-blend-mode aplicados via CSS)
+// Reads the effective opacity and blend mode of a canvas by walking up to `root`
+// (kept for canvases whose compositing comes from CSS rather than the shader)
 export function getLayerCompositing(
   canvas: HTMLCanvasElement,
   root: HTMLElement,
@@ -106,9 +168,57 @@ export function getLayerCompositing(
   return { opacity, blend }
 }
 
-// Redimensiona o drawing buffer do renderer para a resolução alvo sem alterar
-// o tamanho CSS do canvas. Retorna uma função que restaura o estado original,
-// ou null se o canvas não tem renderer registrado.
+// Adjusts the camera projection to the output aspect ratio, returning a function
+// that restores the original projection (or null when nothing had to change).
+//
+// Without this, exporting at an aspect ratio different from the screen renders
+// the on-screen framing stretched into the target buffer: a 1080×1920 story
+// generated from a 16:9 window comes out horizontally squeezed, because the
+// camera keeps projecting at 16:9. Camera aspect is normally updated by
+// react-three-fiber on container resize — and exporting resizes the drawing
+// buffer without going through it.
+export function overrideCameraAspect(
+  camera: THREE.Camera,
+  aspect: number,
+): (() => void) | null {
+  const perspective = camera as THREE.PerspectiveCamera
+  if (perspective.isPerspectiveCamera) {
+    const prevAspect = perspective.aspect
+    if (prevAspect === aspect) return null
+    perspective.aspect = aspect
+    perspective.updateProjectionMatrix()
+    return () => {
+      perspective.aspect = prevAspect
+      perspective.updateProjectionMatrix()
+    }
+  }
+
+  const orthographic = camera as THREE.OrthographicCamera
+  if (orthographic.isOrthographicCamera) {
+    const { left, right, top, bottom } = orthographic
+    // Keeps the visible height and recomputes width from the new aspect ratio,
+    // holding the framing centered
+    const halfHeight = (top - bottom) / 2
+    const centerX = (left + right) / 2
+    const halfWidth = halfHeight * aspect
+    if (left === centerX - halfWidth && right === centerX + halfWidth) return null
+    orthographic.left = centerX - halfWidth
+    orthographic.right = centerX + halfWidth
+    orthographic.updateProjectionMatrix()
+    return () => {
+      orthographic.left = left
+      orthographic.right = right
+      orthographic.updateProjectionMatrix()
+    }
+  }
+
+  return null
+}
+
+// Resizes the renderer's drawing buffer to the target resolution without
+// touching the canvas CSS size, reprojecting the camera to the target aspect
+// ratio. Returns a function that restores the original state, or null if the
+// canvas has no registered renderer.
 export function overrideRenderSize(
   canvas: HTMLCanvasElement,
   width: number,
@@ -117,37 +227,42 @@ export function overrideRenderSize(
   const context = contexts.get(canvas)
   if (!context) return null
 
-  const { gl, scene, camera } = context
+  const { gl, camera } = context
   const prevSize = gl.getSize(new THREE.Vector2())
   const prevPixelRatio = gl.getPixelRatio()
   const maxSize = gl.capabilities.maxTextureSize || 8192
   const target = clampToMaxSize(width, height, maxSize)
 
+  const restoreCamera = overrideCameraAspect(camera, target.width / target.height)
+
   gl.setPixelRatio(1)
   gl.setSize(target.width, target.height, false)
-  gl.render(scene, camera)
+  // Goes through the canvas renderer: layer-compositing scenes have several
+  // passes and intermediate targets that must follow the size
+  renderCanvas(canvas)
 
   return () => {
+    restoreCamera?.()
     gl.setPixelRatio(prevPixelRatio)
     gl.setSize(prevSize.x, prevSize.y, false)
-    gl.render(scene, camera)
+    renderCanvas(canvas)
   }
 }
 
 export interface ExportImageOptions {
   scale?: number
-  // Dimensões fixas de saída (ex.: presets 1920×1080, 1080×1920). Quando
-  // presentes, têm precedência sobre `scale` — o gradiente é re-renderizado
-  // nesse tamanho exato, independente da proporção da tela
+  // Fixed output dimensions (e.g. the 1920×1080 or 1080×1920 presets). When
+  // present they take precedence over `scale` — the gradient is re-rendered at
+  // exactly that size, regardless of the screen's aspect ratio
   width?: number
   height?: number
   mimeType: string
   quality: number
 }
 
-// Exporta a composição de todos os canvases dentro de `container` como Blob,
-// re-renderizando cada camada nativamente na resolução final e aplicando
-// opacidade e blend modes (equivalente ao que o CSS faz na tela)
+// Exports the composition of every canvas inside `container` as a Blob,
+// re-rendering each layer natively at the final resolution and applying opacity
+// and blend modes
 export async function exportCompositeImage(
   container: HTMLElement,
   options: ExportImageOptions,
@@ -171,8 +286,8 @@ export async function exportCompositeImage(
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = "high"
 
-  // Fundo preto: replica o backdrop da página para blend modes e evita
-  // resultados indefinidos em JPEG (que não tem canal alfa)
+  // Black background: matches the page backdrop for blend modes and avoids
+  // undefined results in JPEG (which has no alpha channel)
   ctx.fillStyle = "#000000"
   ctx.fillRect(0, 0, width, height)
 

@@ -8,7 +8,7 @@ describe("cn", () => {
 })
 
 describe("rgbToHex", () => {
-  it("converte componentes RGB para hex", () => {
+  it("converts RGB components to hex", () => {
     expect(rgbToHex(255, 0, 0)).toBe("#ff0000")
     expect(rgbToHex(0, 128, 255)).toBe("#0080ff")
     expect(rgbToHex(0, 0, 0)).toBe("#000000")
@@ -18,29 +18,29 @@ describe("rgbToHex", () => {
     expect(rgbToHex(300, -5, 0)).toBe("#ff0000")
   })
 
-  it("arredonda componentes fracionários", () => {
+  it("rounds fractional components", () => {
     expect(rgbToHex(127.6, 0.4, 255)).toBe("#8000ff")
   })
 })
 
 describe("hexToRgb", () => {
-  it("converte hex com e sem '#'", () => {
+  it("converts hex with and without '#'", () => {
     expect(hexToRgb("#ff0000")).toEqual([255, 0, 0])
     expect(hexToRgb("0080ff")).toEqual([0, 128, 255])
   })
 
-  it("aceita letras maiúsculas", () => {
+  it("accepts uppercase letters", () => {
     expect(hexToRgb("#FF00AA")).toEqual([255, 0, 170])
   })
 
-  it("retorna null para entradas inválidas", () => {
+  it("returns null for invalid input", () => {
     expect(hexToRgb("")).toBeNull()
-    expect(hexToRgb("#fff")).toBeNull() // forma curta não suportada
+    expect(hexToRgb("#fff")).toBeNull() // short form is not supported
     expect(hexToRgb("#gggggg")).toBeNull()
     expect(hexToRgb("vermelho")).toBeNull()
   })
 
-  it("faz round-trip com rgbToHex", () => {
+  it("round-trips with rgbToHex", () => {
     for (const [r, g, b] of [
       [255, 0, 0],
       [0, 128, 255],
@@ -52,13 +52,13 @@ describe("hexToRgb", () => {
 })
 
 describe("rgbToHsl", () => {
-  it("converte cores primárias", () => {
+  it("converts primary colors", () => {
     expect(rgbToHsl(255, 0, 0)).toEqual([0, 100, 50])
     expect(rgbToHsl(0, 255, 0)).toEqual([120, 100, 50])
     expect(rgbToHsl(0, 0, 255)).toEqual([240, 100, 50])
   })
 
-  it("trata cinzas como acromáticos (saturação 0)", () => {
+  it("treats grays as achromatic (zero saturation)", () => {
     expect(rgbToHsl(128, 128, 128)).toEqual([0, 0, 50])
     expect(rgbToHsl(0, 0, 0)).toEqual([0, 0, 0])
     expect(rgbToHsl(255, 255, 255)).toEqual([0, 0, 100])
@@ -66,17 +66,17 @@ describe("rgbToHsl", () => {
 })
 
 describe("hslToRgb", () => {
-  it("converte cores primárias", () => {
+  it("converts primary colors", () => {
     expect(hslToRgb(0, 100, 50)).toEqual([255, 0, 0])
     expect(hslToRgb(120, 100, 50)).toEqual([0, 255, 0])
     expect(hslToRgb(240, 100, 50)).toEqual([0, 0, 255])
   })
 
-  it("retorna cinza para saturação 0", () => {
+  it("returns gray for zero saturation", () => {
     expect(hslToRgb(180, 0, 50)).toEqual([128, 128, 128])
   })
 
-  it("faz round-trip com rgbToHsl", () => {
+  it("round-trips with rgbToHsl", () => {
     for (const rgb of [
       [255, 0, 0],
       [0, 128, 255],
@@ -84,7 +84,7 @@ describe("hslToRgb", () => {
     ] as const) {
       const [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2])
       const back = hslToRgb(h, s, l)
-      // Arredondamentos de H/S/L introduzem pequeno erro por componente
+      // Rounding H/S/L introduces a small per-component error
       back.forEach((v, i) => expect(Math.abs(v - rgb[i])).toBeLessThanOrEqual(3))
     }
   })

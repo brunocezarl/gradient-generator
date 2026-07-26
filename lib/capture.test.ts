@@ -10,23 +10,24 @@ import {
   getCaptureContext,
   getLayerCompositing,
   overrideRenderSize,
+  overrideCameraAspect,
   exportCompositeImage,
   type CaptureContext,
 } from "./capture"
 
 describe("cssBlendToComposite", () => {
-  it("converte 'normal' para 'source-over'", () => {
+  it("converts 'normal' to 'source-over'", () => {
     expect(cssBlendToComposite("normal")).toBe("source-over")
   })
 
-  it("mantém blend modes suportados pelo canvas 2D", () => {
+  it("keeps the blend modes canvas 2D supports", () => {
     expect(cssBlendToComposite("multiply")).toBe("multiply")
     expect(cssBlendToComposite("screen")).toBe("screen")
     expect(cssBlendToComposite("color-dodge")).toBe("color-dodge")
     expect(cssBlendToComposite("soft-light")).toBe("soft-light")
   })
 
-  it("usa 'source-over' como fallback para valores desconhecidos ou vazios", () => {
+  it("uses 'source-over' as the fallback for unknown or empty values", () => {
     expect(cssBlendToComposite("plus-lighter")).toBe("source-over")
     expect(cssBlendToComposite("")).toBe("source-over")
     expect(cssBlendToComposite(undefined)).toBe("source-over")
@@ -34,23 +35,23 @@ describe("cssBlendToComposite", () => {
 })
 
 describe("clampToMaxSize", () => {
-  it("não altera dimensões dentro do limite", () => {
+  it("leaves dimensions within the limit untouched", () => {
     expect(clampToMaxSize(1920, 1080, 8192)).toEqual({ width: 1920, height: 1080 })
   })
 
-  it("reduz preservando a proporção quando excede o limite", () => {
+  it("scales down preserving aspect ratio when over the limit", () => {
     const result = clampToMaxSize(20000, 10000, 8192)
     expect(result.width).toBe(8192)
     expect(result.height).toBe(4096)
   })
 
-  it("limita pela maior dimensão (retrato)", () => {
+  it("clamps by the largest dimension (portrait)", () => {
     const result = clampToMaxSize(10000, 20000, 8192)
     expect(result.height).toBe(8192)
     expect(result.width).toBe(4096)
   })
 
-  it("nunca retorna dimensões menores que 1", () => {
+  it("never returns dimensions smaller than 1", () => {
     const result = clampToMaxSize(1, 100000, 1024)
     expect(result.width).toBeGreaterThanOrEqual(1)
     expect(result.height).toBeGreaterThanOrEqual(1)
@@ -58,7 +59,7 @@ describe("clampToMaxSize", () => {
 })
 
 describe("recommendBitrateMbps", () => {
-  it("recomenda mais bitrate para qualidade mais alta", () => {
+  it("recommends more bitrate for higher quality", () => {
     const low = recommendBitrateMbps(1920, 1080, 30, "low")
     const medium = recommendBitrateMbps(1920, 1080, 30, "medium")
     const high = recommendBitrateMbps(1920, 1080, 30, "high")
@@ -66,7 +67,7 @@ describe("recommendBitrateMbps", () => {
     expect(medium).toBeLessThan(high)
   })
 
-  it("escala com resolução e FPS", () => {
+  it("scales with resolution and FPS", () => {
     const fullHd30 = recommendBitrateMbps(1920, 1080, 30, "high")
     const fullHd60 = recommendBitrateMbps(1920, 1080, 60, "high")
     const fourK30 = recommendBitrateMbps(3840, 2160, 30, "high")
@@ -74,14 +75,14 @@ describe("recommendBitrateMbps", () => {
     expect(fourK30).toBeGreaterThan(fullHd30)
   })
 
-  it("respeita os limites de 2 a 50 Mbps", () => {
+  it("respects the 2 to 50 Mbps bounds", () => {
     expect(recommendBitrateMbps(320, 240, 15, "low")).toBeGreaterThanOrEqual(2)
     expect(recommendBitrateMbps(7680, 4320, 60, "high")).toBeLessThanOrEqual(50)
   })
 })
 
-// Renderer WebGL falso: registra as chamadas para verificar o ciclo
-// resize → render → restore
+// Fake WebGL renderer: records the calls so the resize → render → restore cycle
+// can be verified
 function createStubRenderer(width = 300, height = 150, pixelRatio = 2) {
   return {
     getSize: vi.fn((v: THREE.Vector2) => v.set(width, height)),
@@ -93,16 +94,19 @@ function createStubRenderer(width = 300, height = 150, pixelRatio = 2) {
   }
 }
 
-function stubContext(gl: ReturnType<typeof createStubRenderer>): CaptureContext {
+function stubContext(
+  gl: ReturnType<typeof createStubRenderer>,
+  camera: THREE.Camera = {} as THREE.Camera
+): CaptureContext {
   return {
     gl: gl as unknown as THREE.WebGLRenderer,
     scene: {} as THREE.Scene,
-    camera: {} as THREE.Camera,
+    camera,
   }
 }
 
-describe("registro de contextos de captura", () => {
-  it("registra, retorna e remove contextos por canvas", () => {
+describe("capture context registry", () => {
+  it("registers, returns and removes contexts per canvas", () => {
     const canvas = document.createElement("canvas")
     const context = stubContext(createStubRenderer())
 
@@ -117,7 +121,7 @@ describe("registro de contextos de captura", () => {
 })
 
 describe("getLayerCompositing", () => {
-  it("multiplica opacidades dos ancestrais até a raiz", () => {
+  it("multiplies the opacities of ancestors up to the root", () => {
     const root = document.createElement("div")
     const outer = document.createElement("div")
     outer.style.opacity = "0.5"
@@ -135,7 +139,7 @@ describe("getLayerCompositing", () => {
     root.remove()
   })
 
-  it("usa o mix-blend-mode mais próximo do canvas", () => {
+  it("uses the mix-blend-mode closest to the canvas", () => {
     const root = document.createElement("div")
     const wrapper = document.createElement("div")
     wrapper.style.mixBlendMode = "multiply"
@@ -150,7 +154,7 @@ describe("getLayerCompositing", () => {
     root.remove()
   })
 
-  it("retorna padrões para canvas direto na raiz", () => {
+  it("returns defaults for a canvas directly at the root", () => {
     const root = document.createElement("div")
     const canvas = document.createElement("canvas")
     root.appendChild(canvas)
@@ -161,13 +165,79 @@ describe("getLayerCompositing", () => {
   })
 })
 
+describe("overrideCameraAspect", () => {
+  it("reprojects the perspective camera to the target ratio and restores it", () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 100)
+    const projectionBefore = camera.projectionMatrix.clone()
+
+    const restore = overrideCameraAspect(camera, 1080 / 1920)
+    expect(restore).not.toBeNull()
+    expect(camera.aspect).toBeCloseTo(0.5625)
+    // The projection really changed — writing the `aspect` field is not enough
+    expect(camera.projectionMatrix.equals(projectionBefore)).toBe(false)
+
+    restore!()
+    expect(camera.aspect).toBeCloseTo(16 / 9)
+    expect(camera.projectionMatrix.equals(projectionBefore)).toBe(true)
+  })
+
+  it("does nothing when the aspect ratio is already the target", () => {
+    const camera = new THREE.PerspectiveCamera(75, 1920 / 1080, 0.1, 100)
+    expect(overrideCameraAspect(camera, 1920 / 1080)).toBeNull()
+  })
+
+  it("recomputes the orthographic camera width, preserving height", () => {
+    const camera = new THREE.OrthographicCamera(-8, 8, 4.5, -4.5, 0.1, 100)
+
+    const restore = overrideCameraAspect(camera, 1)
+    expect(restore).not.toBeNull()
+    // Height 9 preserved; width becomes 9 for a 1:1 ratio
+    expect(camera.left).toBeCloseTo(-4.5)
+    expect(camera.right).toBeCloseTo(4.5)
+    expect(camera.top).toBeCloseTo(4.5)
+    expect(camera.bottom).toBeCloseTo(-4.5)
+
+    restore!()
+    expect(camera.left).toBeCloseTo(-8)
+    expect(camera.right).toBeCloseTo(8)
+  })
+
+  it("ignores cameras of unknown type", () => {
+    expect(overrideCameraAspect({} as THREE.Camera, 2)).toBeNull()
+  })
+})
+
 describe("overrideRenderSize", () => {
-  it("retorna null para canvas sem renderer registrado", () => {
+  it("returns null for a canvas with no registered renderer", () => {
     const canvas = document.createElement("canvas")
     expect(overrideRenderSize(canvas, 1920, 1080)).toBeNull()
   })
 
-  it("re-renderiza no tamanho alvo (limitado pela GPU) e restaura o estado", () => {
+  it("reprojects the camera to the output aspect ratio before rendering", () => {
+    // Exporting a 1080×1920 story from a 16:9 window: without reprojecting, the
+    // landscape frame comes out squeezed into the portrait buffer
+    const canvas = document.createElement("canvas")
+    const gl = createStubRenderer(1920, 1080, 1)
+    const camera = new THREE.PerspectiveCamera(75, 1920 / 1080, 0.1, 100)
+    registerCaptureContext(canvas, stubContext(gl, camera))
+
+    const aspectDuringRender: number[] = []
+    gl.render.mockImplementation(() => {
+      aspectDuringRender.push(camera.aspect)
+    })
+
+    const restore = overrideRenderSize(canvas, 1080, 1920)
+    expect(aspectDuringRender[0]).toBeCloseTo(1080 / 1920)
+
+    restore!()
+    expect(camera.aspect).toBeCloseTo(1920 / 1080)
+    // The restore frame already uses the original aspect ratio
+    expect(aspectDuringRender[1]).toBeCloseTo(1920 / 1080)
+
+    unregisterCaptureContext(canvas)
+  })
+
+  it("re-renders at the target size (clamped by the GPU) and restores the state", () => {
     const canvas = document.createElement("canvas")
     const gl = createStubRenderer(300, 150, 2)
     registerCaptureContext(canvas, stubContext(gl))
@@ -193,16 +263,16 @@ describe("exportCompositeImage", () => {
     vi.restoreAllMocks()
   })
 
-  it("rejeita quando o container não tem canvas", async () => {
+  it("rejects when the container has no canvas", async () => {
     const container = document.createElement("div")
     await expect(
       exportCompositeImage(container, { scale: 1, mimeType: "image/png", quality: 1 })
     ).rejects.toThrow("No canvas found to export")
   })
 
-  it("compõe camadas com opacidade/blend e codifica o blob", async () => {
-    // happy-dom não implementa canvas 2D: fornecer um contexto fake que
-    // registra as operações de composição
+  it("composes layers with opacity/blend and encodes the blob", async () => {
+    // happy-dom does not implement canvas 2D: supply a fake context that records
+    // the compositing operations
     const operations: Array<Record<string, unknown>> = []
     const fakeCtx = {
       imageSmoothingEnabled: false,
@@ -248,13 +318,13 @@ describe("exportCompositeImage", () => {
     expect(blob).toBe(expectedBlob)
     expect(fakeCtx.fillRect).toHaveBeenCalledWith(0, 0, 200, 100)
     expect(operations).toEqual([{ alpha: 0.5, blend: "screen" }])
-    // Estado do contexto restaurado após a composição
+    // Context state restored after compositing
     expect(fakeCtx.globalAlpha).toBe(1)
     expect(fakeCtx.globalCompositeOperation).toBe("source-over")
     container.remove()
   })
 
-  it("usa dimensões fixas quando fornecidas, ignorando a escala", async () => {
+  it("uses fixed dimensions when given, ignoring the scale", async () => {
     const fakeCtx = {
       imageSmoothingEnabled: false,
       imageSmoothingQuality: "",
@@ -288,13 +358,13 @@ describe("exportCompositeImage", () => {
       quality: 1,
     })
 
-    // Preset fixo (1920×1080) tem precedência sobre scale=2 (200×100)
+    // The fixed preset (1920×1080) wins over scale=2 (200×100)
     expect(fakeCtx.fillRect).toHaveBeenCalledWith(0, 0, 1920, 1080)
     expect(fakeCtx.drawImage).toHaveBeenCalledWith(canvas, 0, 0, 1920, 1080)
     container.remove()
   })
 
-  it("scale é opcional (padrão 1)", async () => {
+  it("scale is optional (defaults to 1)", async () => {
     const fakeCtx = {
       imageSmoothingEnabled: false,
       imageSmoothingQuality: "",
@@ -325,7 +395,7 @@ describe("exportCompositeImage", () => {
     container.remove()
   })
 
-  it("rejeita quando o blob não pode ser codificado", async () => {
+  it("rejects when the blob cannot be encoded", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
       imageSmoothingEnabled: false,
       imageSmoothingQuality: "",

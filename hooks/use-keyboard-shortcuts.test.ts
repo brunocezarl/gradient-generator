@@ -33,14 +33,14 @@ describe("useKeyboardShortcuts", () => {
     document.body.innerHTML = ""
   })
 
-  it("espaço aciona play/pause e previne o scroll da página", () => {
+  it("space triggers play/pause and prevents page scroll", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     const event = press(" ")
     expect(handlers.onPlayPause).toHaveBeenCalledTimes(1)
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it("r/f/s acionam reset, fullscreen e save (com maiúsculas)", () => {
+  it("r/f/s trigger reset, full screen and save (uppercase too)", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     press("r")
     press("R")
@@ -51,7 +51,7 @@ describe("useKeyboardShortcuts", () => {
     expect(handlers.onSave).toHaveBeenCalledTimes(1)
   })
 
-  it("Ctrl+Z e Cmd+Z acionam undo", () => {
+  it("Ctrl+Z and Cmd+Z trigger undo", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     const ctrlZ = press("z", { ctrlKey: true })
     press("z", { metaKey: true })
@@ -59,7 +59,7 @@ describe("useKeyboardShortcuts", () => {
     expect(ctrlZ.defaultPrevented).toBe(true)
   })
 
-  it("Ctrl+Y e Ctrl+Shift+Z acionam redo", () => {
+  it("Ctrl+Y and Ctrl+Shift+Z trigger redo", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     press("y", { ctrlKey: true })
     press("z", { ctrlKey: true, shiftKey: true })
@@ -67,7 +67,7 @@ describe("useKeyboardShortcuts", () => {
     expect(handlers.onUndo).not.toHaveBeenCalled()
   })
 
-  it("ignora outros atalhos com Ctrl (ex.: Ctrl+S do navegador)", () => {
+  it("ignores other Ctrl shortcuts (e.g. the browser's Ctrl+S)", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     press("s", { ctrlKey: true })
     press("r", { ctrlKey: true })
@@ -75,7 +75,7 @@ describe("useKeyboardShortcuts", () => {
     expect(handlers.onReset).not.toHaveBeenCalled()
   })
 
-  it("ignora teclas quando o foco está em campos de texto", () => {
+  it("ignores keys while focus is in a text field", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     const input = document.createElement("input")
     const textarea = document.createElement("textarea")

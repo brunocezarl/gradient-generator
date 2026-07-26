@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,35 +12,101 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { Save, Trash2, Dices } from "lucide-react"
+import { Save, Trash2, Dices, Download, Upload } from "lucide-react"
 import {
   useGradientStore,
-  resolveActiveColors,
+  resolveActiveStops,
   StateSnapshot,
   GradientStore,
 } from "@/lib/store"
-import { rgbToHex } from "@/lib/utils"
+import { stopsToCss } from "@/lib/color-stops"
+import { disposeThumbnailRenderer, renderThumbnail } from "@/lib/thumbnail"
 import { useToast } from "@/components/ui/use-toast"
 
-// Gera a pré-visualização CSS de um snapshot (aproximação estática do shader)
+// CSS gradient of a snapshot's stops, in the same interpolation space as the
+// render. Used as an instant preview while the shader-rendered thumbnail is not
+// ready yet.
 export function snapshotToGradientCSS(
   snapshot: StateSnapshot,
   colorSchemes: GradientStore["colorSchemes"],
 ): string {
-  const { color1, color2, color3 } = resolveActiveColors({
+  const stops = resolveActiveStops({
     isCustomMode: snapshot.isCustomMode,
-    customColors: snapshot.customColors,
+    customStops: snapshot.customStops,
     colorScheme: snapshot.colorScheme,
     colorSchemes,
   })
-  const hex = (c: number[]) =>
-    rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
-  return `linear-gradient(135deg, ${hex(color1)}, ${hex(color2)}, ${hex(color3)})`
+  return stopsToCss(stops, snapshot.blendSpace)
 }
 
-// ─── Galeria de presets completos ────────────────────────────────────────────
-// Diferente dos esquemas de cores (só 3 cores), um preset salva o visual
-// inteiro: cores + velocidade, complexidade, ruído, fluxo, grão e limiares.
+/**
+ * Shader-rendered thumbnails, with CSS as the immediate preview.
+ *
+ * Each preset renders once and is cached: the gallery is a list of static images,
+ * not N live canvases.
+ */
+function useSnapshotThumbnails(
+  presets: readonly { id: string; snapshot: StateSnapshot }[],
+  colorSchemes: GradientStore["colorSchemes"]
+) {
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const cache = useRef<Map<string, string>>(new Map())
+
+  const signature = presets.map((preset) => preset.id).join("|")
+
+  useEffect(() => {
+    let cancelled = false
+    const pending = presets.filter((preset) => !cache.current.has(preset.id))
+    if (pending.length === 0) return
+
+    // One frame per preset, yielding in between: opening the gallery with 30
+    // presets must not lock up the interface
+    const render = (index: number) => {
+      if (cancelled || index >= pending.length) return
+      const preset = pending[index]
+      const snapshot = preset.snapshot
+      const dataUrl = renderThumbnail({
+        stops: resolveActiveStops({
+          isCustomMode: snapshot.isCustomMode,
+          customStops: snapshot.customStops,
+          colorScheme: snapshot.colorScheme,
+          colorSchemes,
+        }),
+        complexity: snapshot.complexity,
+        noiseScale: snapshot.noiseScale,
+        flowIntensity: snapshot.flowIntensity,
+        grainAmount: snapshot.grainAmount,
+        grainScale: snapshot.grainScale,
+        thresholdMin: snapshot.thresholdMin,
+        thresholdMax: snapshot.thresholdMax,
+        vibrance: snapshot.vibrance,
+        blendSpace: snapshot.blendSpace,
+        seed: snapshot.seed,
+        loopDuration: snapshot.loopDuration,
+      })
+
+      if (dataUrl) {
+        cache.current.set(preset.id, dataUrl)
+        setThumbnails((current) => ({ ...current, [preset.id]: dataUrl }))
+      }
+      requestAnimationFrame(() => render(index + 1))
+    }
+
+    requestAnimationFrame(() => render(0))
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, colorSchemes])
+
+  useEffect(() => () => disposeThumbnailRenderer(), [])
+
+  return thumbnails
+}
+
+// ─── Gallery of full presets ─────────────────────────────────────────────────
+// Unlike a color scheme (colors only), a preset saves the whole look: colors plus
+// speed, complexity, noise, flow, grain and thresholds.
 
 export function PresetGallery() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -52,13 +118,50 @@ export function PresetGallery() {
   const saveCurrentPreset = useGradientStore((state) => state.saveCurrentPreset)
   const applyPreset = useGradientStore((state) => state.applyPreset)
   const deletePreset = useGradientStore((state) => state.deletePreset)
+  const exportLibrary = useGradientStore((state) => state.exportLibrary)
+  const importLibrary = useGradientStore((state) => state.importLibrary)
+
+  const thumbnails = useSnapshotThumbnails(savedPresets, colorSchemes)
+  const importRef = useRef<HTMLInputElement>(null)
+
+  const handleExportLibrary = () => {
+    const blob = new Blob([exportLibrary()], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `gradient-library-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast({
+      title: "Library exported",
+      description: `${savedPresets.length} preset(s) and ${Object.keys(colorSchemes).length} scheme(s).`,
+    })
+  }
+
+  const handleImportLibrary = async (file: File) => {
+    try {
+      const { presets, schemes } = importLibrary(await file.text())
+      toast({
+        title: "Library imported",
+        description: `${presets} preset(s) and ${schemes} scheme(s) added.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Could not import",
+        description: error instanceof Error ? error.message : "Invalid file.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleSave = () => {
     const name = presetName.trim()
     if (!name) {
       toast({
-        title: "Nome Obrigatório",
-        description: "Por favor, forneça um nome para o preset.",
+        title: "Name required",
+        description: "Give the preset a name first.",
         variant: "destructive",
       })
       return
@@ -67,51 +170,97 @@ export function PresetGallery() {
     setPresetName("")
     setSaveDialogOpen(false)
     toast({
-      title: "Preset Salvo",
-      description: `"${name}" guarda cores e todos os parâmetros de animação.`,
+      title: "Preset saved",
+      description: `"${name}" holds the colors and every animation parameter.`,
     })
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-white">Meus Presets</Label>
-        <Button
-          size="sm"
-          onClick={() => setSaveDialogOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white h-8"
-        >
-          <Save className="mr-2 h-3.5 w-3.5" />
-          Salvar atual
-        </Button>
+        <Label className="text-white">My Presets</Label>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-neutral-400 hover:text-white"
+            onClick={handleExportLibrary}
+            disabled={savedPresets.length === 0}
+            title="Export library (JSON)"
+            aria-label="Export library"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-neutral-400 hover:text-white"
+            onClick={() => importRef.current?.click()}
+            title="Import library (JSON)"
+            aria-label="Import library"
+          >
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setSaveDialogOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white h-8"
+          >
+            <Save className="mr-2 h-3.5 w-3.5" />
+            Save current
+          </Button>
+        </div>
       </div>
 
+      <input
+        ref={importRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        aria-label="Library file to import"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) handleImportLibrary(file)
+          event.target.value = ""
+        }}
+      />
+
       {savedPresets.length === 0 ? (
-        <p className="text-xs text-gray-500">
-          Nenhum preset salvo ainda. Um preset guarda o visual completo do
-          gradiente — cores e todos os parâmetros de animação.
+        <p className="text-xs text-neutral-500">
+No presets yet. A preset stores the gradient's whole look — colors and every
+          animation parameter.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {savedPresets.map((preset) => (
             <div
               key={preset.id}
-              className="group relative rounded-md overflow-hidden border border-gray-700 hover:border-gray-500 transition-colors"
+              className="group relative rounded-md overflow-hidden border border-neutral-700 hover:border-neutral-500 transition-colors"
             >
               <button
                 type="button"
                 onClick={() => {
                   applyPreset(preset.id)
-                  toast({ title: "Preset Aplicado", description: preset.name })
+                  toast({ title: "Preset applied", description: preset.name })
                 }}
                 className="w-full text-left"
-                aria-label={`Aplicar preset ${preset.name}`}
+                aria-label={`Apply preset ${preset.name}`}
               >
+                {/* Shader-rendered thumbnail; the CSS gradient shows until it is
+                    ready and serves as the fallback when the browser refuses
+                    another WebGL context */}
                 <div
-                  className="h-12 w-full"
-                  style={{ background: snapshotToGradientCSS(preset.snapshot, colorSchemes) }}
+                  className="h-16 w-full bg-cover bg-center"
+                  style={{
+                    backgroundImage: thumbnails[preset.id]
+                      ? `url(${thumbnails[preset.id]})`
+                      : undefined,
+                    background: thumbnails[preset.id]
+                      ? `url(${thumbnails[preset.id]}) center/cover`
+                      : snapshotToGradientCSS(preset.snapshot, colorSchemes),
+                  }}
                 />
-                <div className="px-2 py-1.5 bg-gray-900">
+                <div className="px-2 py-1.5 bg-neutral-900">
                   <p className="text-xs text-white truncate">{preset.name}</p>
                 </div>
               </button>
@@ -121,10 +270,10 @@ export function PresetGallery() {
                 onClick={(e) => {
                   e.stopPropagation()
                   deletePreset(preset.id)
-                  toast({ title: "Preset Removido", description: preset.name })
+                  toast({ title: "Preset removed", description: preset.name })
                 }}
-                className="absolute top-1 right-1 h-6 w-6 bg-black/60 text-gray-300 hover:text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                aria-label={`Remover preset ${preset.name}`}
+                className="absolute top-1 right-1 h-6 w-6 bg-black/60 text-neutral-300 hover:text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                aria-label={`Remove preset ${preset.name}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -133,39 +282,39 @@ export function PresetGallery() {
         </div>
       )}
 
-      {/* Save Preset Dialog */}
+      {/* Save preset dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent className="bg-gray-900 text-white border-gray-700">
+        <DialogContent className="bg-neutral-900 text-white border-neutral-700">
           <DialogHeader>
-            <DialogTitle>Salvar Preset</DialogTitle>
+            <DialogTitle>Save Preset</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="preset-name" className="text-white mb-2 block">
-              Nome do Preset
+              Preset name
             </Label>
             <Input
               id="preset-name"
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              placeholder="Meu Gradiente Favorito"
-              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="My favorite gradient"
+              className="bg-neutral-800 border-neutral-700 text-white"
             />
-            <p className="text-xs text-gray-400 mt-2">
-              Salva cores, velocidade, complexidade, ruído, fluxo, grão e limiares.
+            <p className="text-xs text-neutral-400 mt-2">
+Saves colors, speed, complexity, noise, flow, grain and thresholds.
             </p>
           </div>
           <DialogFooter>
             <DialogClose asChild>
               <Button
                 variant="outline"
-                className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700"
+                className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
               >
-                Cancelar
+                Cancel
               </Button>
             </DialogClose>
             <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-              Salvar
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -174,9 +323,9 @@ export function PresetGallery() {
   )
 }
 
-// ─── Histórico do randomizador ───────────────────────────────────────────────
-// Cada clique em "Randomizar" guarda o resultado aqui; clicar numa miniatura
-// restaura aquele sorteio.
+// ─── Randomizer history ──────────────────────────────────────────────────────
+// Every click on "Randomize" stores its result here; clicking a thumbnail
+// restores that roll.
 
 export function RandomHistoryStrip() {
   const { toast } = useToast()
@@ -189,8 +338,8 @@ export function RandomHistoryStrip() {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <Dices className="h-3.5 w-3.5 text-gray-400" />
-        <Label className="text-xs text-gray-400">Últimos sorteios</Label>
+        <Dices className="h-3.5 w-3.5 text-neutral-400" />
+        <Label className="text-xs text-neutral-400">Recent rolls</Label>
       </div>
       <div className="flex gap-1.5 flex-wrap">
         {randomHistory.map((snapshot, index) => (
@@ -200,14 +349,14 @@ export function RandomHistoryStrip() {
             onClick={() => {
               applySnapshot(snapshot)
               toast({
-                title: "Sorteio Restaurado",
-                description: "As configurações deste resultado foram reaplicadas.",
+                title: "Roll restored",
+                description: "The settings from this result were reapplied.",
               })
             }}
-            className="h-8 w-8 rounded-md border border-gray-700 hover:border-white hover:scale-110 transition-all"
+            className="h-8 w-8 rounded-md border border-neutral-700 hover:border-white hover:scale-110 transition-all"
             style={{ background: snapshotToGradientCSS(snapshot, colorSchemes) }}
-            aria-label={`Restaurar sorteio ${index + 1}`}
-            title={`Restaurar sorteio ${index + 1}`}
+            aria-label={`Restore roll ${index + 1}`}
+            title={`Restore roll ${index + 1}`}
           />
         ))}
       </div>

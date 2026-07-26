@@ -1,73 +1,51 @@
-# Plano de Melhorias — Gradient Generator
+# Gradient Generator — Roadmap
 
-## Melhorias selecionadas
+The original plan (keyboard shortcuts, undo/redo, richer color picker, layer
+drag and drop, CSS export, more color stops, randomizer) is done, and three
+further passes went in on top of it.
 
-### UX / UI
-1. **Atalhos de teclado** — Space=play/pause, R=reset, F=fullscreen, S=salvar imagem
-2. **Undo / Redo** — Ctrl+Z e Ctrl+Y para desfazer/refazer alterações nos controles
-3. **Color picker aprimorado** — Input HEX, modo HSL e roda de cores
-4. **Drag-and-drop de camadas** — Arrastar camadas para reordenar (nativo HTML5)
+## Shipped
 
-### Funcionalidades
-5. **Exportar CSS** — Copiar gradiente estático como código CSS para clipboard
-6. **Mais paradas de cor** — Suporte a 3 cores no shader e na UI
-7. **Gerador aleatório** — Botão que randomiza cores e parâmetros de animação
+### Render fidelity
+- Camera reprojected to the output aspect ratio on export — a 1080×1920 story
+  exported from a 16:9 window is no longer squeezed
+- Color pipeline: sRGB → linear → interpolation (Oklab or linear) → sRGB, so the
+  HEX from the picker is exactly the exported pixel
+- Triangular dither at ±0.5 LSB against 8-bit banding
+- One GLSL source shared by the single-layer scene and every layer
 
----
+### Tool behavior
+- Artboard at the output ratio with safe area guides; export inherits it
+- Timeline with scrubbing, frame stepping and frame freezing, driven by a single
+  animation clock outside React
+- Seamless loop: a closed circular path through the noise field
+- Multi-layer compositing in one WebGL context through render targets, with the
+  Compositing and Blending Level 1 formulas in the shader
+- Deterministic video export (WebCodecs): exact frame rate and duration,
+  independent of GPU performance
 
-## Plano de implementação
+### Color
+- OKLCH engine: conversions, gamut clamping on chroma, harmonies, WCAG contrast
+- 2 to 8 color stops with positions
+- Palette extraction from a reference image (k-means in Oklab)
+- Shader-rendered preset thumbnails and a portable JSON library
+- Palette export as design tokens (JSON/CSS/Tailwind/SVG)
 
-### Fase 1 — Gerador aleatório (mais simples, alto impacto)
-- Adicionar função `randomizeAll()` no store Zustand
-- Adicionar botão "🎲 Randomizar" no `controls-panel.tsx` (aba Básico)
-- Randomiza: speed, complexity, noiseScale, flowIntensity, grainAmount, thresholdMin/Max, customColors
-- Exibir toast de confirmação
+## Next
 
-### Fase 2 — Atalhos de teclado
-- Adicionar hook `useKeyboardShortcuts` em `/hooks/use-keyboard-shortcuts.ts`
-- Registrar no `gradient-generator.tsx`
-- Space → play/pause
-- R → reset to defaults
-- F → fullscreen toggle
-- S → capturar imagem
-- Ctrl+Z → undo (integrado com Fase 3)
-- Ctrl+Y / Ctrl+Shift+Z → redo
-- Mostrar painel de ajuda com teclas (botão "?" no canto)
+Ideas that came out of the codebase review and have not been built yet:
 
-### Fase 3 — Undo / Redo
-- Adicionar array `history` e `historyIndex` ao store Zustand
-- Criar função `pushHistory(state)` que salva snapshot antes de cada alteração
-- Funções `undo()` e `redo()` que restauram snapshots
-- Limitar histórico a 50 estados
-- Integrar com keyboard shortcuts da Fase 2
-
-### Fase 4 — Color picker aprimorado
-- Modificar `color-picker.tsx`:
-  - Adicionar input HEX (validação com regex)
-  - Adicionar tabs "RGB / HSL" para alternar modo
-  - Adicionar sliders H (0-360), S (0-100%), L (0-100%)
-  - Sincronizar RGB ↔ HSL ↔ HEX em tempo real
-- Funções utilitárias rgb2hsl / hsl2rgb em `lib/utils.ts`
-
-### Fase 5 — Exportar CSS
-- Gerar string CSS a partir dos parâmetros atuais do gradiente:
-  ```css
-  background: linear-gradient(135deg, #color1 0%, #color2 100%);
-  ```
-- Com 3 cores (Fase 6): incluir stop intermediário
-- Adicionar botão "Copiar CSS" no painel de exportação (`export-options.tsx`)
-- Copiar para clipboard via `navigator.clipboard.writeText()`
-- Exibir toast de confirmação
-
-### Fase 6 — Mais paradas de cor (3 cores)
-- Atualizar uniform `uColor3` no shader GLSL em `organic-gradient-shader.tsx`
-- Modificar interpolação de cores: usar `mix(mix(c1, c2, t), c3, t*t)` ou dois `mix()` em sequência
-- Atualizar store: adicionar `customColor3` e `colorSchemes` com 3 cores
-- Adicionar terceiro `ColorPicker` na aba "Cores"
-- Atualizar esquemas de cores existentes para incluir 3a cor
-
-### Fase 7 — Drag-and-drop de camadas
-- Instalar `@dnd-kit/core` e `@dnd-kit/sortable` (alternativa mais leve ao react-beautiful-dnd)
-- Refatorar `layer-manager.tsx` com `<SortableContext>` e itens `<SortableItem>`
-- Remover botões ▲▼ e substituir por handle de arraste
-- Atualizar `reorderLayers()` no store
+1. **Curated preset catalog** — the animation presets only touch speed,
+   complexity, noise scale and scheme; a signed set of complete looks would sell
+   the tool in the first minute.
+2. **Batch export** — shipping one gradient as post, story, cover, OG and
+   wallpaper in a single action is the real delivery flow.
+3. **PNG with alpha and mask output** — needed to composite the gradient into
+   other artwork.
+4. **Adaptive resolution scaling** with an FPS target, instead of the current
+   fixed per-device pixel ratio.
+5. **Golden-image tests in CI** — the `verify` skill already drives headless
+   WebGL; turning it into a suite would catch color and composition regressions
+   automatically.
+6. **Dynamic OG image** rendering the shared gradient, so a pasted link previews
+   the actual artwork.

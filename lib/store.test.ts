@@ -1,24 +1,30 @@
 // @vitest-environment happy-dom
-// (o middleware zustand/persist exige window.localStorage; sem DOM ele se
-// desabilita silenciosamente e a API useGradientStore.persist não existe)
+// (the zustand/persist middleware needs window.localStorage; without a DOM it
+// silently disables itself and useGradientStore.persist does not exist)
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { useGradientStore, resolveActiveColors } from "@/lib/store"
+import {
+  useGradientStore,
+  resolveActiveStops,
+  migratePersistedState,
+  normalizePersistedState,
+  PERSIST_VERSION,
+} from "@/lib/store"
 
-// Snapshot do estado inicial para restaurar entre testes
+// Snapshot of the initial state, restored between tests
 const initialState = useGradientStore.getState()
 
 let now = 0
 
 beforeEach(() => {
-  // Controlar Date.now para testar a coalescência de histórico de forma
-  // determinística (e isolar o estado de coalescência entre testes)
+  // Control Date.now so history coalescing can be tested deterministically (and
+  // so coalescing state does not leak between tests)
   now = 1_000_000
   vi.spyOn(Date, "now").mockImplementation(() => now)
 
   useGradientStore.setState(
     {
       ...initialState,
-      customColors: { ...initialState.customColors },
+      customStops: initialState.customStops.map((stop) => ({ ...stop })),
       colorSchemes: { ...initialState.colorSchemes },
       layers: [...initialState.layers],
       past: [],
@@ -26,7 +32,7 @@ beforeEach(() => {
     },
     true
   )
-  // Garantir que a próxima edição não seja coalescida com a de um teste anterior
+  // Make sure the next edit is not coalesced with one from a previous test
   useGradientStore.getState().pushHistory()
   useGradientStore.setState({ past: [], future: [] })
 })
@@ -40,7 +46,7 @@ const advance = (ms: number) => {
 }
 
 describe("resetToDefaults", () => {
-  it("restaura os parâmetros padrão", () => {
+  it("restores the default parameters", () => {
     const store = useGradientStore.getState()
     store.setSpeed(2.5)
     store.setComplexity(8)
@@ -54,8 +60,8 @@ describe("resetToDefaults", () => {
     expect(state.flowIntensity).toBe(0.3)
   })
 
-  it("preserva esquemas de cores salvos pelo usuário", () => {
-    useGradientStore.getState().saveCustomScheme("Meu Esquema")
+  it("preserves user-saved color schemes", () => {
+    useGradientStore.getState().saveCustomScheme("My Scheme")
     const savedKey = useGradientStore.getState().colorScheme
     expect(savedKey).toMatch(/^custom_/)
 
@@ -63,7 +69,7 @@ describe("resetToDefaults", () => {
 
     const state = useGradientStore.getState()
     expect(state.colorSchemes[savedKey]).toBeDefined()
-    expect(state.colorSchemes[savedKey].name).toBe("Meu Esquema")
+    expect(state.colorSchemes[savedKey].name).toBe("My Scheme")
     expect(state.colorScheme).toBe("redBlue")
   })
 
@@ -80,8 +86,8 @@ describe("resetToDefaults", () => {
   })
 })
 
-describe("undo/redo com coalescência", () => {
-  it("agrupa edições contínuas do mesmo controle em um único passo", () => {
+describe("undo/redo with coalescing", () => {
+  it("groups continuous edits of the same control into one step", () => {
     const store = useGradientStore.getState()
     store.setSpeed(1.1)
     advance(100)
@@ -95,7 +101,7 @@ describe("undo/redo com coalescência", () => {
     expect(useGradientStore.getState().speed).toBe(1.0)
   })
 
-  it("cria um novo passo após a janela de coalescência", () => {
+  it("creates a new step after the coalescing window", () => {
     useGradientStore.getState().setSpeed(1.5)
     advance(2000)
     useGradientStore.getState().setSpeed(2.0)
@@ -108,7 +114,7 @@ describe("undo/redo com coalescência", () => {
     expect(useGradientStore.getState().speed).toBe(1.0)
   })
 
-  it("cria passos separados para controles diferentes", () => {
+  it("creates separate steps for different controls", () => {
     useGradientStore.getState().setSpeed(1.5)
     advance(100)
     useGradientStore.getState().setComplexity(7)
@@ -116,7 +122,7 @@ describe("undo/redo com coalescência", () => {
     expect(useGradientStore.getState().past).toHaveLength(2)
   })
 
-  it("redo refaz o que foi desfeito", () => {
+  it("redo reapplies what was undone", () => {
     useGradientStore.getState().setSpeed(2.0)
     useGradientStore.getState().undo()
     expect(useGradientStore.getState().speed).toBe(1.0)
@@ -125,13 +131,13 @@ describe("undo/redo com coalescência", () => {
     expect(useGradientStore.getState().speed).toBe(2.0)
   })
 
-  it("undo sem histórico é um no-op", () => {
+  it("undo with no history is a no-op", () => {
     const before = useGradientStore.getState().speed
     useGradientStore.getState().undo()
     expect(useGradientStore.getState().speed).toBe(before)
   })
 
-  it("limita o histórico a 50 estados", () => {
+  it("caps the history at 50 states", () => {
     for (let i = 0; i < 60; i++) {
       advance(2000)
       useGradientStore.getState().setSpeed(1 + (i % 9) / 10)
@@ -141,7 +147,7 @@ describe("undo/redo com coalescência", () => {
 })
 
 describe("importSettings", () => {
-  it("aplica configurações válidas com clamping", () => {
+  it("applies valid settings with clamping", () => {
     useGradientStore.getState().importSettings({
       speed: 99,
       complexity: -5,
@@ -158,12 +164,12 @@ describe("importSettings", () => {
     expect(state.colorScheme).toBe("neon")
   })
 
-  it("usa fallback para esquema de cores desconhecido", () => {
+  it("falls back for an unknown color scheme", () => {
     useGradientStore.getState().importSettings({
       speed: 1,
       complexity: 3,
       noiseScale: 2,
-      colorScheme: "esquema_que_nao_existe",
+      colorScheme: "scheme_that_does_not_exist",
       isCustomMode: false,
       customColors: { color1: [0, 0, 0], color2: [1, 1, 1] },
     })
@@ -171,7 +177,7 @@ describe("importSettings", () => {
     expect(useGradientStore.getState().colorScheme).toBe("redBlue")
   })
 
-  it("valida e limita as cores customizadas; usa fallback para color3 ausente", () => {
+  it("converts three-color links into stops, clamping values outside 0-1", () => {
     useGradientStore.getState().importSettings({
       speed: 1,
       complexity: 3,
@@ -181,29 +187,29 @@ describe("importSettings", () => {
       customColors: { color1: [5, -1, 0.5], color2: [0.1, 0.2, 0.3] },
     })
 
-    const { customColors } = useGradientStore.getState()
-    expect(customColors.color1).toEqual([1, 0, 0.5])
-    expect(customColors.color2).toEqual([0.1, 0.2, 0.3])
-    expect(customColors.color3).toEqual([0.5, 0.0, 0.5])
+    const { customStops } = useGradientStore.getState()
+    expect(customStops).toHaveLength(2)
+    expect(customStops[0]).toEqual({ color: [1, 0, 0.5], position: 0 })
+    expect(customStops[1]).toEqual({ color: [0.1, 0.2, 0.3], position: 1 })
   })
 
-  it("rejeita cores malformadas", () => {
+  it("rejects malformed colors", () => {
     useGradientStore.getState().importSettings({
       speed: 1,
       complexity: 3,
       noiseScale: 2,
       colorScheme: "redBlue",
       isCustomMode: true,
-      // @ts-expect-error — simula payload externo inválido
-      customColors: { color1: "vermelho", color2: [0.1] },
+      // Invalid external payload: a hand-edited link
+      customColors: { color1: "red" as unknown as number[], color2: [0.1] },
     })
 
-    const { customColors } = useGradientStore.getState()
-    expect(customColors.color1).toEqual([0.9, 0.1, 0.1])
-    expect(customColors.color2).toEqual([0.0, 0.0, 0.9])
+    // With no valid colors in the link, the app default is preserved
+    const { customStops } = useGradientStore.getState()
+    expect(customStops).toEqual(initialState.customStops)
   })
 
-  it("aplica parâmetros avançados com clamping (links v2)", () => {
+  it("applies advanced parameters with clamping (v2 links)", () => {
     useGradientStore.getState().importSettings({
       speed: 1,
       complexity: 3,
@@ -223,11 +229,11 @@ describe("importSettings", () => {
     expect(state.grainAmount).toBe(0)
     expect(state.grainScale).toBe(700)
     expect(state.thresholdMin).toBe(0.5)
-    // thresholdMax é forçado a ficar acima de thresholdMin
+    // thresholdMax is forced to stay above thresholdMin
     expect(state.thresholdMax).toBeCloseTo(0.6)
   })
 
-  it("não altera parâmetros avançados ausentes (links v1)", () => {
+  it("leaves missing advanced parameters untouched (v1 links)", () => {
     useGradientStore.getState().setFlowIntensity(0.8)
     useGradientStore.getState().importSettings({
       speed: 1,
@@ -241,7 +247,7 @@ describe("importSettings", () => {
     expect(useGradientStore.getState().flowIntensity).toBe(0.8)
   })
 
-  it("importa camadas com ids regenerados e blend mode validado", () => {
+  it("imports layers with regenerated ids and a validated blend mode", () => {
     useGradientStore.getState().importSettings({
       speed: 1,
       complexity: 3,
@@ -253,14 +259,15 @@ describe("importSettings", () => {
       layers: [
         {
           opacity: 5,
-          blendMode: "modo_invalido",
+          blendMode: "invalid_mode",
           visible: true,
-          colorScheme: "esquema_que_nao_existe",
+          colorScheme: "scheme_that_does_not_exist",
           isCustomMode: false,
           noiseScale: 1.5,
           flowIntensity: 0.4,
           thresholdMin: 0.2,
           thresholdMax: 0.8,
+          seed: [0, 0],
         },
         {
           opacity: 0.5,
@@ -268,11 +275,15 @@ describe("importSettings", () => {
           visible: false,
           colorScheme: "neon",
           isCustomMode: true,
-          customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+          customStops: [
+            { color: [1, 0, 0] as [number, number, number], position: 0 },
+            { color: [0, 0, 1] as [number, number, number], position: 1 },
+          ],
           noiseScale: 3,
           flowIntensity: 0.6,
           thresholdMin: 0.3,
           thresholdMax: 0.7,
+          seed: [3, 4],
         },
       ],
     })
@@ -290,32 +301,32 @@ describe("importSettings", () => {
   })
 })
 
-describe("resolveActiveColors", () => {
-  it("retorna as cores customizadas em modo custom", () => {
+describe("resolveActiveStops", () => {
+  it("returns the custom stops in custom mode", () => {
     const state = useGradientStore.getState()
-    expect(resolveActiveColors({ ...state, isCustomMode: true })).toBe(state.customColors)
+    expect(resolveActiveStops({ ...state, isCustomMode: true })).toBe(state.customStops)
   })
 
-  it("resolve o esquema nomeado", () => {
+  it("resolves the named scheme", () => {
     const state = useGradientStore.getState()
-    expect(resolveActiveColors({ ...state, isCustomMode: false, colorScheme: "neon" })).toBe(
-      state.colorSchemes.neon
+    expect(resolveActiveStops({ ...state, isCustomMode: false, colorScheme: "neon" })).toBe(
+      state.colorSchemes.neon.stops
     )
   })
 
-  it("usa fallback para esquema inexistente", () => {
+  it("falls back for a missing scheme", () => {
     const state = useGradientStore.getState()
-    const resolved = resolveActiveColors({
+    const resolved = resolveActiveStops({
       ...state,
       isCustomMode: false,
-      colorScheme: "nao_existe",
+      colorScheme: "does_not_exist",
     })
-    expect(resolved).toBe(state.colorSchemes.redBlue)
+    expect(resolved).toBe(state.colorSchemes.redBlue.stops)
   })
 })
 
 describe("randomize", () => {
-  it("gera valores dentro dos limites dos controles", () => {
+  it("produces values inside the control ranges", () => {
     for (let i = 0; i < 20; i++) {
       advance(2000)
       useGradientStore.getState().randomize()
@@ -331,7 +342,7 @@ describe("randomize", () => {
 })
 
 describe("setThresholdMax", () => {
-  it("mantém thresholdMax pelo menos 0.1 acima de thresholdMin", () => {
+  it("keeps thresholdMax at least 0.1 above thresholdMin", () => {
     useGradientStore.getState().setThresholdMin(0.5)
     advance(2000)
     useGradientStore.getState().setThresholdMax(0.2)
@@ -340,14 +351,14 @@ describe("setThresholdMax", () => {
     expect(state.thresholdMax).toBeCloseTo(0.6)
   })
 
-  it("aceita valores acima do mínimo sem alteração", () => {
+  it("leaves values above the minimum untouched", () => {
     useGradientStore.getState().setThresholdMax(0.9)
     expect(useGradientStore.getState().thresholdMax).toBe(0.9)
   })
 })
 
 describe("applyAnimationPreset", () => {
-  it("aplica os parâmetros do preset e desativa o modo custom", () => {
+  it("applies the preset parameters and turns custom mode off", () => {
     useGradientStore.getState().setCustomMode(true)
     advance(2000)
     useGradientStore.getState().applyAnimationPreset("energetic")
@@ -360,7 +371,7 @@ describe("applyAnimationPreset", () => {
     expect(state.isCustomMode).toBe(false)
   })
 
-  it("registra um passo de histórico desfazível", () => {
+  it("records an undoable history step", () => {
     useGradientStore.getState().applyAnimationPreset("calm")
     expect(useGradientStore.getState().speed).toBe(0.5)
 
@@ -368,7 +379,7 @@ describe("applyAnimationPreset", () => {
     expect(useGradientStore.getState().speed).toBe(1.0)
   })
 
-  it("é no-op para preset desconhecido", () => {
+  it("is a no-op for an unknown preset", () => {
     const before = useGradientStore.getState()
     useGradientStore.getState().applyAnimationPreset("preset_falso")
 
@@ -379,29 +390,29 @@ describe("applyAnimationPreset", () => {
 })
 
 describe("saveCustomScheme", () => {
-  it("salva uma cópia isolada das cores customizadas", () => {
-    useGradientStore.getState().setCustomColor1([0.2, 0.3, 0.4])
+  it("saves an isolated copy of the custom stops", () => {
+    useGradientStore.getState().setStopColor(0, [0.2, 0.3, 0.4])
     useGradientStore.getState().saveCustomScheme("Congelado")
     const savedKey = useGradientStore.getState().colorScheme
 
-    // Editar as cores customizadas depois não pode alterar o esquema salvo
+    // Editing the custom stops afterwards must not change the saved scheme
     advance(2000)
-    useGradientStore.getState().setCustomColor1([0.9, 0.9, 0.9])
+    useGradientStore.getState().setStopColor(0, [0.9, 0.9, 0.9])
 
     const saved = useGradientStore.getState().colorSchemes[savedKey]
-    expect(saved.color1).toEqual([0.2, 0.3, 0.4])
+    expect(saved.stops[0].color).toEqual([0.2, 0.3, 0.4])
     expect(saved.name).toBe("Congelado")
   })
 })
 
 describe("presets completos", () => {
-  it("salva uma cópia congelada do estado atual", () => {
+  it("saves a frozen copy of the current state", () => {
     useGradientStore.getState().setSpeed(2.2)
     advance(2000)
     useGradientStore.getState().setFlowIntensity(0.7)
     useGradientStore.getState().saveCurrentPreset("Meu Visual")
 
-    // Edições posteriores não podem alterar o preset salvo
+    // Later edits must not change the saved preset
     advance(2000)
     useGradientStore.getState().setSpeed(0.5)
 
@@ -411,7 +422,7 @@ describe("presets completos", () => {
     expect(preset.snapshot.flowIntensity).toBe(0.7)
   })
 
-  it("applyPreset restaura todos os parâmetros e é desfazível", () => {
+  it("applyPreset restores every parameter and is undoable", () => {
     useGradientStore.getState().setSpeed(2.2)
     advance(2000)
     useGradientStore.getState().setGrainAmount(0.15)
@@ -430,7 +441,7 @@ describe("presets completos", () => {
     expect(useGradientStore.getState().speed).toBe(1.0)
   })
 
-  it("applyPreset é no-op para id desconhecido", () => {
+  it("applyPreset is a no-op for an unknown id", () => {
     const before = useGradientStore.getState().speed
     useGradientStore.getState().applyPreset("preset_falso")
     expect(useGradientStore.getState().speed).toBe(before)
@@ -451,8 +462,8 @@ describe("presets completos", () => {
   })
 })
 
-describe("histórico do randomizador", () => {
-  it("guarda cada sorteio no histórico (mais recente primeiro)", () => {
+describe("randomizer history", () => {
+  it("stores each roll in the history (most recent first)", () => {
     advance(2000)
     useGradientStore.getState().randomize()
     const firstSpeed = useGradientStore.getState().speed
@@ -466,7 +477,7 @@ describe("histórico do randomizador", () => {
     expect(history[0].speed).toBe(useGradientStore.getState().speed)
   })
 
-  it("limita o histórico a 10 sorteios", () => {
+  it("caps the history at 10 rolls", () => {
     for (let i = 0; i < 15; i++) {
       advance(2000)
       useGradientStore.getState().randomize()
@@ -474,7 +485,7 @@ describe("histórico do randomizador", () => {
     expect(useGradientStore.getState().randomHistory).toHaveLength(10)
   })
 
-  it("applySnapshot restaura um sorteio antigo e é desfazível", () => {
+  it("applySnapshot restores an old roll and is undoable", () => {
     advance(2000)
     useGradientStore.getState().randomize()
     const rolled = useGradientStore.getState().randomHistory[0]
@@ -486,15 +497,15 @@ describe("histórico do randomizador", () => {
     useGradientStore.getState().applySnapshot(rolled)
     const state = useGradientStore.getState()
     expect(state.speed).toBe(rolled.speed)
-    expect(state.customColors.color1).toEqual(rolled.customColors.color1)
+    expect(state.customStops[0].color).toEqual(rolled.customStops[0].color)
 
     useGradientStore.getState().undo()
     expect(useGradientStore.getState().speed).toBe(1.0)
   })
 })
 
-describe("persistência", () => {
-  it("não persiste o histórico de undo/redo", () => {
+describe("persistence", () => {
+  it("does not persist the undo/redo history", () => {
     useGradientStore.getState().setSpeed(2.0)
     const { partialize } = useGradientStore.persist.getOptions()
     const persisted = partialize!(useGradientStore.getState()) as Record<string, unknown>
@@ -505,7 +516,7 @@ describe("persistência", () => {
     expect(persisted).toHaveProperty("layers")
   })
 
-  it("persiste presets salvos e histórico do randomizador", () => {
+  it("persists saved presets and the randomizer history", () => {
     useGradientStore.getState().saveCurrentPreset("Persistente")
     advance(2000)
     useGradientStore.getState().randomize()
@@ -518,8 +529,8 @@ describe("persistência", () => {
   })
 })
 
-describe("camadas", () => {
-  it("não remove a última camada", () => {
+describe("layers", () => {
+  it("does not remove the last layer", () => {
     const state = useGradientStore.getState()
     expect(state.layers).toHaveLength(1)
     state.removeLayer(state.layers[0].id)
@@ -529,20 +540,20 @@ describe("camadas", () => {
   it("reorderLayers ignora ids desconhecidos", () => {
     useGradientStore.getState().addLayer()
     const ids = useGradientStore.getState().layers.map((l) => l.id)
-    useGradientStore.getState().reorderLayers([ids[1], "id_falso", ids[0]])
+    useGradientStore.getState().reorderLayers([ids[1], "fake_id", ids[0]])
 
     const reordered = useGradientStore.getState().layers.map((l) => l.id)
     expect(reordered).toEqual([ids[1], ids[0]])
   })
 
-  it("addLayer torna a nova camada ativa", () => {
+  it("addLayer makes the new layer active", () => {
     useGradientStore.getState().addLayer()
     const state = useGradientStore.getState()
     expect(state.layers).toHaveLength(2)
     expect(state.activeLayerId).toBe(state.layers[1].id)
   })
 
-  it("remover a camada ativa move a seleção para uma camada restante", () => {
+  it("removing the active layer moves the selection to a remaining layer", () => {
     useGradientStore.getState().addLayer()
     const active = useGradientStore.getState().activeLayerId
     useGradientStore.getState().removeLayer(active)
@@ -553,7 +564,7 @@ describe("camadas", () => {
     expect(state.activeLayerId).not.toBe(active)
   })
 
-  it("remover uma camada inativa preserva a seleção", () => {
+  it("removing an inactive layer keeps the selection", () => {
     useGradientStore.getState().addLayer()
     const [first, second] = useGradientStore.getState().layers
     useGradientStore.getState().setActiveLayer(second.id)
@@ -562,7 +573,7 @@ describe("camadas", () => {
     expect(useGradientStore.getState().activeLayerId).toBe(second.id)
   })
 
-  it("updateLayer altera apenas a camada alvo", () => {
+  it("updateLayer changes only the target layer", () => {
     useGradientStore.getState().addLayer()
     const [first, second] = useGradientStore.getState().layers
     useGradientStore.getState().updateLayer(first.id, { opacity: 0.5, blendMode: "multiply" })
@@ -574,7 +585,7 @@ describe("camadas", () => {
     expect(untouchedSecond.blendMode).toBe("normal")
   })
 
-  it("moveLayer troca camadas adjacentes nas duas direções", () => {
+  it("moveLayer swaps adjacent layers in both directions", () => {
     useGradientStore.getState().addLayer()
     const [a, b] = useGradientStore.getState().layers.map((l) => l.id)
 
@@ -585,14 +596,570 @@ describe("camadas", () => {
     expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual([a, b])
   })
 
-  it("moveLayer é no-op nas bordas e para id desconhecido", () => {
+  it("moveLayer is a no-op at the edges and for an unknown id", () => {
     useGradientStore.getState().addLayer()
     const ids = useGradientStore.getState().layers.map((l) => l.id)
 
     useGradientStore.getState().moveLayer(ids[0], "up")
     useGradientStore.getState().moveLayer(ids[1], "down")
-    useGradientStore.getState().moveLayer("id_falso", "up")
+    useGradientStore.getState().moveLayer("fake_id", "up")
 
     expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual(ids)
+  })
+})
+
+// ─── History covering layers ─────────────────────────────────────────────────
+
+describe("layer undo/redo", () => {
+  it("undoes creating a layer", () => {
+    const store = useGradientStore.getState()
+    expect(store.layers).toHaveLength(1)
+
+    store.addLayer()
+    expect(useGradientStore.getState().layers).toHaveLength(2)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().layers).toHaveLength(1)
+
+    useGradientStore.getState().redo()
+    expect(useGradientStore.getState().layers).toHaveLength(2)
+  })
+
+  it("undoes removing a layer, restoring its parameters", () => {
+    useGradientStore.getState().addLayer()
+    const removed = useGradientStore.getState().layers[1]
+    advance(2000)
+    useGradientStore.getState().updateLayer(removed.id, { opacity: 0.42, blendMode: "screen" })
+
+    useGradientStore.getState().removeLayer(removed.id)
+    expect(useGradientStore.getState().layers).toHaveLength(1)
+
+    useGradientStore.getState().undo()
+    const restored = useGradientStore.getState().layers[1]
+    expect(restored.id).toBe(removed.id)
+    expect(restored.opacity).toBe(0.42)
+    expect(restored.blendMode).toBe("screen")
+  })
+
+  it("undoes editing a layer", () => {
+    const layerId = useGradientStore.getState().layers[0].id
+    advance(2000)
+    useGradientStore.getState().updateLayer(layerId, { opacity: 0.3 })
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().layers[0].opacity).toBe(1)
+  })
+
+  it("coalesces dragging a layer slider into a single snapshot", () => {
+    const layerId = useGradientStore.getState().layers[0].id
+    advance(2000)
+    useGradientStore.getState().updateLayer(layerId, { opacity: 0.9 })
+    useGradientStore.getState().updateLayer(layerId, { opacity: 0.8 })
+    useGradientStore.getState().updateLayer(layerId, { opacity: 0.7 })
+
+    expect(useGradientStore.getState().past).toHaveLength(1)
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().layers[0].opacity).toBe(1)
+  })
+
+  it("undoes reordering layers", () => {
+    useGradientStore.getState().addLayer()
+    const [a, b] = useGradientStore.getState().layers.map((l) => l.id)
+
+    useGradientStore.getState().reorderLayers([b, a])
+    expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual([b, a])
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual([a, b])
+  })
+
+  it("undoes turning on multi-layer mode", () => {
+    useGradientStore.getState().setMultiLayerMode(true)
+    expect(useGradientStore.getState().multiLayerMode).toBe(true)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().multiLayerMode).toBe(false)
+  })
+
+  it("keeps the active layer when it survives the undo", () => {
+    useGradientStore.getState().addLayer()
+    const secondId = useGradientStore.getState().layers[1].id
+    advance(2000)
+    useGradientStore.getState().updateLayer(secondId, { noiseScale: 4 })
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().activeLayerId).toBe(secondId)
+  })
+
+  it("new layers are born with their own seed, so shapes do not repeat", () => {
+    useGradientStore.getState().addLayer()
+    const [first, second] = useGradientStore.getState().layers
+    expect(first.seed).toEqual([0, 0])
+    expect(second.seed).not.toEqual(first.seed)
+  })
+})
+
+describe("seed", () => {
+  it("shuffleSeed changes the shape and is undoable", () => {
+    expect(useGradientStore.getState().seed).toEqual([0, 0])
+
+    useGradientStore.getState().shuffleSeed()
+    expect(useGradientStore.getState().seed).not.toEqual([0, 0])
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().seed).toEqual([0, 0])
+  })
+
+  it("randomize also rolls the shape", () => {
+    useGradientStore.getState().randomize()
+    expect(useGradientStore.getState().seed).not.toEqual([0, 0])
+  })
+
+  it("resetToDefaults returns the seed to the origin", () => {
+    useGradientStore.getState().shuffleSeed()
+    useGradientStore.getState().resetToDefaults()
+    expect(useGradientStore.getState().seed).toEqual([0, 0])
+  })
+})
+
+describe("presets store the layer composition", () => {
+  it("restores layers when applying a preset", () => {
+    useGradientStore.getState().addLayer()
+    useGradientStore.getState().setMultiLayerMode(true)
+    useGradientStore.getState().saveCurrentPreset("Two layers")
+
+    useGradientStore.getState().removeLayer(useGradientStore.getState().layers[1].id)
+    expect(useGradientStore.getState().layers).toHaveLength(1)
+
+    const presetId = useGradientStore.getState().savedPresets[0].id
+    useGradientStore.getState().applyPreset(presetId)
+    expect(useGradientStore.getState().layers).toHaveLength(2)
+    expect(useGradientStore.getState().multiLayerMode).toBe(true)
+  })
+
+  it("an old snapshot without layers preserves the current layers", () => {
+    useGradientStore.getState().addLayer()
+    const before = useGradientStore.getState().layers.map((l) => l.id)
+
+    // Preset saved before layers joined the snapshot
+    const legacySnapshot = {
+      speed: 2,
+      complexity: 5,
+      noiseScale: 3,
+      colorScheme: "neon",
+      isCustomMode: false,
+      customStops: [
+        { color: [1, 0, 0] as [number, number, number], position: 0 },
+        { color: [0, 1, 0] as [number, number, number], position: 0.5 },
+        { color: [0, 0, 1] as [number, number, number], position: 1 },
+      ],
+      flowIntensity: 0.5,
+      grainAmount: 0.1,
+      grainScale: 400,
+      thresholdMin: 0.2,
+      thresholdMax: 0.8,
+      vibrance: 0,
+      blendSpace: "oklab" as const,
+      seed: [0, 0] as [number, number],
+      loopDuration: 0,
+    }
+
+    useGradientStore.getState().applySnapshot(legacySnapshot)
+
+    expect(useGradientStore.getState().speed).toBe(2)
+    expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual(before)
+  })
+})
+
+// ─── Persistence migration ───────────────────────────────────────────────────
+
+describe("migratePersistedState", () => {
+  // State as it was written before the color pipeline and the seed
+  const v0State = () => ({
+    speed: 1.5,
+    complexity: 4,
+    noiseScale: 2,
+    colorScheme: "custom_123",
+    isCustomMode: false,
+    customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+    colorSchemes: {
+      redBlue: { color1: [0.9, 0.1, 0.1], color2: [0, 0, 0.9], name: "Red & Blue" },
+      custom_123: { color1: [0.2, 0.4, 0.6], color2: [0.8, 0.2, 0.1], name: "Mine" },
+    },
+    flowIntensity: 0.3,
+    grainAmount: 0.05,
+    grainScale: 500,
+    thresholdMin: 0.3,
+    thresholdMax: 0.7,
+    multiLayerMode: true,
+    layers: [
+      {
+        id: "layer_1",
+        opacity: 1,
+        blendMode: "normal",
+        visible: true,
+        colorScheme: "redBlue",
+        isCustomMode: true,
+        customColors: { color1: [1, 1, 0], color2: [0, 1, 1] },
+        noiseScale: 2,
+        flowIntensity: 0.3,
+        thresholdMin: 0.3,
+        thresholdMax: 0.7,
+      },
+    ],
+    activeLayerId: "layer_1",
+    savedPresets: [
+      {
+        id: "preset_1",
+        name: "Legacy",
+        createdAt: 1,
+        snapshot: {
+          speed: 1,
+          complexity: 3,
+          noiseScale: 2,
+          colorScheme: "redBlue",
+          isCustomMode: false,
+          customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+          flowIntensity: 0.3,
+          grainAmount: 0.05,
+          grainScale: 500,
+          thresholdMin: 0.3,
+          thresholdMax: 0.7,
+        },
+      },
+    ],
+    randomHistory: [
+      {
+        speed: 2,
+        complexity: 6,
+        noiseScale: 3,
+        colorScheme: "neon",
+        isCustomMode: true,
+        customColors: { color1: [0.1, 0.2, 0.3], color2: [0.4, 0.5, 0.6] },
+        flowIntensity: 0.5,
+        grainAmount: 0.1,
+        grainScale: 300,
+        thresholdMin: 0.2,
+        thresholdMax: 0.8,
+      },
+    ],
+  })
+
+  it("fills in the color parameters and the seed that did not exist", () => {
+    const migrated = migratePersistedState(v0State(), 0) as Record<string, unknown>
+    expect(migrated.vibrance).toBe(0)
+    expect(migrated.blendSpace).toBe("oklab")
+    expect(migrated.seed).toEqual([0, 0])
+  })
+
+  it("preserves values that already existed", () => {
+    const migrated = migratePersistedState(v0State(), 0) as Record<string, unknown>
+    expect(migrated.speed).toBe(1.5)
+    expect(migrated.grainScale).toBe(500)
+    expect(migrated.colorScheme).toBe("custom_123")
+  })
+
+  it("converts three-color schemes into evenly spaced stops", () => {
+    const migrated = migratePersistedState(v0State(), 0) as {
+      colorSchemes: Record<string, { stops: { color: number[]; position: number }[]; name?: string }>
+      customStops: { color: number[]; position: number }[]
+    }
+    // Two colors become stops at 0 and 1 — the same look the user saved
+    const scheme = migrated.colorSchemes.custom_123
+    expect(scheme.name).toBe("Mine")
+    expect(scheme.stops).toEqual([
+      { color: [0.2, 0.4, 0.6], position: 0 },
+      { color: [0.8, 0.2, 0.1], position: 1 },
+    ])
+    expect(migrated.customStops).toEqual([
+      { color: [1, 0, 0], position: 0 },
+      { color: [0, 0, 1], position: 1 },
+    ])
+  })
+
+  it("gives persisted layers a seed and stops", () => {
+    const migrated = migratePersistedState(v0State(), 0) as {
+      layers: Array<{ seed: number[]; customStops: { color: number[] }[]; customColors?: unknown }>
+    }
+    expect(migrated.layers[0].seed).toEqual([0, 0])
+    expect(migrated.layers[0].customStops.map((stop) => stop.color)).toEqual([
+      [1, 1, 0],
+      [0, 1, 1],
+    ])
+    expect(migrated.layers[0].customColors).toBeUndefined()
+  })
+
+  it("migrates snapshots of saved presets and of the randomizer history", () => {
+    const migrated = migratePersistedState(v0State(), 0) as {
+      savedPresets: Array<{ name: string; snapshot: Record<string, unknown> }>
+      randomHistory: Array<Record<string, unknown>>
+    }
+    const snapshot = migrated.savedPresets[0].snapshot
+    expect(migrated.savedPresets[0].name).toBe("Legacy")
+    expect(snapshot.vibrance).toBe(0)
+    expect(snapshot.blendSpace).toBe("oklab")
+    expect(snapshot.seed).toEqual([0, 0])
+    expect((snapshot.customStops as { color: number[] }[]).map((stop) => stop.color)).toEqual([
+      [1, 0, 0],
+      [0, 0, 1],
+    ])
+    expect(migrated.randomHistory[0].seed).toEqual([0, 0])
+    expect(
+      (migrated.randomHistory[0].customStops as { color: number[] }[]).map((stop) => stop.color)
+    ).toEqual([
+      [0.1, 0.2, 0.3],
+      [0.4, 0.5, 0.6],
+    ])
+  })
+
+  it("drops invalid values coming from localStorage", () => {
+    const corrupted = {
+      ...v0State(),
+      vibrance: "lots" as unknown as number,
+      blendSpace: "nonexistent_space",
+      seed: ["a", null],
+    }
+    const migrated = migratePersistedState(corrupted, 0) as Record<string, unknown>
+    expect(migrated.vibrance).toBe(0)
+    expect(migrated.blendSpace).toBe("oklab")
+    expect(migrated.seed).toEqual([0, 0])
+  })
+
+  it("leaves states already on the current version untouched", () => {
+    const current = { ...v0State(), vibrance: 0.4, blendSpace: "linear", seed: [5, 6] }
+    const migrated = migratePersistedState(current, PERSIST_VERSION) as Record<string, unknown>
+    expect(migrated.vibrance).toBe(0.4)
+    expect(migrated.blendSpace).toBe("linear")
+    expect(migrated.seed).toEqual([5, 6])
+  })
+
+  it("tolerates empty or non-object states", () => {
+    expect(migratePersistedState(null, 0)).toBeNull()
+    expect(migratePersistedState("garbage", 0)).toBe("garbage")
+    expect(migratePersistedState({}, 0)).toEqual({
+      vibrance: 0,
+      blendSpace: "oklab",
+      loopDuration: 0,
+      seed: [0, 0],
+      artboardId: "free",
+      showSafeAreas: false,
+      customStops: initialState.customStops,
+    })
+  })
+})
+
+describe("normalizePersistedState", () => {
+  // zustand only calls `migrate` when the stored JSON has a numeric `version`;
+  // earlier versions persisted without that field, so it is the normalization in
+  // `merge` that rescues real user localStorage
+  it("normalizes a state stored without a version", () => {
+    const legacy = {
+      speed: 1,
+      customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+      colorSchemes: { meu: { color1: [0.2, 0.3, 0.4], color2: [0.5, 0.6, 0.7] } },
+      layers: [{ id: "layer_1", colorScheme: "meu" }],
+    }
+    const migrated = normalizePersistedState(legacy) as {
+      vibrance: number
+      blendSpace: string
+      seed: number[]
+      colorSchemes: Record<string, { stops: { color: number[]; position: number }[] }>
+      customStops: { color: number[]; position: number }[]
+      layers: Array<{ seed: number[] }>
+    }
+
+    expect(migrated.vibrance).toBe(0)
+    expect(migrated.blendSpace).toBe("oklab")
+    expect(migrated.seed).toEqual([0, 0])
+    expect(migrated.colorSchemes.meu.stops).toEqual([
+      { color: [0.2, 0.3, 0.4], position: 0 },
+      { color: [0.5, 0.6, 0.7], position: 1 },
+    ])
+    expect(migrated.customStops).toEqual([
+      { color: [1, 0, 0], position: 0 },
+      { color: [0, 0, 1], position: 1 },
+    ])
+    expect(migrated.layers[0].seed).toEqual([0, 0])
+  })
+
+  it("is idempotent — running it again changes nothing", () => {
+    const once = normalizePersistedState(v0StateForNormalize())
+    const twice = normalizePersistedState(once)
+    expect(twice).toEqual(once)
+  })
+
+  it("preserves valid user choices", () => {
+    const normalized = normalizePersistedState({
+      ...v0StateForNormalize(),
+      vibrance: 0.35,
+      blendSpace: "linear",
+      seed: [12, 34],
+    }) as Record<string, unknown>
+    expect(normalized.vibrance).toBe(0.35)
+    expect(normalized.blendSpace).toBe("linear")
+    expect(normalized.seed).toEqual([12, 34])
+  })
+})
+
+const v0StateForNormalize = () => ({
+  speed: 1,
+  customColors: { color1: [1, 0, 0], color2: [0, 0, 1] },
+  colorSchemes: { meu: { color1: [0.2, 0.3, 0.4], color2: [0.5, 0.6, 0.7] } },
+  layers: [{ id: "layer_1", colorScheme: "meu" }],
+})
+
+describe("library (import/export)", () => {
+  it("exports and re-imports presets and schemes", () => {
+    useGradientStore.getState().saveCustomScheme("My Scheme")
+    useGradientStore.getState().saveCurrentPreset("My Preset")
+
+    const json = useGradientStore.getState().exportLibrary()
+
+    // Clean state: importing has to rebuild the library
+    useGradientStore.setState({ savedPresets: [], colorSchemes: initialState.colorSchemes })
+
+    const result = useGradientStore.getState().importLibrary(json)
+    expect(result.presets).toBe(1)
+    expect(result.schemes).toBeGreaterThanOrEqual(1)
+
+    const state = useGradientStore.getState()
+    expect(state.savedPresets[0].name).toBe("My Preset")
+    expect(Object.values(state.colorSchemes).some((s) => s.name === "My Scheme")).toBe(true)
+  })
+
+  it("importing twice does not collide ids", () => {
+    useGradientStore.getState().saveCurrentPreset("Preset")
+    const json = useGradientStore.getState().exportLibrary()
+    useGradientStore.setState({ savedPresets: [] })
+
+    useGradientStore.getState().importLibrary(json)
+    useGradientStore.getState().importLibrary(json)
+
+    const ids = useGradientStore.getState().savedPresets.map((preset) => preset.id)
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  it("migrates presets exported in the three-color format", () => {
+    const legacyFile = JSON.stringify({
+      format: "gradient-generator-library",
+      version: 1,
+      presets: [
+        {
+          id: "antigo",
+          name: "Legacy Preset",
+          createdAt: 1,
+          snapshot: {
+            speed: 1,
+            complexity: 3,
+            noiseScale: 2,
+            colorScheme: "redBlue",
+            isCustomMode: true,
+            customColors: { color1: [1, 0, 0], color2: [0, 1, 0], color3: [0, 0, 1] },
+            flowIntensity: 0.3,
+            grainAmount: 0.05,
+            grainScale: 500,
+            thresholdMin: 0.3,
+            thresholdMax: 0.7,
+          },
+        },
+      ],
+      colorSchemes: {
+        antigo: { color1: [0.2, 0.3, 0.4], color2: [0.5, 0.6, 0.7], name: "Legacy Scheme" },
+      },
+    })
+
+    useGradientStore.setState({ savedPresets: [] })
+    const result = useGradientStore.getState().importLibrary(legacyFile)
+    expect(result.presets).toBe(1)
+
+    const state = useGradientStore.getState()
+    const imported = state.savedPresets[0].snapshot
+    expect(imported.customStops.map((stop) => stop.color)).toEqual([
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ])
+    expect(imported.vibrance).toBe(0)
+    expect(imported.blendSpace).toBe("oklab")
+    expect(state.colorSchemes.antigo.stops).toEqual([
+      { color: [0.2, 0.3, 0.4], position: 0 },
+      { color: [0.5, 0.6, 0.7], position: 1 },
+    ])
+  })
+
+  it("propagates the error for an invalid file", () => {
+    expect(() => useGradientStore.getState().importLibrary("{}")).toThrow()
+  })
+})
+
+describe("color stops", () => {
+  it("adds a stop in the largest gap and removes by index", () => {
+    const store = useGradientStore.getState()
+    expect(store.customStops).toHaveLength(3)
+
+    store.addStop()
+    expect(useGradientStore.getState().customStops).toHaveLength(4)
+
+    useGradientStore.getState().removeStop(1)
+    expect(useGradientStore.getState().customStops).toHaveLength(3)
+  })
+
+  it("respects the minimum and maximum", () => {
+    useGradientStore.setState({
+      customStops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+    })
+    useGradientStore.getState().removeStop(0)
+    expect(useGradientStore.getState().customStops).toHaveLength(2)
+
+    for (let i = 0; i < 12; i++) {
+      advance(2000)
+      useGradientStore.getState().addStop()
+    }
+    expect(useGradientStore.getState().customStops).toHaveLength(8)
+  })
+
+  it("adding and removing a stop are undoable", () => {
+    useGradientStore.getState().addStop()
+    expect(useGradientStore.getState().customStops).toHaveLength(4)
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().customStops).toHaveLength(3)
+  })
+
+  it("setStops sorts and validates the incoming palette", () => {
+    useGradientStore.getState().setStops([
+      { color: [0, 1, 0], position: 0.9 },
+      { color: [1, 0, 0], position: 0.1 },
+      { color: [5, -1, 0.5], position: 2 },
+    ])
+    const stops = useGradientStore.getState().customStops
+    expect(stops.map((stop) => stop.position)).toEqual([0.1, 0.9, 1])
+    expect(stops[2].color).toEqual([1, 0, 0.5])
+  })
+
+  it("moving a stop does not re-sort the list (stable drag)", () => {
+    advance(2000)
+    useGradientStore.getState().setStopPosition(0, 1)
+    const stops = useGradientStore.getState().customStops
+    expect(stops[0].position).toBe(1)
+    expect(stops[0].color).toEqual(initialState.customStops[0].color)
+  })
+
+  it("randomize produces a palette with perceptible chroma", () => {
+    for (let i = 0; i < 10; i++) {
+      advance(2000)
+      useGradientStore.getState().randomize()
+      const stops = useGradientStore.getState().customStops
+      expect(stops.length).toBeGreaterThanOrEqual(2)
+      // Drawn in OKLCH: none of the mud the RGB draw produced
+      const saturated = stops.some((stop) => {
+        const [r, g, b] = stop.color
+        return Math.max(r, g, b) - Math.min(r, g, b) > 0.05
+      })
+      expect(saturated).toBe(true)
+    }
   })
 })
