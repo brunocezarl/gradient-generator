@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import { renderHook } from "@testing-library/react"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 
-// matchMedia fake: responde true apenas para as queries listadas
+// Fake matchMedia: returns true only for the listed queries
 function mockMatchMedia(matching: string[]) {
   window.matchMedia = vi.fn((query: string) => ({
     matches: matching.some((m) => query.includes(m)),
@@ -25,7 +25,7 @@ describe("useDeviceOptimizations", () => {
     mockCores(8)
   })
 
-  it("desktop com 8+ núcleos usa qualidade alta", () => {
+  it("desktop with 8+ cores uses high quality", () => {
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("high")
     expect(result.current.maxComplexity).toBe(10)
@@ -33,21 +33,21 @@ describe("useDeviceOptimizations", () => {
     expect(result.current.antialias).toBe(true)
   })
 
-  it("desktop com 4-7 núcleos usa qualidade média", () => {
+  it("desktop with 4-7 cores uses medium quality", () => {
     mockCores(4)
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("medium")
     expect(result.current.pixelRatio).toBe(1.5)
   })
 
-  it("desktop com poucos núcleos usa qualidade baixa", () => {
+  it("desktop with few cores uses low quality", () => {
     mockCores(2)
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("low")
     expect(result.current.antialias).toBe(false)
   })
 
-  it("mobile força qualidade baixa mesmo com CPU forte", () => {
+  it("mobile forces low quality even with a strong CPU", () => {
     mockMatchMedia(["max-width: 768px"])
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("low")
@@ -55,14 +55,14 @@ describe("useDeviceOptimizations", () => {
     expect(result.current.pixelRatio).toBe(1)
   })
 
-  it("prefers-reduced-motion força qualidade baixa", () => {
+  it("prefers-reduced-motion forces low quality", () => {
     mockMatchMedia(["prefers-reduced-motion"])
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("low")
     expect(result.current.isLowPower).toBe(true)
   })
 
-  it("usa qualidade média quando hardwareConcurrency não existe", () => {
+  it("uses medium quality when hardwareConcurrency is missing", () => {
     mockCores(undefined)
     const { result } = renderHook(() => useDeviceOptimizations())
     expect(result.current.quality).toBe("medium")

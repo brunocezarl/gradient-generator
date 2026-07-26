@@ -2,37 +2,37 @@
 
 import { overrideRenderSize, renderFrameAtTime } from "@/lib/capture"
 
-// Exportação de vídeo determinística.
+// Deterministic video export.
 //
-// A gravação anterior usava MediaRecorder sobre o canvas em tempo real: o
-// arquivo ficava com os frames que a GPU conseguiu entregar no tempo em que o
-// navegador chamou o rAF. Em 4K, ou num notebook ocupado, isso significa frames
-// repetidos, duração errada e nenhuma chance de loop perfeito.
+// The previous recording used MediaRecorder over the live canvas: the file ended
+// up with whatever frames the GPU managed to deliver whenever the browser called
+// rAF. At 4K, or on a busy laptop, that means duplicated frames, the wrong
+// duration and no chance of a seamless loop.
 //
-// Aqui o tempo é dirigido pelo exportador: para cada frame, a cena é desenhada
-// em um instante exato e o quadro é entregue ao encoder com timestamp
-// explícito. A gravação pode ser mais lenta que o tempo real sem afetar o
-// resultado — só demora mais.
+// Here time is driven by the exporter: for each frame the scene is drawn at an
+// exact instant and the frame is handed to the encoder with an explicit
+// timestamp. Recording slower than real time does not affect the result — it
+// just takes longer.
 
 export type VideoFormat = "mp4" | "webm"
 
 export interface VideoExportPlan {
-  /** Quantidade de frames a renderizar */
+  /** How many frames to render */
   frameCount: number
-  /** Segundos de animação por frame */
+  /** Animation seconds per frame */
   animationStep: number
-  /** Duração do arquivo em segundos */
+  /** File duration in seconds */
   videoDuration: number
-  /** true quando o arquivo fecha um número inteiro de loops */
+  /** true when the file closes a whole number of loops */
   loopExact: boolean
 }
 
 export interface PlanVideoExportOptions {
   requestedDuration: number
   fps: number
-  /** Duração do loop em segundos de animação (0 = animação livre) */
+  /** Loop duration in animation seconds (0 = free animation) */
   loopDuration: number
-  /** Velocidade de preview: mantém no arquivo o ritmo que se vê na tela */
+  /** Preview speed: keeps the on-screen rhythm in the file */
   speed: number
 }
 
@@ -47,18 +47,18 @@ export function planVideoExport({
   const safeDuration = Math.min(Math.max(requestedDuration || 1, 1 / safeFps), 600)
 
   if (loopDuration > 0) {
-    // Um loop dura `loopDuration` segundos de animação; na velocidade de
-    // preview isso equivale a `loopDuration / speed` segundos de vídeo. A
-    // duração pedida é arredondada para um número inteiro de loops, senão o
-    // corte cairia no meio do ciclo e o loop apareceria.
+    // A loop lasts `loopDuration` animation seconds; at preview speed that is
+    // `loopDuration / speed` seconds of video. The requested duration is rounded
+    // to a whole number of loops, otherwise the cut would land mid-cycle and the
+    // seam would show.
     const singleLoopVideo = loopDuration / safeSpeed
     const loops = Math.max(1, Math.round(safeDuration / singleLoopVideo))
     const videoDuration = singleLoopVideo * loops
     const frameCount = Math.max(1, Math.round(videoDuration * safeFps))
     return {
       frameCount,
-      // O último frame renderizado é o anterior ao fechamento do ciclo: o
-      // frame do fechamento é idêntico ao primeiro e duplicaria na emenda
+      // The last rendered frame is the one before the cycle closes: the closing
+      // frame is identical to the first and would duplicate at the seam
       animationStep: (loopDuration * loops) / frameCount,
       videoDuration,
       loopExact: true,
@@ -75,9 +75,9 @@ export function planVideoExport({
 }
 
 export interface ExportVideoOptions {
-  /** Elemento que contém os canvases da prancheta */
+  /** Element holding the artboard canvases */
   container: HTMLElement
-  /** Canvas a codificar (o primeiro da prancheta) */
+  /** Canvas to encode (the first one in the artboard) */
   canvas: HTMLCanvasElement
   width: number
   height: number
@@ -93,8 +93,8 @@ export function isWebCodecsAvailable(): boolean {
   return typeof window !== "undefined" && typeof window.VideoEncoder === "function"
 }
 
-// Codecs por container. AVC para MP4 (compatível com edição e redes sociais),
-// VP9 para WebM.
+// Codecs per container. AVC for MP4 (works with editors and social platforms),
+// VP9 for WebM.
 const CODEC_BY_FORMAT: Record<VideoFormat, "avc" | "vp9"> = {
   mp4: "avc",
   webm: "vp9",
@@ -138,8 +138,8 @@ export async function exportVideo({
 
   output.addVideoTrack(source, { frameRate: fps })
 
-  // Renderiza na resolução de saída (e reprojeta a câmera na proporção alvo)
-  // durante toda a gravação
+  // Renders at output resolution (and reprojects the camera to the target aspect
+  // ratio) for the whole recording
   const restoreSize = overrideRenderSize(canvas, width, height)
 
   try {
@@ -148,12 +148,12 @@ export async function exportVideo({
     for (let frame = 0; frame < plan.frameCount; frame++) {
       if (shouldCancel?.()) {
         await output.cancel()
-        throw new DOMException("Gravação cancelada", "AbortError")
+        throw new DOMException("Recording cancelled", "AbortError")
       }
 
       const drawn = renderFrameAtTime(container, frame * plan.animationStep)
       if (drawn === 0) {
-        throw new Error("Nenhuma cena registrada para renderizar os frames")
+        throw new Error("No scene registered to render the frames")
       }
 
       await source.add(frame / fps, 1 / fps)
@@ -164,7 +164,7 @@ export async function exportVideo({
     await output.finalize()
 
     const buffer = output.target.buffer
-    if (!buffer) throw new Error("Falha ao gerar o arquivo de vídeo")
+    if (!buffer) throw new Error("Failed to produce the video file")
 
     return new Blob([buffer], { type: format === "mp4" ? "video/mp4" : "video/webm" })
   } finally {

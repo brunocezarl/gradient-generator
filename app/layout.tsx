@@ -4,13 +4,13 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/toaster"
 
 export const metadata = {
-  title: "Gerador de Gradientes Orgânicos",
+  title: "Organic Gradient Generator",
   description:
-    "Crie gradientes animados em HD com formas orgânicas para sistemas de marca. Exporte como imagem, vídeo, tokens ou CSS.",
+    "Build animated organic gradients for brand systems. Export as image, video, design tokens or CSS.",
   openGraph: {
-    title: "Gerador de Gradientes Orgânicos",
+    title: "Organic Gradient Generator",
     description:
-      "Gradientes animados em WebGL com cor fiel, loop perfeito e exportação em imagem, vídeo e tokens.",
+      "WebGL animated gradients with faithful color, seamless loops and export to image, video and design tokens.",
     type: "website",
   },
 }
@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans">
         <ThemeProvider
           attribute="class"

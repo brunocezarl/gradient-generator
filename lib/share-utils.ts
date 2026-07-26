@@ -4,8 +4,8 @@ import { GradientStore } from "@/lib/store"
 import type { GradientLayer } from "@/lib/layer-utils"
 import { stopsFromColors, type ColorStop } from "@/lib/color-stops"
 
-// Camada compartilhável: uma GradientLayer sem o id (ids são regenerados na
-// importação para não colidir com camadas existentes no cliente de destino)
+// Shareable layer: a GradientLayer without the id (ids are regenerated on import
+// so they cannot collide with layers already in the destination client)
 export type ShareableLayer = Omit<GradientLayer, "id">
 
 // Define the shape of shareable data
@@ -15,35 +15,35 @@ export interface ShareableGradient {
   noiseScale: number
   colorScheme: string
   isCustomMode: boolean
-  // Formato de três cores (v1/v2), mantido só para leitura de links antigos
+  // Three-color format (v1/v2), kept only for reading old links
   customColors?: {
     color1: number[]
     color2: number[]
     color3?: number[]
   }
-  // Paradas com posição (v3)
+  // Stops with positions (v3)
   stops?: ColorStop[]
-  // Parâmetros avançados (v2) — opcionais para compatibilidade com links antigos
+  // Advanced parameters (v2) — optional, for compatibility with old links
   flowIntensity?: number
   grainAmount?: number
   grainScale?: number
   thresholdMin?: number
   thresholdMax?: number
-  // Multi-camadas (v2)
+  // Multi-layer (v2)
   multiLayerMode?: boolean
   layers?: ShareableLayer[]
-  // Cor e forma (v3): sem o seed, abrir um link reproduzia as cores e o ritmo
-  // mas desenhava outra forma
+  // Color and shape (v3): without the seed, opening a link reproduced the colors
+  // and the rhythm but drew a different shape
   vibrance?: number
   blendSpace?: string
   seed?: [number, number]
   loopDuration?: number
 }
 
-// ─── Codificação compacta ─────────────────────────────────────────────────────
-// O formato v2 usa chaves curtas + base64url em vez de JSON puro na query
-// string, produzindo URLs bem mais curtas e fáceis de colar em chats.
-// O formato v1 (?gradient=<JSON url-encoded>) continua suportado na leitura.
+// ─── Compact encoding ─────────────────────────────────────────────────────────
+// The v2 format uses short keys + base64url instead of raw JSON in the query
+// string, producing much shorter URLs that survive being pasted into chats.
+// The v1 format (?gradient=<url-encoded JSON>) is still readable.
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 const roundColor = (c: number[]) => c.slice(0, 3).map(round3)
@@ -65,13 +65,13 @@ function fromBase64Url(encoded: string): string {
 type PackedLayer = {
   o: number // opacity
   b: string // blendMode
-  h: 0 | 1 // visible (hidden flag invertido)
+  h: 0 | 1 // visible (inverted hidden flag)
   cs: string // colorScheme
   cm: 0 | 1 // isCustomMode
-  k1?: number[] // customColors.color1 (leitura de links v2)
+  k1?: number[] // customColors.color1 (reading v2 links)
   k2?: number[]
   k3?: number[]
-  st?: number[][] // paradas: [r, g, b, posição]
+  st?: number[][] // stops: [r, g, b, position]
   n: number // noiseScale
   f: number // flowIntensity
   tn: number // thresholdMin
@@ -86,10 +86,10 @@ type PackedGradient = {
   n: number // noiseScale
   cs: string // colorScheme
   cm: 0 | 1 // isCustomMode
-  k1?: number[] // customColors.color1 (leitura de links v2)
+  k1?: number[] // customColors.color1 (reading v2 links)
   k2?: number[]
   k3?: number[]
-  st?: number[][] // paradas: [r, g, b, posição]
+  st?: number[][] // stops: [r, g, b, position]
   f?: number // flowIntensity
   ga?: number // grainAmount
   gs?: number // grainScale
@@ -111,8 +111,8 @@ function pack(data: ShareableGradient): PackedGradient {
     n: round3(data.noiseScale),
     cs: data.colorScheme,
     cm: data.isCustomMode ? 1 : 0,
-    // Paradas com posição. Links v2 e anteriores traziam k1/k2/k3 — a leitura
-    // ainda aceita esse formato, a escrita não usa mais.
+    // Stops with positions. v2 and earlier carried k1/k2/k3 — reading still
+    // accepts that format, writing no longer uses it.
     st: (data.stops ?? []).map((stop) => [...roundColor(stop.color), round3(stop.position)]),
   }
 
@@ -169,7 +169,7 @@ function unpack(packed: PackedGradient): ShareableGradient {
       position: stop[3] ?? 0,
     }))
   } else if (packed.k1 && packed.k2) {
-    // Link v2: três cores sem posição
+    // v2 link: three colors without positions
     data.customColors = { color1: packed.k1, color2: packed.k2, color3: packed.k3 }
   }
 
@@ -214,9 +214,9 @@ function unpack(packed: PackedGradient): ShareableGradient {
 
 // Create a shareable URL for the current gradient settings
 export function createShareableURL(state: Partial<GradientStore>): string {
-  // Extract only the properties we want to share
-  // `??` em vez de `||`: valores numéricos legítimos como 0 não devem cair
-  // no padrão (0 || 1.0 === 1.0 corromperia o compartilhamento)
+  // Extract only the properties we want to share.
+  // `??` rather than `||`: legitimate numeric values such as 0 must not fall
+  // through to the default (0 || 1.0 === 1.0 would corrupt the share)
   const shareableData: ShareableGradient = {
     speed: state.speed ?? 1.0,
     complexity: state.complexity ?? 3,
@@ -239,8 +239,8 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     loopDuration: state.loopDuration ?? 0,
   }
 
-  // Camadas só entram no link quando o modo multi-camadas está ativo — o
-  // link fica mais curto no caso comum de camada única
+  // Layers only go into the link when multi-layer mode is on — that
+  // keeps the link shorter in the common single-layer case
   if (state.multiLayerMode && state.layers && state.layers.length > 0) {
     shareableData.multiLayerMode = true
     shareableData.layers = state.layers.map(({ id: _id, ...layer }) => layer)

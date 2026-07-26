@@ -28,14 +28,14 @@ function createRenderTarget() {
   })
 }
 
-// Composição de N camadas em um único contexto WebGL.
+// Compositing N layers in a single WebGL context.
 //
-// Antes cada camada tinha o próprio <Canvas> e a mesclagem era feita pelo
-// `mix-blend-mode` do CSS: um contexto WebGL por camada (recurso escasso e
-// caro), zero controle sobre a composição e uma segunda implementação — em
-// canvas 2D — só para a exportação. Aqui cada camada é desenhada em um render
-// target e as camadas são combinadas no shader, com o mesmo resultado na tela e
-// no arquivo.
+// Each layer used to have its own <Canvas> with blending done by CSS
+// `mix-blend-mode`: one WebGL context per layer (a scarce, expensive resource),
+// no control over the composition, and a second implementation — in canvas 2D —
+// just for exporting. Here each layer is drawn into a render target and the
+// layers are combined in the shader, with the same result on screen and in the
+// file.
 function LayeredComposition({
   layers,
   globals,
@@ -55,14 +55,14 @@ function LayeredComposition({
   const gl = useThree((state) => state.gl)
   const camera = useThree((state) => state.camera)
 
-  // Ordem de desenho: de baixo para cima. layers[0] é a camada de cima na UI.
+  // Draw order: bottom to top. layers[0] is the topmost layer in the UI.
   const visibleLayers = useMemo(
     () => [...layers].reverse().filter((layer) => layer.visible),
     [layers]
   )
 
-  // Uma cena por camada, alimentada por portal — assim cada camada continua
-  // sendo o mesmo componente de shader usado no modo de camada única
+  // One scene per layer, fed through a portal — so each layer stays the same
+  // shader component the single-layer mode uses
   const layerScenes = useMemo(
     () => visibleLayers.map(() => new THREE.Scene()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,8 +95,8 @@ function LayeredComposition({
     mesh.frustumCulled = false
     const scene = new THREE.Scene()
     scene.add(mesh)
-    // O vertex shader da composição escreve gl_Position direto de `position`,
-    // então qualquer câmera serve
+    // The compositing vertex shader writes gl_Position straight from `position`,
+    // so any camera works
     return { scene, material, camera: new THREE.Camera() }
   }, [])
 
@@ -117,8 +117,8 @@ function LayeredComposition({
     const width = Math.max(1, Math.floor(size.x))
     const height = Math.max(1, Math.floor(size.y))
 
-    // Acompanha o tamanho do drawing buffer, inclusive quando a exportação o
-    // redimensiona para a resolução final
+    // Follows the drawing buffer size, including when the export resizes it to
+    // the final resolution
     for (const target of [targets.layer, targets.accumulation, targets.swap]) {
       if (target.width !== width || target.height !== height) {
         target.setSize(width, height)
@@ -129,8 +129,8 @@ function LayeredComposition({
     const previousClear = gl.getClearColor(new THREE.Color())
     const previousClearAlpha = gl.getClearAlpha()
 
-    // Fundo preto: as camadas mesclam contra ele, exatamente como faziam
-    // contra o fundo da página no modo anterior
+    // Black backdrop: layers blend against it, exactly as they did against the
+    // page background in the previous mode
     gl.setClearColor(0x000000, 1)
     gl.setRenderTarget(targets.accumulation)
     gl.clear(true, false, false)
@@ -153,7 +153,7 @@ function LayeredComposition({
       ;[accumulation, swap] = [swap, accumulation]
     })
 
-    // Resultado para a tela
+    // Result to the screen
     composite.material.uniforms.uBase.value = accumulation.texture
     composite.material.uniforms.uLayer.value = accumulation.texture
     composite.material.uniforms.uOpacity.value = 1
@@ -165,12 +165,12 @@ function LayeredComposition({
     gl.setClearColor(previousClear, previousClearAlpha)
   }, [gl, camera, visibleLayers, layerScenes, targets, composite])
 
-  // Prioridade > 0 assume o render loop: o react-three-fiber para de desenhar
-  // a cena raiz sozinho e a composição passa a controlar as passagens
+  // Priority > 0 takes over the render loop: react-three-fiber stops drawing the
+  // root scene on its own and the composition controls the passes
   useFrame(renderComposition, 1)
 
-  // Exportação de imagem e vídeo desenham por aqui, para receber a composição
-  // completa em vez de uma única passagem
+  // Image and video export draw through here, so they get the full composition
+  // instead of a single pass
   useEffect(
     () => registerFrameRenderer(gl.domElement, renderComposition),
     [gl, renderComposition]
@@ -213,10 +213,9 @@ export function MultiLayerGradient() {
   const colorSchemes = useGradientStore((state) => state.colorSchemes)
   const isPlaying = useGradientStore((state) => state.isPlaying)
 
-  // O movimento e o acabamento são globais: a composição inteira se move junta
-  // e recebe o mesmo tratamento de cor. Antes estes valores eram fixos no
-  // código, então play/pause, velocidade e complexidade não tinham efeito
-  // nenhum no modo multi-camadas.
+  // Motion and finishing are global: the whole composition moves together and
+  // gets the same color treatment. These values used to be hardcoded here, so
+  // play/pause, speed and complexity had no effect at all in multi-layer mode.
   const globals = useGradientStore(
     useShallow((state) => ({
       complexity: state.complexity,

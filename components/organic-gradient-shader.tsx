@@ -16,7 +16,7 @@ import { registerTimeConsumer } from "@/lib/capture"
 export interface OrganicGradientParams {
   complexity: number
   noiseScale: number
-  /** Paradas de cor em sRGB, como saem do color picker */
+  /** Color stops in sRGB, as they come out of the color picker */
   stops: ColorStop[]
   flowIntensity: number
   grainAmount: number
@@ -26,7 +26,7 @@ export interface OrganicGradientParams {
   vibrance: number
   blendSpace: ColorBlendSpace
   seed: [number, number]
-  // 0 = animação livre; > 0 = período em que o desenho se repete exatamente
+  // 0 = free animation; > 0 = period over which the drawing repeats exactly
   loopDuration: number
 }
 
@@ -46,12 +46,12 @@ function createStopUniforms(): StopUniforms {
   }
 }
 
-// Escreve as paradas nos uniforms.
+// Writes the stops into the uniforms.
 //
-// A ordenação acontece aqui, não no estado: reordenar a lista no meio de um
-// arraste faria o slider pular para outra parada na mão do usuário, enquanto o
-// shader precisa das posições crescentes. As posições não usadas repetem a
-// última parada, mantendo o array preenchido.
+// Sorting happens here, not in state: re-sorting the list mid-drag would make the
+// slider jump to another stop under the user's cursor, while the shader needs
+// ascending positions. Unused slots repeat the last stop, keeping the array
+// filled.
 function writeStopUniforms(uniforms: StopUniforms, stops: readonly ColorStop[]) {
   const sorted = sortStops(stops)
   const count = Math.min(Math.max(sorted.length, 2), MAX_COLOR_STOPS)
@@ -67,9 +67,9 @@ function writeStopUniforms(uniforms: StopUniforms, stops: readonly ColorStop[]) 
   uniforms.uStopCount.value = count
 }
 
-// Único componente de shader do app: a cena simples e cada camada do modo
-// multi-camadas renderizam por aqui, garantindo que a mesma configuração
-// produza a mesma imagem nos dois modos.
+// The app's only shader component: the simple scene and every layer of the
+// multi-layer mode render through here, so the same configuration produces the
+// same image in both modes.
 export function OrganicGradientShader({
   complexity,
   noiseScale,
@@ -88,8 +88,8 @@ export function OrganicGradientShader({
   const invalidate = useThree((state) => state.invalidate)
   const gl = useThree((state) => state.gl)
 
-  // Valores iniciais apenas — as atualizações acontecem no effect abaixo, sem
-  // recriar o material (recriar recompila o shader e pisca a tela)
+  // Initial values only — updates happen in the effect below, without recreating
+  // the material (recreating recompiles the shader and flashes the screen)
   const uniforms = useMemo(() => {
     const stopUniforms = createStopUniforms()
     writeStopUniforms(stopUniforms, stops)
@@ -128,8 +128,8 @@ export function OrganicGradientShader({
     material.uniforms.uSeed.value = [seed[0], seed[1]]
     material.uniforms.uLoopDuration.value = loopDuration
 
-    // Com a animação pausada o canvas roda em frameloop "demand": sem isto a
-    // tela ficaria com a imagem antiga ao mexer nos controles
+    // With the animation paused the canvas runs on the "demand" frameloop:
+    // without this the screen would keep the old image while controls change
     invalidate()
   }, [
     complexity,
@@ -147,21 +147,21 @@ export function OrganicGradientShader({
     invalidate,
   ])
 
-  // Arrastar a timeline (ou pular para um frame) precisa redesenhar mesmo com a
-  // animação pausada
+  // Dragging the timeline (or jumping to a frame) has to redraw even while the
+  // animation is paused
   useEffect(() => playback.subscribe(invalidate), [invalidate])
 
-  // O tempo vem do relógio compartilhado (lib/playback.ts), não de um
-  // acumulador local: assim a timeline mostra o instante real e o export pode
-  // pedir um instante específico
+  // Time comes from the shared clock (lib/playback.ts), not from a local
+  // accumulator: that way the timeline shows the real instant and the exporter
+  // can ask for a specific one
   useFrame(() => {
     const material = meshRef.current?.material as THREE.ShaderMaterial | undefined
     if (!material?.uniforms) return
     material.uniforms.uTime.value = playback.time
   })
 
-  // Permite que a exportação peça um instante exato da animação, em vez de
-  // capturar o instante em que o navegador chamou o render loop
+  // Lets the exporter ask for an exact instant of the animation instead of
+  // capturing whichever one the browser called the render loop on
   useEffect(
     () =>
       registerTimeConsumer(gl.domElement, (time) => {

@@ -1,28 +1,28 @@
-// Pranchetas: a proporção em que o gradiente é composto e exportado.
+// Artboards: the aspect ratio the gradient is composed and exported in.
 //
-// Antes o preview era sempre a janela inteira e a proporção de saída só
-// aparecia no diálogo de exportação — o designer descobria o enquadramento
-// depois de baixar o arquivo. Com a prancheta, o que está na tela é o que sai.
+// The preview used to be the whole window, with the output ratio showing up
+// only in the export dialog — the designer discovered the framing after
+// downloading the file. With an artboard, what is on screen is what ships.
 
 export interface Artboard {
   id: string
   label: string
-  // 0 × 0 = acompanha a área disponível (modo livre)
+  // 0 × 0 = follows the available area (free mode)
   width: number
   height: number
   group: string
 }
 
 export const artboards: Artboard[] = [
-  { id: "free", label: "Livre (área disponível)", width: 0, height: 0, group: "Livre" },
-  { id: "fullhd", label: "Full HD · 1920×1080", width: 1920, height: 1080, group: "Tela" },
-  { id: "qhd", label: "QHD · 2560×1440", width: 2560, height: 1440, group: "Tela" },
-  { id: "uhd4k", label: "4K · 3840×2160", width: 3840, height: 2160, group: "Tela" },
-  { id: "square", label: "Post quadrado · 1080×1080", width: 1080, height: 1080, group: "Social" },
-  { id: "portrait45", label: "Post 4:5 · 1080×1350", width: 1080, height: 1350, group: "Social" },
+  { id: "free", label: "Free (available area)", width: 0, height: 0, group: "Free" },
+  { id: "fullhd", label: "Full HD · 1920×1080", width: 1920, height: 1080, group: "Screen" },
+  { id: "qhd", label: "QHD · 2560×1440", width: 2560, height: 1440, group: "Screen" },
+  { id: "uhd4k", label: "4K · 3840×2160", width: 3840, height: 2160, group: "Screen" },
+  { id: "square", label: "Square post · 1080×1080", width: 1080, height: 1080, group: "Social" },
+  { id: "portrait45", label: "Portrait 4:5 · 1080×1350", width: 1080, height: 1350, group: "Social" },
   { id: "story", label: "Story / Reels · 1080×1920", width: 1080, height: 1920, group: "Social" },
   { id: "og", label: "Open Graph · 1200×630", width: 1200, height: 630, group: "Social" },
-  { id: "a4", label: "A4 300dpi · 2480×3508", width: 2480, height: 3508, group: "Impressão" },
+  { id: "a4", label: "A4 at 300dpi · 2480×3508", width: 2480, height: 3508, group: "Print" },
 ]
 
 export const defaultArtboardId = "free"
@@ -39,6 +39,6 @@ export function artboardAspect(artboard: Artboard): number | null {
   return isFreeArtboard(artboard) ? null : artboard.width / artboard.height
 }
 
-// Safe area usada como guia de composição: margem proporcional ao menor lado,
-// mais a faixa que a UI de stories costuma cobrir
+// Safe area used as a composition guide: an inset proportional to the shorter
+// side, roughly covering what story UIs overlay
 export const SAFE_AREA_INSET = 0.06

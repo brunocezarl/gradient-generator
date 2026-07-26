@@ -9,15 +9,15 @@ import {
 import { srgbTripletToLinear } from "@/lib/color"
 import { sortStops, type ColorStop } from "@/lib/color-stops"
 
-// Miniaturas renderizadas pelo próprio shader.
+// Thumbnails rendered by the shader itself.
 //
-// As miniaturas eram `linear-gradient` do CSS: mostravam as cores, mas não o
-// gradiente. Duas configurações com as mesmas cores e formas completamente
-// diferentes apareciam idênticas na galeria, o que torna a galeria inútil como
-// forma de escolher.
+// Thumbnails used to be CSS `linear-gradient`: they showed the colors but not
+// the gradient. Two configurations with the same colors and completely different
+// shapes looked identical in the gallery, which makes the gallery useless as a
+// way to choose.
 //
-// Um renderer WebGL pequeno e compartilhado desenha cada miniatura de verdade —
-// mesmo GLSL, mesmo enquadramento, uma fração do custo.
+// A small shared WebGL renderer draws each thumbnail for real — same GLSL, same
+// framing, a fraction of the cost.
 
 export interface ThumbnailParams {
   stops: ColorStop[]
@@ -85,15 +85,15 @@ function getRenderer(width: number, height: number): ThumbnailRenderer | null {
       const scene = new THREE.Scene()
       scene.add(new THREE.Mesh(new THREE.PlaneGeometry(20, 20), material))
 
-      // Mesmo enquadramento da cena principal, para a miniatura mostrar o que a
-      // prancheta mostraria
+      // Same framing as the main scene, so the thumbnail shows what the artboard
+      // would show
       const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100)
       camera.position.set(0, 0, 5)
 
       shared = { renderer, scene, camera, material }
     } catch {
-      // Sem contexto WebGL disponível (aba com muitos canvases, GPU bloqueada):
-      // quem chamou cai para o preview em CSS
+      // No WebGL context available (tab with too many canvases, blocked GPU):
+      // the caller falls back to the CSS preview
       unavailable = true
       return null
     }
@@ -105,7 +105,7 @@ function getRenderer(width: number, height: number): ThumbnailRenderer | null {
   return shared
 }
 
-/** Libera o renderer compartilhado (usado ao desmontar a galeria) */
+/** Releases the shared renderer (used when the gallery unmounts) */
 export function disposeThumbnailRenderer() {
   if (!shared) return
   shared.material.dispose()

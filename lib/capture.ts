@@ -1,8 +1,8 @@
 import * as THREE from "three"
 
-// Registro dos renderers WebGL ativos (um por <Canvas> do react-three-fiber),
-// permitindo re-renderizar a cena na resolução de exportação em vez de
-// apenas redimensionar os pixels exibidos na tela (que gera borrão).
+// Registry of live WebGL renderers (one per react-three-fiber <Canvas>), so the
+// scene can be re-rendered at export resolution instead of just resizing the
+// pixels already on screen (which blurs).
 export interface CaptureContext {
   gl: THREE.WebGLRenderer
   scene: THREE.Scene
@@ -11,9 +11,9 @@ export interface CaptureContext {
 
 const contexts = new Map<HTMLCanvasElement, CaptureContext>()
 
-// Consumidores de tempo: cada material de shader registra como aplicar um
-// instante da animação. Fora do render loop, é isto que permite desenhar um
-// instante *específico* em vez do instante em que o navegador chamou o rAF.
+// Time consumers: each shader material registers how to apply an instant of the
+// animation. Outside the render loop, this is what allows drawing a *specific*
+// instant instead of whichever one the browser happened to call rAF on.
 export type TimeConsumer = (time: number) => void
 
 const timeConsumers = new Map<HTMLCanvasElement, Set<TimeConsumer>>()
@@ -31,8 +31,8 @@ export function registerTimeConsumer(
   }
 }
 
-// Renderizador do canvas. Cenas com múltiplas passagens (composição de
-// camadas) registram o próprio; uma cena simples usa o fallback gl.render.
+// Canvas renderer. Multi-pass scenes (layer compositing) register their own; a
+// simple scene falls back to gl.render.
 export type FrameRenderer = () => void
 
 const frameRenderers = new Map<HTMLCanvasElement, FrameRenderer>()
@@ -61,9 +61,9 @@ function renderCanvas(canvas: HTMLCanvasElement): boolean {
   return false
 }
 
-// Desenha o instante `time` em todos os canvases de um container. Retorna
-// quantos canvases responderam — zero significa que nada está registrado e o
-// chamador deve cair para o caminho em tempo real.
+// Draws instant `time` on every canvas inside a container. Returns how many
+// canvases responded — zero means nothing is registered and the caller should
+// fall back to the real-time path.
 export function renderFrameAtTime(container: HTMLElement, time: number): number {
   const canvases = Array.from(container.querySelectorAll("canvas"))
   let rendered = 0
@@ -86,7 +86,7 @@ export function getCaptureContext(canvas: HTMLCanvasElement): CaptureContext | n
   return contexts.get(canvas) ?? null
 }
 
-// ─── Helpers puros ────────────────────────────────────────────────────────────
+// ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 const COMPOSITE_BLEND_MODES: ReadonlySet<string> = new Set([
   "multiply",
@@ -106,8 +106,8 @@ const COMPOSITE_BLEND_MODES: ReadonlySet<string> = new Set([
   "luminosity",
 ])
 
-// Converte um valor CSS de mix-blend-mode para o globalCompositeOperation
-// equivalente do canvas 2D (os nomes coincidem, exceto "normal")
+// Converts a CSS mix-blend-mode value to the equivalent canvas 2D
+// globalCompositeOperation (names match, except "normal")
 export function cssBlendToComposite(blend: string | undefined): GlobalCompositeOperation {
   if (blend && COMPOSITE_BLEND_MODES.has(blend)) {
     return blend as GlobalCompositeOperation
@@ -115,7 +115,7 @@ export function cssBlendToComposite(blend: string | undefined): GlobalCompositeO
   return "source-over"
 }
 
-// Limita as dimensões ao tamanho máximo suportado pela GPU, preservando a proporção
+// Clamps dimensions to the GPU maximum, preserving aspect ratio
 export function clampToMaxSize(
   width: number,
   height: number,
@@ -130,8 +130,8 @@ export function clampToMaxSize(
   }
 }
 
-// Bitrate recomendado (Mbps) para vídeo: gradientes com ruído orgânico têm
-// alta entropia e precisam de mais bits por pixel que vídeo comum
+// Recommended video bitrate (Mbps): organic-noise gradients are high entropy and
+// need more bits per pixel than ordinary footage
 export function recommendBitrateMbps(
   width: number,
   height: number,
@@ -143,11 +143,10 @@ export function recommendBitrateMbps(
   return Math.min(50, Math.max(2, Math.round(mbps)))
 }
 
-// ─── Composição de camadas ───────────────────────────────────────────────────
+// ─── Layer compositing ───────────────────────────────────────────────────────
 
-// Lê a opacidade e o blend mode efetivos de um canvas subindo até `root`
-// (no modo multi-camadas cada canvas fica dentro de um div com opacity e
-// mix-blend-mode aplicados via CSS)
+// Reads the effective opacity and blend mode of a canvas by walking up to `root`
+// (kept for canvases whose compositing comes from CSS rather than the shader)
 export function getLayerCompositing(
   canvas: HTMLCanvasElement,
   root: HTMLElement,
@@ -169,15 +168,15 @@ export function getLayerCompositing(
   return { opacity, blend }
 }
 
-// Ajusta a projeção da câmera para a proporção de saída, retornando uma função
-// que restaura a projeção original (ou null quando nada precisou mudar).
+// Adjusts the camera projection to the output aspect ratio, returning a function
+// that restores the original projection (or null when nothing had to change).
 //
-// Sem isso, exportar numa proporção diferente da tela renderiza o
-// enquadramento da tela esticado dentro do buffer alvo: um "story" 1080×1920
-// gerado a partir de uma janela 16:9 sai horizontalmente comprimido, porque a
-// câmera continua projetando em 16:9. A proporção da câmera é normalmente
-// atualizada pelo react-three-fiber no resize do container — e a exportação
-// redimensiona o drawing buffer sem passar por lá.
+// Without this, exporting at an aspect ratio different from the screen renders
+// the on-screen framing stretched into the target buffer: a 1080×1920 story
+// generated from a 16:9 window comes out horizontally squeezed, because the
+// camera keeps projecting at 16:9. Camera aspect is normally updated by
+// react-three-fiber on container resize — and exporting resizes the drawing
+// buffer without going through it.
 export function overrideCameraAspect(
   camera: THREE.Camera,
   aspect: number,
@@ -197,8 +196,8 @@ export function overrideCameraAspect(
   const orthographic = camera as THREE.OrthographicCamera
   if (orthographic.isOrthographicCamera) {
     const { left, right, top, bottom } = orthographic
-    // Preserva a altura visível e recalcula a largura pela nova proporção,
-    // mantendo o centro do enquadramento
+    // Keeps the visible height and recomputes width from the new aspect ratio,
+    // holding the framing centered
     const halfHeight = (top - bottom) / 2
     const centerX = (left + right) / 2
     const halfWidth = halfHeight * aspect
@@ -216,10 +215,10 @@ export function overrideCameraAspect(
   return null
 }
 
-// Redimensiona o drawing buffer do renderer para a resolução alvo sem alterar
-// o tamanho CSS do canvas, reprojetando a câmera na proporção alvo. Retorna uma
-// função que restaura o estado original, ou null se o canvas não tem renderer
-// registrado.
+// Resizes the renderer's drawing buffer to the target resolution without
+// touching the canvas CSS size, reprojecting the camera to the target aspect
+// ratio. Returns a function that restores the original state, or null if the
+// canvas has no registered renderer.
 export function overrideRenderSize(
   canvas: HTMLCanvasElement,
   width: number,
@@ -238,8 +237,8 @@ export function overrideRenderSize(
 
   gl.setPixelRatio(1)
   gl.setSize(target.width, target.height, false)
-  // Passa pelo renderizador do canvas: cenas com composição de camadas têm
-  // várias passagens e alvos intermediários que precisam acompanhar o tamanho
+  // Goes through the canvas renderer: layer-compositing scenes have several
+  // passes and intermediate targets that must follow the size
   renderCanvas(canvas)
 
   return () => {
@@ -252,18 +251,18 @@ export function overrideRenderSize(
 
 export interface ExportImageOptions {
   scale?: number
-  // Dimensões fixas de saída (ex.: presets 1920×1080, 1080×1920). Quando
-  // presentes, têm precedência sobre `scale` — o gradiente é re-renderizado
-  // nesse tamanho exato, independente da proporção da tela
+  // Fixed output dimensions (e.g. the 1920×1080 or 1080×1920 presets). When
+  // present they take precedence over `scale` — the gradient is re-rendered at
+  // exactly that size, regardless of the screen's aspect ratio
   width?: number
   height?: number
   mimeType: string
   quality: number
 }
 
-// Exporta a composição de todos os canvases dentro de `container` como Blob,
-// re-renderizando cada camada nativamente na resolução final e aplicando
-// opacidade e blend modes (equivalente ao que o CSS faz na tela)
+// Exports the composition of every canvas inside `container` as a Blob,
+// re-rendering each layer natively at the final resolution and applying opacity
+// and blend modes
 export async function exportCompositeImage(
   container: HTMLElement,
   options: ExportImageOptions,
@@ -287,8 +286,8 @@ export async function exportCompositeImage(
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = "high"
 
-  // Fundo preto: replica o backdrop da página para blend modes e evita
-  // resultados indefinidos em JPEG (que não tem canal alfa)
+  // Black background: matches the page backdrop for blend modes and avoids
+  // undefined results in JPEG (which has no alpha channel)
   ctx.fillStyle = "#000000"
   ctx.fillRect(0, 0, width, height)
 

@@ -1,23 +1,23 @@
 import { linearToSrgb, srgbToLinear, type RgbTriplet } from "@/lib/color"
 
-// Motor de cor em OKLCH.
+// OKLCH color engine.
 //
-// Oklab (Björn Ottosson) é perceptualmente uniforme: distâncias iguais no
-// espaço correspondem a diferenças visuais parecidas. Em coordenadas
-// cilíndricas (OKLCH) isso vira exatamente o vocabulário de quem escolhe cor —
-// luminosidade, croma e matiz —, o que permite gerar harmonias e variações que
-// se parecem intencionais em vez de sorteadas.
+// Oklab (Björn Ottosson) is perceptually uniform: equal distances in the space
+// correspond to similar visual differences. In cylindrical coordinates (OKLCH)
+// that becomes exactly the vocabulary of someone choosing color — lightness,
+// chroma and hue — which is what lets us generate harmonies and variations that
+// look intentional instead of drawn from a hat.
 
 export interface Oklch {
-  /** Luminosidade perceptual, 0 (preto) a 1 (branco) */
+  /** Perceptual lightness, 0 (black) to 1 (white) */
   l: number
-  /** Croma (saturação perceptual). sRGB comporta ~0.37 no máximo */
+  /** Chroma (perceptual saturation). sRGB tops out around 0.37 */
   c: number
-  /** Matiz em graus, 0-360 */
+  /** Hue in degrees, 0-360 */
   h: number
 }
 
-// ─── Conversões ──────────────────────────────────────────────────────────────
+// ─── Conversions ─────────────────────────────────────────────────────────────
 
 export function linearToOklab(rgb: readonly number[]): RgbTriplet {
   const [r, g, b] = [rgb[0] ?? 0, rgb[1] ?? 0, rgb[2] ?? 0]
@@ -54,12 +54,12 @@ export function srgbToOklch(color: readonly number[]): Oklch {
     srgbToLinear(color[2] ?? 0),
   ])
   const c = Math.hypot(a, b)
-  // Cinzas não têm matiz definido; 0 é uma escolha estável para round-trip
+  // Grays have no defined hue; 0 is a stable choice for round-tripping
   const h = c < 1e-6 ? 0 : ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360
   return { l: L, c, h }
 }
 
-// Converte sem verificar gamut: o resultado pode ter canais fora de 0-1
+// Converts without checking gamut: channels may land outside 0-1
 export function oklchToLinear({ l, c, h }: Oklch): RgbTriplet {
   const radians = (h * Math.PI) / 180
   return oklabToLinear([l, c * Math.cos(radians), c * Math.sin(radians)])
@@ -73,11 +73,11 @@ export function isInSrgbGamut(linear: readonly number[]): boolean {
   )
 }
 
-// Reduz o croma até a cor caber no sRGB, preservando luminosidade e matiz.
+// Reduces chroma until the color fits in sRGB, preserving lightness and hue.
 //
-// É o comportamento que um designer espera de um "clarear/saturar": a cor perde
-// intensidade, não vira outra cor. Simplesmente saturar os canais RGB desloca o
-// matiz — um vermelho muito saturado viraria laranja.
+// This is what a designer expects from lighten/saturate: the color loses
+// intensity, it does not become a different color. Clipping the RGB channels
+// instead shifts the hue — an over-saturated red would drift toward orange.
 export function clampChromaToGamut(oklch: Oklch): Oklch {
   const l = Math.min(Math.max(oklch.l, 0), 1)
   const base = { ...oklch, l }
@@ -86,7 +86,7 @@ export function clampChromaToGamut(oklch: Oklch): Oklch {
 
   let low = 0
   let high = base.c
-  // 20 passos levam a precisão bem abaixo de 1/255
+  // 20 steps take precision well below 1/255
   for (let i = 0; i < 20; i++) {
     const mid = (low + high) / 2
     if (isInSrgbGamut(oklchToLinear({ ...base, c: mid }))) {
@@ -104,12 +104,12 @@ export function oklchToSrgb(oklch: Oklch): RgbTriplet {
   return [linearToSrgb(linear[0]), linearToSrgb(linear[1]), linearToSrgb(linear[2])]
 }
 
-/** Croma máximo que a dupla luminosidade/matiz comporta em sRGB */
+/** Maximum chroma this lightness/hue pair can hold in sRGB */
 export function maxChroma(l: number, h: number): number {
   return clampChromaToGamut({ l, c: 0.5, h }).c
 }
 
-// ─── Contraste (WCAG 2.1) ────────────────────────────────────────────────────
+// ─── Contrast (WCAG 2.1) ─────────────────────────────────────────────────────
 
 export function relativeLuminance(srgb: readonly number[]): number {
   const [r, g, b] = [
@@ -128,18 +128,18 @@ export function contrastRatio(a: readonly number[], b: readonly number[]): numbe
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-export type ContrastLevel = "AAA" | "AA" | "AA Large" | "Insuficiente"
+export type ContrastLevel = "AAA" | "AA" | "AA Large" | "Fail"
 
-// Limiares WCAG 2.1 para texto sobre o fundo
+// WCAG 2.1 thresholds for text over the background
 export function contrastLevel(ratio: number): ContrastLevel {
   if (ratio >= 7) return "AAA"
   if (ratio >= 4.5) return "AA"
   if (ratio >= 3) return "AA Large"
-  return "Insuficiente"
+  return "Fail"
 }
 
-// Pior caso de contraste ao longo de um gradiente: o texto precisa funcionar
-// sobre *todas* as cores por onde passa, não sobre a média
+// Worst-case contrast along a gradient: text has to work over *every* color it
+// crosses, not over the average
 export function worstContrast(
   colors: readonly number[][],
   text: readonly number[]
@@ -151,7 +151,7 @@ export function worstContrast(
   )
 }
 
-// ─── Harmonias ───────────────────────────────────────────────────────────────
+// ─── Harmonies ───────────────────────────────────────────────────────────────
 
 export type HarmonyKind =
   | "analogous"
@@ -161,14 +161,14 @@ export type HarmonyKind =
   | "monochromatic"
 
 export const harmonyLabels: Record<HarmonyKind, string> = {
-  analogous: "Análoga",
-  complementary: "Complementar",
-  splitComplementary: "Complementar dividida",
-  triadic: "Tríade",
-  monochromatic: "Monocromática",
+  analogous: "Analogous",
+  complementary: "Complementary",
+  splitComplementary: "Split complementary",
+  triadic: "Triadic",
+  monochromatic: "Monochromatic",
 }
 
-// Deslocamentos de matiz por harmonia, em graus
+// Hue offsets per harmony, in degrees
 const HARMONY_HUE_OFFSETS: Record<HarmonyKind, number[]> = {
   analogous: [0, 30, -30, 60, -60, 90, -90, 120],
   complementary: [0, 180, 20, 200, -20, 160, 40, 220],
@@ -179,15 +179,15 @@ const HARMONY_HUE_OFFSETS: Record<HarmonyKind, number[]> = {
 
 export interface HarmonyOptions {
   count: number
-  /** Variação de luminosidade entre as paradas (0 = todas iguais) */
+  /** Lightness spread across the stops (0 = all the same) */
   lightnessSpread?: number
-  /** Variação de croma entre as paradas */
+  /** Chroma spread across the stops */
   chromaSpread?: number
 }
 
-// Gera uma paleta derivada de uma cor base mantendo a relação de matiz da
-// harmonia escolhida. A luminosidade varia de propósito: uma paleta com todas
-// as paradas na mesma luminosidade some no gradiente.
+// Builds a palette derived from a base color, keeping the hue relationship of
+// the chosen harmony. Lightness varies on purpose: a palette with every stop at
+// the same lightness disappears into the gradient.
 export function generateHarmony(
   base: Oklch,
   kind: HarmonyKind,
@@ -197,7 +197,7 @@ export function generateHarmony(
   const offsets = HARMONY_HUE_OFFSETS[kind] ?? HARMONY_HUE_OFFSETS.analogous
 
   return Array.from({ length: stops }, (_, index) => {
-    // Distribui a luminosidade em torno da base, alternando acima e abaixo
+    // Spreads lightness around the base, alternating above and below
     const t = stops === 1 ? 0 : index / (stops - 1) - 0.5
     const l = Math.min(Math.max(base.l + t * lightnessSpread * 2, 0.12), 0.95)
     const c = Math.max(base.c + (index % 2 === 0 ? chromaSpread : -chromaSpread), 0.01)
@@ -206,7 +206,7 @@ export function generateHarmony(
   })
 }
 
-// ─── Sorteio estético ────────────────────────────────────────────────────────
+// ─── Aesthetic randomization ─────────────────────────────────────────────────
 
 const HARMONY_KINDS: HarmonyKind[] = [
   "analogous",
@@ -221,12 +221,12 @@ export interface RandomPaletteOptions {
   random?: () => number
 }
 
-// Paleta aleatória mas plausível.
+// Random but plausible palette.
 //
-// Sortear R, G e B independentemente (o que o randomizador fazia) cai quase
-// sempre em cores dessaturadas e sem relação entre si — visualmente, lama. Aqui
-// o sorteio acontece nos eixos que importam: um matiz base, uma harmonia, e
-// faixas de luminosidade e croma que costumam funcionar.
+// Drawing R, G and B independently (what the randomizer used to do) almost
+// always lands on desaturated colors with no relationship to each other —
+// visually, mud. Here the draw happens on the axes that matter: a base hue, a
+// harmony, and lightness/chroma ranges that tend to work.
 export function randomPalette({
   count = 3,
   random = Math.random,

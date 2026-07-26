@@ -17,13 +17,13 @@ import { useGradientStore } from "@/lib/store"
 import { playback } from "@/lib/playback"
 import { TooltipHelp } from "@/components/tooltip-help"
 
-// Janela de scrub quando não há loop definido: a animação livre não tem fim,
-// então a régua acompanha o instante atual
+// Scrub window when no loop is set: a free animation has no end, so the ruler
+// just follows the current instant
 const FREE_SCRUB_WINDOW = 30
 const STEP_FPS = 30
 
 const LOOP_OPTIONS = [
-  { value: "0", label: "Livre" },
+  { value: "0", label: "Free" },
   { value: "4", label: "4 s" },
   { value: "6", label: "6 s" },
   { value: "8", label: "8 s" },
@@ -43,8 +43,8 @@ export function TimelineBar() {
       }))
     )
 
-  // O tempo vive fora do React (lib/playback.ts). A régua espelha o relógio
-  // num rAF próprio para não re-renderizar a árvore inteira a 60 fps.
+  // Time lives outside React (lib/playback.ts). The ruler mirrors the clock in
+  // its own rAF so the whole tree does not re-render at 60 fps.
   const [time, setTime] = useState(0)
   const scrubbingRef = useRef(false)
 
@@ -69,7 +69,7 @@ export function TimelineBar() {
     scrubbingRef.current = true
     setTime(next)
     playback.set(next, loopDuration)
-    // Solta o espelhamento no próximo frame, já com o valor aplicado
+    // Releases the mirror on the next frame, with the value already applied
     requestAnimationFrame(() => {
       scrubbingRef.current = false
     })
@@ -88,8 +88,8 @@ export function TimelineBar() {
           size="icon"
           className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
           onClick={() => setIsPlaying(!isPlaying)}
-          title={isPlaying ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
-          aria-label={isPlaying ? "Pausar animação" : "Reproduzir animação"}
+          title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+          aria-label={isPlaying ? "Pause animation" : "Play animation"}
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
@@ -101,8 +101,8 @@ export function TimelineBar() {
             setIsPlaying(false)
             seek(0)
           }}
-          title="Voltar ao início"
-          aria-label="Voltar ao início da animação"
+          title="Back to start"
+          aria-label="Back to the start of the animation"
         >
           <SkipBack className="h-4 w-4" />
         </Button>
@@ -111,8 +111,8 @@ export function TimelineBar() {
           size="icon"
           className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
           onClick={() => step(-1)}
-          title="Frame anterior"
-          aria-label="Frame anterior"
+          title="Previous frame"
+          aria-label="Previous frame"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -121,8 +121,8 @@ export function TimelineBar() {
           size="icon"
           className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
           onClick={() => step(1)}
-          title="Frame seguinte"
-          aria-label="Frame seguinte"
+          title="Next frame"
+          aria-label="Next frame"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -141,7 +141,7 @@ export function TimelineBar() {
             setIsPlaying(false)
             seek(value[0])
           }}
-          thumbLabel="Instante da animação"
+          thumbLabel="Animation time"
         />
         <span className="font-mono text-xs text-neutral-500 tabular-nums w-16 shrink-0 text-right">
           {scrubMax.toFixed(0)}s
@@ -152,7 +152,7 @@ export function TimelineBar() {
         <div className="flex items-center">
           <Repeat className="h-3.5 w-3.5 mr-1.5 text-neutral-400" />
           <Label className="text-xs text-neutral-400">Loop</Label>
-          <TooltipHelp content="Com um loop definido, a animação percorre um caminho fechado no campo de ruído e volta exatamente ao início — é o que permite exportar vídeo sem corte visível. Em 'Livre' a animação deriva sem repetir." />
+          <TooltipHelp content="With a loop set, the animation travels a closed path through the noise field and returns exactly to the start — that is what allows exporting video without a visible seam. On 'Free' the animation drifts without repeating." />
         </div>
         <Select
           value={String(loopDuration)}
@@ -175,10 +175,10 @@ export function TimelineBar() {
           size="sm"
           className="h-8 text-xs text-neutral-300 hover:text-white hover:bg-neutral-800"
           onClick={shuffleSeed}
-          title="Sortear outra forma mantendo cores e ritmo"
+          title="Roll another shape, keeping colors and rhythm"
         >
           <Waves className="h-3.5 w-3.5 mr-1.5" />
-          Forma
+          Shape
         </Button>
       </div>
     </div>

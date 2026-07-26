@@ -1,15 +1,15 @@
 "use client"
 
-// Relógio único da animação.
+// The single animation clock.
 //
-// Antes cada componente de shader acumulava o próprio tempo dentro do render
-// loop: no modo multi-camadas isso significava N relógios independentes, e não
-// havia como saber — nem escolher — em que instante da animação a imagem
-// exportada estava. Com um relógio só, o tempo passa a ser um valor que a
-// timeline mostra, o usuário arrasta e o export percorre em passos exatos.
+// Each shader component used to accumulate its own time inside the render loop:
+// in multi-layer mode that meant N independent clocks, and there was no way to
+// know — let alone choose — which instant of the animation an exported image
+// captured. With one clock, time becomes a value the timeline displays, the user
+// drags, and the exporter walks in exact steps.
 //
-// Fica fora do estado do React de propósito: a 60 fps, tempo em estado
-// re-renderizaria a árvore inteira a cada frame.
+// It deliberately lives outside React state: at 60 fps, time in state would
+// re-render the whole tree every frame.
 
 type Listener = () => void
 
@@ -25,8 +25,8 @@ export const playback = {
     return currentTime
   },
 
-  // Avanço vindo do driver de animação. Não notifica: quem está animando já
-  // está desenhando a cada frame.
+  // Advance coming from the animation driver. It does not notify: whoever is
+  // animating is already drawing every frame.
   advance(delta: number, loopDuration = 0) {
     let next = currentTime + delta
     if (loopDuration > 0) {
@@ -35,8 +35,8 @@ export const playback = {
     currentTime = Math.max(0, next)
   },
 
-  // Mudança externa (arrastar a timeline, resetar, exportar um frame
-  // específico): notifica para o canvas redesenhar mesmo pausado
+  // External change (dragging the timeline, resetting, exporting a specific
+  // frame): notifies so the canvas redraws even while paused
   set(time: number, loopDuration = 0) {
     let next = Math.max(0, time)
     if (loopDuration > 0) {

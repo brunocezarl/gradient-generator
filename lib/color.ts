@@ -1,21 +1,21 @@
-// Conversões entre sRGB e RGB linear.
+// Conversions between sRGB and linear RGB.
 //
-// Os valores que o usuário escolhe no color picker (e que aparecem como HEX)
-// são sRGB — um espaço com curva de transferência, feito para percepção e
-// para o display. Mistura de cor, por outro lado, é mistura de luz: só se
-// comporta de forma correta em espaço linear. Misturar dois sRGB direto
-// escurece o meio do gradiente e cria as faixas "lamacentas" clássicas.
+// The values a user picks in the color picker (and sees as HEX) are sRGB — a
+// space with a transfer curve, built for perception and for displays. Mixing
+// color, on the other hand, is mixing light: it only behaves correctly in
+// linear space. Interpolating two sRGB values directly darkens the middle of
+// the gradient and produces the classic muddy band.
 //
-// Curva de transferência: IEC 61966-2-1 (a mesma usada por CSS Color 4).
+// Transfer curve: IEC 61966-2-1 (the same one CSS Color 4 uses).
 
-// Espaço em que as paradas de cor são interpoladas. Oklab é perceptualmente
-// uniforme (não escurece o meio entre matizes opostos); linear é a mistura
-// fisicamente correta de luz.
+// Space the color stops are interpolated in. Oklab is perceptually uniform (no
+// dark middle between opposing hues); linear is the physically correct mixing
+// of light.
 export type ColorBlendSpace = "oklab" | "linear"
 
 export const colorBlendSpaces: Record<ColorBlendSpace, string> = {
   oklab: "Oklab (perceptual)",
-  linear: "Linear (luz)",
+  linear: "Linear (light)",
 }
 
 export function srgbToLinear(channel: number): number {
@@ -30,8 +30,8 @@ export function linearToSrgb(channel: number): number {
 
 export type RgbTriplet = [number, number, number]
 
-// Aceita entrada incompleta: uma cor pode chegar de um link compartilhado ou de
-// um localStorage antigo. Preto é um fallback visível, e não uma tela de erro.
+// Accepts incomplete input: a color can arrive from a shared link or from an
+// old localStorage entry. Black is a visible fallback rather than a crash.
 export function srgbTripletToLinear(color: readonly number[] | undefined): RgbTriplet {
   return [
     srgbToLinear(color?.[0] ?? 0),

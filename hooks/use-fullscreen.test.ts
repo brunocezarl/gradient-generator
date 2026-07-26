@@ -21,13 +21,13 @@ describe("useFullscreen", () => {
     document.exitFullscreen = vi.fn().mockResolvedValue(undefined)
   })
 
-  it("expõe o suporte a fullscreen do documento", () => {
+  it("exposes the document's full screen support", () => {
     const { result } = renderHook(() => useFullscreen())
     expect(result.current.isFullscreenEnabled).toBe(true)
     expect(result.current.isFullscreen).toBe(false)
   })
 
-  it("entra em fullscreen no elemento raiz por padrão", async () => {
+  it("enters full screen on the root element by default", async () => {
     const { result } = renderHook(() => useFullscreen())
     await act(() => result.current.toggleFullscreen())
     expect(document.documentElement.requestFullscreen).toHaveBeenCalledTimes(1)
@@ -44,7 +44,7 @@ describe("useFullscreen", () => {
     expect(document.documentElement.requestFullscreen).not.toHaveBeenCalled()
   })
 
-  it("acompanha o evento fullscreenchange e sai do fullscreen", async () => {
+  it("follows the fullscreenchange event and exits full screen", async () => {
     const { result } = renderHook(() => useFullscreen())
 
     // Navegador entrou em fullscreen
@@ -54,12 +54,12 @@ describe("useFullscreen", () => {
     })
     expect(result.current.isFullscreen).toBe(true)
 
-    // Próximo toggle deve sair
+    // The next toggle should exit
     await act(() => result.current.toggleFullscreen())
     expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
   })
 
-  it("é no-op quando fullscreen não é suportado", async () => {
+  it("is a no-op when full screen is unsupported", async () => {
     Object.defineProperty(document, "fullscreenEnabled", {
       value: false,
       configurable: true,

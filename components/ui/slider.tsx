@@ -5,9 +5,9 @@ import * as SliderPrimitive from "@radix-ui/react-slider"
 
 import { cn } from "@/lib/utils"
 
-// `thumbLabel` nomeia o controle que realmente recebe foco: quem navega por
-// teclado ou leitor de tela interage com o thumb (role="slider"), não com a
-// raiz — um aria-label na raiz não é anunciado nem alcançado.
+// `thumbLabel` names the control that actually receives focus: keyboard and
+// screen reader users interact with the thumb (role="slider"), not the root — an
+// aria-label on the root is neither announced nor reachable.
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & { thumbLabel?: string }

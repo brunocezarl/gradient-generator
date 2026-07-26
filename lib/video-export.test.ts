@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest"
 import { planVideoExport } from "./video-export"
 
-describe("planVideoExport — animação livre", () => {
-  it("deriva a contagem de frames da duração e do FPS", () => {
+describe("planVideoExport — free animation", () => {
+  it("derives the frame count from duration and FPS", () => {
     const plan = planVideoExport({
       requestedDuration: 6,
       fps: 30,
@@ -14,7 +14,7 @@ describe("planVideoExport — animação livre", () => {
     expect(plan.loopExact).toBe(false)
   })
 
-  it("respeita a velocidade de preview no avanço da animação", () => {
+  it("respects the preview speed in the animation step", () => {
     const normal = planVideoExport({
       requestedDuration: 4,
       fps: 30,
@@ -27,13 +27,13 @@ describe("planVideoExport — animação livre", () => {
       loopDuration: 0,
       speed: 2,
     })
-    // Mesma quantidade de frames, mas cada frame avança o dobro no tempo da
-    // animação: o arquivo tem o ritmo que se vê na tela
+    // Same frame count, but each frame advances twice as far in animation time:
+    // the file keeps the rhythm seen on screen
     expect(fast.frameCount).toBe(normal.frameCount)
     expect(fast.animationStep).toBeCloseTo(normal.animationStep * 2)
   })
 
-  it("satura entradas absurdas em vez de gerar um plano impossível", () => {
+  it("clamps absurd inputs instead of producing an impossible plan", () => {
     const plan = planVideoExport({
       requestedDuration: 100_000,
       fps: 1000,
@@ -54,10 +54,10 @@ describe("planVideoExport — animação livre", () => {
   })
 })
 
-describe("planVideoExport — loop fechado", () => {
-  it("cobre um número inteiro de ciclos", () => {
-    // Loop de 8s pedido em 6s de vídeo: um ciclo inteiro é melhor que 3/4 de
-    // ciclo, que mostraria o corte
+describe("planVideoExport — closed loop", () => {
+  it("covers a whole number of cycles", () => {
+    // An 8s loop requested as 6s of video: one whole cycle beats 3/4 of a cycle,
+    // which would show the cut
     const plan = planVideoExport({
       requestedDuration: 6,
       fps: 30,
@@ -69,7 +69,7 @@ describe("planVideoExport — loop fechado", () => {
     expect(plan.frameCount).toBe(240)
   })
 
-  it("repete o loop quando a duração pedida é bem maior", () => {
+  it("repeats the loop when the requested duration is much longer", () => {
     const plan = planVideoExport({
       requestedDuration: 12,
       fps: 30,
@@ -80,7 +80,7 @@ describe("planVideoExport — loop fechado", () => {
     expect(plan.frameCount).toBe(360)
   })
 
-  it("o frame seguinte ao último fecha exatamente o ciclo", () => {
+  it("the frame after the last one closes the cycle exactly", () => {
     const loopDuration = 6
     const plan = planVideoExport({
       requestedDuration: 6,
@@ -88,15 +88,15 @@ describe("planVideoExport — loop fechado", () => {
       loopDuration,
       speed: 1,
     })
-    // O instante do frame que *não* é gravado coincide com o início: é isso
-    // que faz a emenda desaparecer sem duplicar um quadro
+    // The instant of the frame that is *not* recorded coincides with the start:
+    // that is what makes the seam disappear without duplicating a frame
     const wrapTime = plan.frameCount * plan.animationStep
     expect(wrapTime).toBeCloseTo(loopDuration, 10)
   })
 
-  it("a velocidade encurta cada ciclo, sem quebrar o fechamento", () => {
-    // Um loop de 8s de animação a 2× dura 4s de vídeo, então 4s pedidos são
-    // exatamente um ciclo
+  it("speed shortens each cycle without breaking the close", () => {
+    // An 8s animation loop at 2× lasts 4s of video, so 4s requested is exactly
+    // one cycle
     const single = planVideoExport({
       requestedDuration: 4,
       fps: 30,
@@ -106,7 +106,7 @@ describe("planVideoExport — loop fechado", () => {
     expect(single.videoDuration).toBeCloseTo(4)
     expect(single.frameCount * single.animationStep).toBeCloseTo(8, 10)
 
-    // E 8s pedidos cabem dois ciclos inteiros — a duração pedida é respeitada
+    // And 8s requested fits two whole cycles — the requested duration is honored
     const double = planVideoExport({
       requestedDuration: 8,
       fps: 30,

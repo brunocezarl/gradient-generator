@@ -2,12 +2,12 @@
 
 import type { ColorStop } from "@/lib/color-stops"
 
-// Uma camada do gradiente.
+// A gradient layer.
 //
-// A camada controla a *forma* (escala de ruído, fluxo, limiares) e a cor; o
-// movimento (play/pause, velocidade, complexidade) e o acabamento (grão,
-// vibrância, espaço de mistura) vêm do estado global, para que a composição
-// inteira se mova junta e tenha o mesmo tratamento de cor.
+// A layer owns *shape* (noise scale, flow, thresholds) and color; motion
+// (play/pause, speed, complexity) and finishing (grain, vibrance, blend space)
+// come from global state, so the whole composition moves together and gets the
+// same color treatment.
 export interface GradientLayer {
   id: string
   opacity: number
@@ -20,30 +20,30 @@ export interface GradientLayer {
   flowIntensity: number
   thresholdMin: number
   thresholdMax: number
-  // Deslocamento no campo de ruído: sem isso, duas camadas com os mesmos
-  // parâmetros desenham exatamente a mesma forma e a composição não soma nada
+  // Offset into the noise field: without it, two layers with the same
+  // parameters draw the exact same shape and the composition adds nothing
   seed: [number, number]
 }
 
 // Available blend modes
 export const blendModes = {
   normal: "Normal",
-  multiply: "Multiplicar",
-  screen: "Tela",
-  overlay: "Sobreposição",
-  darken: "Escurecer",
-  lighten: "Clarear",
-  colorDodge: "Subexposição de Cor",
-  colorBurn: "Superexposição de Cor",
-  hardLight: "Luz Forte",
-  softLight: "Luz Suave",
-  difference: "Diferença",
-  exclusion: "Exclusão",
+  multiply: "Multiply",
+  screen: "Screen",
+  overlay: "Overlay",
+  darken: "Darken",
+  lighten: "Lighten",
+  colorDodge: "Color Dodge",
+  colorBurn: "Color Burn",
+  hardLight: "Hard Light",
+  softLight: "Soft Light",
+  difference: "Difference",
+  exclusion: "Exclusion",
 }
 
 // Create a new layer with default settings.
-// O seed padrão [0, 0] faz a primeira camada coincidir com a cena simples —
-// ligar o modo multi-camadas não muda a imagem.
+// The default seed [0, 0] makes the first layer match the single-layer scene —
+// turning multi-layer mode on does not change the image.
 export function createDefaultLayer(
   id: string,
   seed: [number, number] = [0, 0]
@@ -68,7 +68,7 @@ export function generateLayerId(): string {
   return `layer_${Date.now()}_${Math.floor(Math.random() * 1000)}`
 }
 
-// Seed aleatório para uma nova camada, garantindo formas distintas
+// Random seed for a new layer, so shapes stay distinct
 export function generateSeed(): [number, number] {
   return [Math.random() * 100, Math.random() * 100]
 }

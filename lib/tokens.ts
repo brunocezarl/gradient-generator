@@ -2,12 +2,12 @@ import { sortStops, stopToHex, stopsToCss, type ColorStop } from "@/lib/color-st
 import { srgbToOklch } from "@/lib/oklch"
 import type { ColorBlendSpace } from "@/lib/color"
 
-// Exportação da paleta como tokens.
+// Exporting the palette as tokens.
 //
-// O gradiente costuma ser a peça mais visível de um sistema de marca, e sem uma
-// saída em tokens ele fica preso na ferramenta: o designer entrega um PNG e o
-// time de front-end escolhe os hex "no olho". Aqui a mesma paleta sai no formato
-// que cada destino consome.
+// The gradient is often the most visible piece of a brand system, and without a
+// token output it stays trapped in the tool: the designer ships a PNG and the
+// front-end team eyeballs the hex values. Here the same palette leaves in the
+// format each destination consumes.
 
 export type TokenFormat = "json" | "css" | "tailwind" | "svg"
 
@@ -15,7 +15,7 @@ export const tokenFormatLabels: Record<TokenFormat, string> = {
   json: "JSON (design tokens)",
   css: "CSS custom properties",
   tailwind: "Tailwind config",
-  svg: "SVG (gradiente)",
+  svg: "SVG (gradient)",
 }
 
 export const tokenFormatExtensions: Record<TokenFormat, string> = {
@@ -28,7 +28,7 @@ export const tokenFormatExtensions: Record<TokenFormat, string> = {
 export interface TokenOptions {
   stops: readonly ColorStop[]
   blendSpace: ColorBlendSpace
-  /** Prefixo dos nomes gerados (ex.: "gradient" → --gradient-1) */
+  /** Prefix for generated names (e.g. "gradient" → --gradient-1) */
   name?: string
 }
 
@@ -43,7 +43,7 @@ function slug(name: string): string {
   )
 }
 
-/** Design tokens no formato do W3C Design Tokens Community Group */
+/** Design tokens in the W3C Design Tokens Community Group format */
 export function toJsonTokens({ stops, blendSpace, name = "gradient" }: TokenOptions): string {
   const base = slug(name)
   const sorted = sortStops(stops)
@@ -125,8 +125,8 @@ export function toTailwindTokens({ stops, name = "gradient" }: TokenOptions): st
 }
 
 /**
- * SVG com as mesmas paradas. Serve como fallback estático do gradiente animado
- * em e-mail, PDF e qualquer lugar onde WebGL não roda.
+ * SVG with the same stops. Serves as the static fallback for the animated
+ * gradient in email, PDF and anywhere WebGL does not run.
  */
 export function toSvgGradient({ stops, name = "gradient" }: TokenOptions): string {
   const base = slug(name)

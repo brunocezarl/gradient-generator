@@ -8,11 +8,11 @@ import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
 import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 
-// Cena de camada única. O GLSL vive em lib/shaders/organic-gradient.ts e é o
-// mesmo usado pelo modo multi-camadas.
+// Single-layer scene. The GLSL lives in lib/shaders/organic-gradient.ts and is
+// the same one the multi-layer mode uses.
 function GradientShader() {
-  // Seletores em vez do store inteiro: arrastar um slider não deve
-  // re-renderizar toda a árvore de um app que desenha em canvas
+  // Selectors instead of the whole store: dragging a slider must not re-render
+  // the entire tree of an app that draws on a canvas
   const params = useGradientStore(
     useShallow((state) => ({
       complexity: state.complexity,
@@ -47,13 +47,13 @@ export function GradientScene() {
 
   const glConfig = useMemo(() => {
     return {
-      preserveDrawingBuffer: true, // Necessário para exportação de imagem
-      antialias, // Desativar antialiasing em dispositivos de baixo desempenho
+      preserveDrawingBuffer: true, // Required for image export
+      antialias, // Off on low-end devices
       powerPreference: (quality === "high"
         ? "high-performance"
         : "low-power") as WebGLPowerPreference,
-      depth: false, // Não precisamos de teste de profundidade para um gradiente 2D
-      stencil: false, // Não precisamos de buffer de stencil
+      depth: false, // No depth testing needed for a 2D gradient
+      stencil: false, // No stencil buffer needed
     }
   }, [quality, antialias])
 
@@ -62,9 +62,9 @@ export function GradientScene() {
       gl={glConfig}
       camera={{ position: [0, 0, 5] }}
       dpr={[1, pixelRatio]}
-      // Pausado significa pausado: em vez de seguir redesenhando o mesmo frame,
-      // o canvas só renderiza sob demanda (mudança de controle ou resize).
-      // Poupa GPU e bateria enquanto o designer ajusta cores.
+      // Paused means paused: instead of redrawing the same frame forever, the
+      // canvas only renders on demand (a control change or a resize). Saves GPU
+      // and battery while the designer works on colors.
       frameloop={isPlaying ? "always" : "demand"}
     >
       <GradientShader />

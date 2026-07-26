@@ -40,19 +40,19 @@ import {
 import { Keyboard, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { artboards } from "@/lib/artboards"
 
-// ─── Tabela de atalhos exibida no dialog ─────────────────────────────────────
+// ─── Shortcut table shown in the dialog ──────────────────────────────────────
 const SHORTCUTS = [
-  { key: "Espaço", desc: "Play / Pausar animação" },
-  { key: "R", desc: "Restaurar configurações padrão" },
-  { key: "S", desc: "Salvar / Capturar imagem" },
-  { key: "F", desc: "Alternar tela cheia (preview limpo)" },
-  { key: "Ctrl + Z", desc: "Desfazer última ação" },
-  { key: "Ctrl + Y", desc: "Refazer última ação" },
+  { key: "Space", desc: "Play / pause the animation" },
+  { key: "R", desc: "Restore default settings" },
+  { key: "S", desc: "Save / capture an image" },
+  { key: "F", desc: "Toggle full screen (clean preview)" },
+  { key: "Ctrl + Z", desc: "Undo the last action" },
+  { key: "Ctrl + Y", desc: "Redo the last action" },
 ]
 
 export default function GradientGenerator() {
-  // Aponta apenas para a prancheta: a exportação varre os canvases dentro dele,
-  // e o fullscreen mostra a arte sem o chrome do app
+  // Points only at the artboard: exporting scans the canvases inside it, and full
+  // screen shows the art without the app chrome
   const artboardRef = useRef<HTMLDivElement>(null)
   const isWebGLSupported = useWebGLSupport()
   const { toast } = useToast()
@@ -72,17 +72,17 @@ export default function GradientGenerator() {
 
   const { toggleFullscreen } = useFullscreen()
 
-  // Relógio único da animação (lib/playback.ts)
+  // The single animation clock (lib/playback.ts)
   usePlaybackDriver()
 
-  // Respeitar preferência de movimento reduzido: iniciar pausado
+  // Respect the reduced-motion preference: start paused
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       useGradientStore.getState().setIsPlaying(false)
     }
   }, [])
 
-  // ─── Captura de imagem ────────────────────────────────────────────────────
+  // ─── Image capture ────────────────────────────────────────────────────────
 
   const captureImage = useCallback(
     async (
@@ -96,21 +96,21 @@ export default function GradientGenerator() {
         const canvas = artboardRef.current.querySelector("canvas")
         if (!canvas) {
           toast({
-            title: "Erro",
-            description: "Não foi possível encontrar o canvas para capturar a imagem.",
+            title: "Error",
+            description: "Could not find a canvas to capture the image from.",
             variant: "destructive",
           })
           return
         }
 
-        toast({ title: "Processando", description: "Preparando a imagem para download..." })
+        toast({ title: "Working", description: "Preparing the image for download…" })
 
         let mimeType = "image/png"
         if (format === "jpeg") mimeType = "image/jpeg"
         if (format === "webp") mimeType = "image/webp"
 
-        // Sem dimensões explícitas, a prancheta manda: o arquivo sai no
-        // tamanho que o preview está mostrando
+        // With no explicit dimensions the artboard decides: the file comes out at
+        // the size the preview is showing
         const artboard = getArtboard(useGradientStore.getState().artboardId)
         const target =
           size ??
@@ -118,9 +118,9 @@ export default function GradientGenerator() {
             ? undefined
             : { width: artboard.width, height: artboard.height })
 
-        // Re-renderiza cada camada nativamente na resolução final (sem
-        // upscaling) e compõe com opacidade/blend modes; usa Blob em vez de
-        // dataURL para suportar arquivos grandes (4K/8K) sem estourar memória
+        // Re-renders each layer natively at the final resolution (no upscaling)
+        // and composes with opacity/blend modes; uses a Blob instead of a dataURL
+        // so large files (4K/8K) do not blow up memory
         const blob = await exportCompositeImage(artboardRef.current, {
           scale,
           width: target?.width,
@@ -138,12 +138,12 @@ export default function GradientGenerator() {
         document.body.removeChild(link)
         setTimeout(() => URL.revokeObjectURL(url), 1000)
 
-        toast({ title: "Sucesso!", description: "Imagem exportada com sucesso." })
+        toast({ title: "Done", description: "Image exported successfully." })
       } catch (error) {
         console.error("Error capturing image:", error)
         toast({
-          title: "Erro",
-          description: "Ocorreu um erro ao exportar a imagem.",
+          title: "Error",
+          description: "Something went wrong while exporting the image.",
           variant: "destructive",
         })
         throw error
@@ -152,26 +152,26 @@ export default function GradientGenerator() {
     [toast]
   )
 
-  // ─── Atalhos de teclado ───────────────────────────────────────────────────
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
 
   useKeyboardShortcuts({
     onPlayPause: () => setIsPlaying(!isPlaying),
     onReset: () => {
       resetToDefaults()
       toast({
-        title: "Configurações Resetadas",
-        description: "Todas as configurações foram restauradas para os valores padrão.",
+        title: "Settings reset",
+        description: "Every setting is back to its default value.",
       })
     },
     onFullscreen: () => toggleFullscreen(artboardRef.current ?? undefined),
     onSave: () => captureImage(),
     onUndo: () => {
       undo()
-      toast({ title: "Desfeito", description: "Última ação desfeita." })
+      toast({ title: "Undone", description: "Last action undone." })
     },
     onRedo: () => {
       redo()
-      toast({ title: "Refeito", description: "Ação refeita." })
+      toast({ title: "Redone", description: "Action redone." })
     },
   })
 
@@ -181,15 +181,15 @@ export default function GradientGenerator() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-neutral-950 text-white overflow-hidden">
-      {/* ─── Barra superior ─────────────────────────────────────────────── */}
+      {/* ─── Top bar ────────────────────────────────────────────────────── */}
       <header className="flex items-center gap-2 px-3 py-2 border-b border-neutral-800 bg-neutral-950 shrink-0">
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
           onClick={toggleSidebar}
-          title={sidebarOpen ? "Ocultar controles" : "Mostrar controles"}
-          aria-label={sidebarOpen ? "Ocultar controles" : "Mostrar controles"}
+          title={sidebarOpen ? "Hide controls" : "Show controls"}
+          aria-label={sidebarOpen ? "Hide controls" : "Show controls"}
         >
           {sidebarOpen ? (
             <PanelLeftClose className="h-4 w-4" />
@@ -199,15 +199,15 @@ export default function GradientGenerator() {
         </Button>
 
         <h1 className="text-sm font-medium tracking-tight mr-2 hidden sm:block">
-          Gradientes Orgânicos
+          Organic Gradients
         </h1>
 
-        {/* Prancheta: define a proporção do preview e o tamanho do arquivo */}
+        {/* Artboard: sets the preview ratio and the file size */}
         <div className="flex items-center gap-2">
           <Select value={artboardId} onValueChange={setArtboard}>
             <SelectTrigger
               className="h-8 w-[190px] md:w-[230px] bg-neutral-900 border-neutral-700 text-white text-xs"
-              aria-label="Prancheta"
+              aria-label="Artboard"
             >
               <SelectValue />
             </SelectTrigger>
@@ -227,7 +227,7 @@ export default function GradientGenerator() {
               onCheckedChange={setShowSafeAreas}
             />
             <Label htmlFor="safe-areas" className="text-xs text-neutral-400">
-              Guias
+              Guides
             </Label>
           </div>
         </div>
@@ -247,15 +247,15 @@ export default function GradientGenerator() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
-                title="Atalhos de teclado"
-                aria-label="Atalhos de teclado"
+                title="Keyboard shortcuts"
+                aria-label="Keyboard shortcuts"
               >
                 <Keyboard className="h-4 w-4" />
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-neutral-900 text-white border-neutral-700">
               <DialogHeader>
-                <DialogTitle>Atalhos de Teclado</DialogTitle>
+                <DialogTitle>Keyboard Shortcuts</DialogTitle>
               </DialogHeader>
               <div className="space-y-2 py-2">
                 {SHORTCUTS.map(({ key, desc }) => (
@@ -277,7 +277,7 @@ export default function GradientGenerator() {
         </div>
       </header>
 
-      {/* ─── Corpo: controles + prancheta ──────────────────────────────── */}
+      {/* ─── Body: controls + artboard ─────────────────────────────────── */}
       <div className="flex flex-1 min-h-0">
         {sidebarOpen && (
           <aside className="w-72 lg:w-80 shrink-0 border-r border-neutral-800 bg-neutral-950 overflow-y-auto">
@@ -290,13 +290,13 @@ export default function GradientGenerator() {
             fallback={
               <div className="flex-1 flex items-center justify-center bg-neutral-900 text-white">
                 <div className="text-center p-6">
-                  <h2 className="text-xl font-bold mb-2">Algo deu errado</h2>
-                  <p className="mb-4">Ocorreu um erro ao renderizar o gradiente.</p>
+                  <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
+                  <p className="mb-4">An error occurred while rendering the gradient.</p>
                   <button
                     className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
                     onClick={() => window.location.reload()}
                   >
-                    Tentar novamente
+                    Try again
                   </button>
                 </div>
               </div>
@@ -309,8 +309,8 @@ export default function GradientGenerator() {
 
           <TimelineBar />
 
-          {/* Exportação também no rodapé em telas estreitas, onde a barra
-              superior não tem espaço */}
+          {/* Export also in the footer on narrow screens, where the top bar runs
+              out of room */}
           <div className="sm:hidden flex gap-2 p-2 border-t border-neutral-800">
             <ExportOptions onExport={captureImage} />
             <VideoExport containerRef={artboardRef} />

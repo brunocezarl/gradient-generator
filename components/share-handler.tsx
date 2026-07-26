@@ -12,7 +12,7 @@ export default function ShareHandler() {
   const [isProcessingShare, setIsProcessingShare] = useState(true)
 
   useEffect(() => {
-    // "g" é o formato compacto atual; "gradient" é o formato legado (JSON)
+    // "g" is the current compact format; "gradient" is the legacy JSON one
     const gradientParam = searchParams.get("g") ?? searchParams.get("gradient")
 
     if (gradientParam) {

@@ -1,124 +1,122 @@
 # Gradient Generator
 
-Gerador de gradientes orgânicos animados em WebGL, pensado para sistemas de marca,
-planos de fundo e conteúdo visual. A animação é gerada por um shader GLSL com
-ruído simplex e curl noise, renderizado via React Three Fiber.
+Animated organic gradients in WebGL, built for brand systems, backgrounds and
+visual content. The animation comes from a GLSL shader with simplex and curl
+noise, rendered through React Three Fiber.
 
-## Funcionalidades
+## Features
 
-- **Prancheta com a proporção de saída** (Full HD, 4K, story, post 4:5, Open
-  Graph, A4…) com guias de safe area: o preview mostra o enquadramento real e a
-  exportação herda essas dimensões
-- **Timeline** com scrub, avanço quadro a quadro e congelamento de frame — o
-  instante da animação é um valor visível e reprodutível
-- **Loop perfeito**: com um período definido, a animação percorre um caminho
-  fechado no campo de ruído e volta exatamente ao início
-- **Animação em tempo real** com controles de velocidade, complexidade, escala de
-  ruído, fluxo, granulação e limiares de forma
-- **Cor fiel**: as paradas de cor são interpoladas em Oklab (perceptual) ou em
-  RGB linear, com codificação sRGB na saída — o HEX escolhido no picker é
-  exatamente o pixel exportado. Dither triangular sub-quantização elimina o
-  banding típico de gradientes suaves em 8 bits
-- **De 2 a 8 paradas de cor**, cada uma com posição própria ao longo do
-  gradiente
-- **Color picker em OKLCH**, RGB, HSL ou HEX: mexer em luminosidade ou croma em
-  OKLCH não desloca o matiz (clarear um vermelho em HSL puxa para rosa), e o
-  slider de croma respeita o teto real do sRGB para aquela cor
-- **Harmonias** (análoga, complementar, complementar dividida, tríade,
-  monocromática) derivadas da primeira parada, mantendo as posições
-- **Paleta extraída de uma imagem** de referência, por clusterização em Oklab
-- **Contraste WCAG** do texto branco e preto no pior caso ao longo do gradiente
-- **Esquemas de cores** prontos + modo personalizado com salvamento de esquemas
-  próprios
-- **Forma reproduzível**: o *seed* do campo de ruído entra em presets, histórico
-  e links — "Sortear Forma" troca o desenho mantendo cores e ritmo
-- **Multi-camadas** em um único contexto WebGL: cada camada é renderizada em um
-  render target e a mesclagem acontece no shader (mesmas fórmulas do
-  Compositing and Blending Level 1), com reordenação por arrastar e soltar.
-  Movimento e acabamento vêm do estado global; cada camada tem sua própria forma
-- **Presets de animação** e gerador aleatório com **histórico dos últimos
-  sorteios** (clique numa miniatura para restaurar um bom resultado)
-- **Presets completos** salvos pelo usuário: cores + todos os parâmetros de
-  animação, com galeria de miniaturas **renderizadas pelo shader** (duas
-  configurações com as mesmas cores e formas diferentes aparecem diferentes) e
-  **biblioteca portátil** em JSON (exportar/importar)
-- **Undo/Redo** (Ctrl+Z / Ctrl+Y) com coalescência de edições contínuas,
-  cobrindo também criar, remover, editar e reordenar camadas
-- **Exportação**: imagem (PNG/JPEG/WebP) na prancheta atual, em dimensões
-  prontas ou com escala de até 8×; vídeo determinístico (MP4/H.264 ou WebM/VP9)
-  renderizado quadro a quadro com timestamps explícitos — taxa de quadros e
-  duração exatas, independentes do desempenho da GPU — e **tokens da paleta**
-  (JSON de design tokens com OKLCH, CSS custom properties, config Tailwind e SVG)
-- **Compartilhamento** por URL compacta que reproduz o gradiente completo —
-  incluindo parâmetros avançados (fluxo, grão, limiares) e camadas
-- **Atalhos de teclado**: `Espaço` play/pause, `R` reset, `S` salvar imagem,
-  `F` tela cheia (preview limpo)
+- **Artboard at the output ratio** (Full HD, 4K, story, 4:5 post, Open Graph,
+  A4…) with safe area guides: the preview shows the real framing and the export
+  inherits those dimensions
+- **Timeline** with scrubbing, frame-by-frame stepping and frame freezing — the
+  instant of the animation is a visible, reproducible value
+- **Seamless loop**: with a period set, the animation travels a closed path
+  through the noise field and returns exactly to the start
+- **Real-time animation** with controls for speed, complexity, noise scale,
+  flow, grain and shape thresholds
+- **Faithful color**: stops are interpolated in Oklab (perceptual) or linear RGB,
+  with sRGB encoding on output — the HEX picked in the picker is exactly the
+  exported pixel. Sub-quantization triangular dither removes the banding smooth
+  8-bit gradients always produce
+- **2 to 8 color stops**, each with its own position along the gradient
+- **Color picker in OKLCH**, RGB, HSL or HEX: adjusting lightness or chroma in
+  OKLCH does not shift the hue (lightening a red in HSL pulls it toward pink),
+  and the chroma slider respects the real sRGB ceiling for that color
+- **Harmonies** (analogous, complementary, split complementary, triadic,
+  monochromatic) derived from the first stop, keeping the positions
+- **Palette extracted from a reference image**, clustered in Oklab
+- **WCAG contrast** for white and black text, worst case along the gradient
+- **Color schemes** out of the box, plus a custom mode that saves your own
+- **Reproducible shape**: the noise field *seed* travels in presets, history and
+  links — "Roll Shape" changes the drawing while keeping colors and rhythm
+- **Multi-layer** in a single WebGL context: each layer renders into a render
+  target and blending happens in the shader (the Compositing and Blending Level
+  1 formulas), with drag-and-drop reordering. Motion and finishing come from
+  global state; each layer owns its shape
+- **Animation presets** and a randomizer with a **history of recent rolls**
+  (click a thumbnail to bring a good result back)
+- **Full presets** saved by the user: colors plus every animation parameter,
+  with a gallery of **shader-rendered thumbnails** (two configurations with the
+  same colors and different shapes look different) and a **portable library** in
+  JSON (export/import)
+- **Undo/redo** (Ctrl+Z / Ctrl+Y) with coalescing of continuous edits, covering
+  creating, removing, editing and reordering layers as well
+- **Export**: image (PNG/JPEG/WebP) at the current artboard, at a ready-made
+  size or scaled up to 8×; deterministic video (MP4/H.264 or WebM/VP9) rendered
+  frame by frame with explicit timestamps — exact frame rate and duration,
+  independent of GPU performance — and **palette tokens** (design tokens JSON
+  with OKLCH, CSS custom properties, Tailwind config and SVG)
+- **Sharing** through a compact URL that reproduces the whole gradient,
+  including advanced parameters (flow, grain, thresholds) and layers
+- **Keyboard shortcuts**: `Space` play/pause, `R` reset, `S` save image,
+  `F` full screen (clean preview)
 
 ## Stack
 
 - [Next.js 15](https://nextjs.org) (App Router) + React 19 + TypeScript
-- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) / Three.js para o
-  shader WebGL
-- [Zustand](https://zustand.docs.pmnd.rs) (com persistência em `localStorage`)
-- [Tailwind CSS](https://tailwindcss.com) + componentes
-  [shadcn/ui](https://ui.shadcn.com) (Radix UI)
-- [dnd-kit](https://dndkit.com) para reordenação de camadas
-- [mediabunny](https://mediabunny.dev) + WebCodecs para a exportação de vídeo
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) / Three.js for the
+  WebGL shader
+- [Zustand](https://zustand.docs.pmnd.rs) (persisted to `localStorage`)
+- [Tailwind CSS](https://tailwindcss.com) with
+  [shadcn/ui](https://ui.shadcn.com) (Radix UI) components
+- [dnd-kit](https://dndkit.com) for layer reordering
+- [mediabunny](https://mediabunny.dev) + WebCodecs for video export
 
-## Desenvolvimento
+## Development
 
 ```bash
 npm install
-npm run dev        # servidor de desenvolvimento em http://localhost:3000
+npm run dev        # dev server at http://localhost:3000
 ```
 
-Outros scripts:
+Other scripts:
 
 ```bash
-npm run build      # build de produção (inclui validação de tipos)
-npm run start      # servir o build de produção
+npm run build      # production build (includes type checking)
+npm run start      # serve the production build
 npm run lint       # lint
-npm test           # testes unitários (Vitest)
+npm test           # unit tests (Vitest)
 ```
 
-## Estrutura
+## Structure
 
 ```
-app/          # rotas e layout (App Router)
-components/   # componentes da aplicação + components/ui (shadcn)
-hooks/        # hooks (atalhos de teclado, fullscreen, otimizações de dispositivo)
-lib/          # store Zustand, presets, cor, captura e compartilhamento
+app/          # routes and layout (App Router)
+components/   # application components + components/ui (shadcn)
+hooks/        # hooks (keyboard shortcuts, fullscreen, device optimizations)
+lib/          # Zustand store, presets, color, capture and sharing
               # (color-stops, oklch, palette-extract, tokens, library)
-lib/shaders/  # fonte única do GLSL (gradiente + composição de camadas)
+lib/shaders/  # single source of the GLSL (gradient + layer compositing)
 ```
 
-## Notas de implementação
+## Implementation notes
 
-- **Pipeline de cor**: as cores saem do picker em sRGB, são convertidas para
-  linear em `lib/color.ts`, interpoladas no espaço escolhido (Oklab ou linear)
-  e reencodadas em sRGB no fim do fragment shader. Vibrância padrão 0 mantém o
-  round-trip exato; o CSS exportado usa `in oklab` / `in srgb-linear` para
-  interpolar no mesmo espaço do render.
-- **Exportação**: cada camada é re-renderizada nativamente na resolução final e
-  a câmera é reprojetada na proporção de saída, então exportar 1080×1920 a
-  partir de uma janela 16:9 gera a mesma imagem que ver a cena numa janela
-  9:16 — sem distorção nem upscaling.
-- **Persistência**: o store é versionado (`PERSIST_VERSION`) e normalizado na
-  hidratação. Como o zustand só chama `migrate` quando o JSON gravado tem
-  `version` numérico, a normalização roda no `merge`, que sempre executa.
-- **Tempo**: o relógio da animação vive em `lib/playback.ts`, fora do React e
-  fora do render loop — antes cada canvas acumulava o próprio tempo, o que fazia
-  a velocidade em multi-camadas depender do número de camadas visíveis. A
-  exportação dirige esse relógio: cada quadro é desenhado num instante exato.
-- **Loop**: com `loopDuration > 0` o shader troca a deriva linear por um caminho
-  circular no campo de ruído (`theta = 2π·t/T`), periódico por construção. O
-  quadro que fecharia o ciclo é idêntico ao primeiro e por isso não é gravado —
-  evita um quadro duplicado na emenda.
-- **Paradas de cor**: o shader recebe arrays de até 8 paradas (cores em linear +
-  posições). A ordenação acontece na escrita dos uniforms, não no estado:
-  reordenar a lista no meio de um arraste faria o slider pular de parada na mão
-  do usuário, enquanto o shader precisa das posições crescentes.
-- **OKLCH**: `lib/oklch.ts` faz as conversões, o clamp de gamut por busca binária
-  no croma (preservando matiz e luminosidade), as harmonias e o contraste WCAG.
-  O randomizador sorteia nesses eixos — sortear R, G e B independentemente
-  produz quase sempre cores dessaturadas e sem relação entre si.
+- **Color pipeline**: colors leave the picker in sRGB, are converted to linear in
+  `lib/color.ts`, interpolated in the chosen space (Oklab or linear) and encoded
+  back to sRGB at the end of the fragment shader. Vibrance defaults to 0 so the
+  round trip stays exact; the exported CSS uses `in oklab` / `in srgb-linear` to
+  interpolate in the same space as the render.
+- **Export**: each layer is re-rendered natively at the final resolution and the
+  camera is reprojected to the output aspect ratio, so exporting 1080×1920 from a
+  16:9 window produces the same image as viewing the scene in a 9:16 window — no
+  distortion, no upscaling.
+- **Persistence**: the store is versioned (`PERSIST_VERSION`) and normalized on
+  hydration. Since zustand only calls `migrate` when the stored JSON has a
+  numeric `version`, normalization runs in `merge`, which always executes.
+- **Time**: the animation clock lives in `lib/playback.ts`, outside React and
+  outside the render loop — each canvas used to accumulate its own time, which
+  made speed in multi-layer mode depend on how many layers were visible. The
+  exporter drives that clock: every frame is drawn at an exact instant.
+- **Loop**: with `loopDuration > 0` the shader swaps linear drift for a circular
+  path through the noise field (`theta = 2π·t/T`), periodic by construction. The
+  frame that would close the cycle is identical to the first one and is therefore
+  not recorded — avoiding a duplicated frame at the seam.
+- **Color stops**: the shader receives arrays of up to 8 stops (linear colors +
+  positions). Sorting happens when writing the uniforms, not in state:
+  re-sorting the list mid-drag would make the slider jump to another stop under
+  the user's cursor, while the shader needs ascending positions.
+- **OKLCH**: `lib/oklch.ts` handles the conversions, gamut clamping by binary
+  search on chroma (preserving hue and lightness), the harmonies and WCAG
+  contrast. The randomizer draws on those axes — drawing R, G and B
+  independently almost always produces desaturated, unrelated colors.

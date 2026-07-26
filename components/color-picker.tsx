@@ -27,7 +27,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
   const [hexInput, setHexInput] = useState(() => rgbToHex(toR(), toG(), toB()))
   const [hexError, setHexError] = useState(false)
 
-  // Sincronizar com prop externa
+  // Keep in sync with the external prop
   useEffect(() => {
     const nr = toR()
     const ng = toG()
@@ -46,7 +46,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
     [onChange]
   )
 
-  // ─── Handlers RGB ─────────────────────────────────────────────────────────
+  // ─── RGB handlers ─────────────────────────────────────────────────────────
 
   const handleRgbChange = (red: number, green: number, blue: number) => {
     setR(red)
@@ -57,7 +57,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
     emitRgb(red, green, blue)
   }
 
-  // ─── Handlers HSL ─────────────────────────────────────────────────────────
+  // ─── HSL handlers ─────────────────────────────────────────────────────────
 
   const [hsl, setHsl] = useState<[number, number, number]>(() =>
     rgbToHsl(toR(), toG(), toB())
@@ -79,9 +79,9 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
     emitRgb(nr, ng, nb)
   }
 
-  // ─── Handlers OKLCH ───────────────────────────────────────────────────────
-  // Ajustar luminosidade ou croma em OKLCH não desloca o matiz, ao contrário do
-  // HSL: clarear um vermelho em HSL puxa para rosa, aqui ele continua vermelho.
+  // ─── OKLCH handlers ───────────────────────────────────────────────────────
+  // Adjusting lightness or chroma in OKLCH does not shift the hue, unlike HSL:
+  // lightening a red in HSL pulls it toward pink, here it stays red.
 
   const [oklch, setOklch] = useState(() => srgbToOklch(color))
 
@@ -102,7 +102,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
     emitRgb(nr, ng, nb)
   }
 
-  // ─── Handler HEX ──────────────────────────────────────────────────────────
+  // ─── HEX handler ──────────────────────────────────────────────────────────
 
   const handleHexChange = (value: string) => {
     setHexInput(value)
@@ -125,11 +125,11 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
 
   return (
     <div className="space-y-3">
-      {/* Cabeçalho: label + preview + mode toggle */}
+      {/* Header: label + preview + mode toggle */}
       <div className="flex items-center justify-between">
         <Label className="text-white">{label}</Label>
         <div className="flex items-center gap-2">
-          {/* Toggle OKLCH / RGB / HSL */}
+          {/* OKLCH / RGB / HSL toggle */}
           <div className="flex rounded-md overflow-hidden border border-neutral-700 text-xs">
             {(["oklch", "rgb", "hsl"] as const).map((option) => (
               <button
@@ -154,7 +154,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         </div>
       </div>
 
-      {/* Input HEX */}
+      {/* HEX input */}
       <div>
         <Input
           value={hexInput}
@@ -167,12 +167,12 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         />
       </div>
 
-      {/* Sliders OKLCH */}
+      {/* OKLCH sliders */}
       {mode === "oklch" && (
         <div className="space-y-3">
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-neutral-400">L (Luminosidade)</Label>
+              <Label className="text-xs text-neutral-400">L (lightness)</Label>
               <span className="text-xs text-neutral-400">{Math.round(oklch.l * 100)}%</span>
             </div>
             <Slider
@@ -182,29 +182,29 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               step={1}
               onValueChange={(val) => handleOklchChange(val[0] / 100, oklch.c, oklch.h)}
               className="h-2"
-              thumbLabel={`${label}: luminosidade`}
+              thumbLabel={`${label}: lightness`}
             />
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-neutral-400">C (Croma)</Label>
+              <Label className="text-xs text-neutral-400">C (chroma)</Label>
               <span className="text-xs text-neutral-400">{oklch.c.toFixed(3)}</span>
             </div>
             <Slider
               value={[oklch.c]}
               min={0}
-              // Teto de croma real para esta luminosidade e matiz: acima disso a
-              // cor não existe em sRGB e o slider mentiria
+              // Real chroma ceiling for this lightness and hue: above it the color
+              // does not exist in sRGB and the slider would be lying
               max={Math.max(maxChroma(oklch.l, oklch.h), 0.01)}
               step={0.002}
               onValueChange={(val) => handleOklchChange(oklch.l, val[0], oklch.h)}
               className="h-2"
-              thumbLabel={`${label}: croma`}
+              thumbLabel={`${label}: chroma`}
             />
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-neutral-400">H (Matiz)</Label>
+              <Label className="text-xs text-neutral-400">H (hue)</Label>
               <span className="text-xs text-neutral-400">{Math.round(oklch.h)}°</span>
             </div>
             <Slider
@@ -214,13 +214,13 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               step={1}
               onValueChange={(val) => handleOklchChange(oklch.l, oklch.c, val[0])}
               className="h-2"
-              thumbLabel={`${label}: matiz`}
+              thumbLabel={`${label}: hue`}
             />
           </div>
         </div>
       )}
 
-      {/* Sliders RGB */}
+      {/* RGB sliders */}
       {mode === "rgb" && (
         <div className="space-y-3">
           {(
@@ -248,12 +248,12 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         </div>
       )}
 
-      {/* Sliders HSL */}
+      {/* HSL sliders */}
       {mode === "hsl" && (
         <div className="space-y-3">
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-neutral-400">H (Matiz)</Label>
+              <Label className="text-xs text-neutral-400">H (hue)</Label>
               <span className="text-xs text-neutral-400">{hsl[0]}°</span>
             </div>
             <Slider
@@ -267,7 +267,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-neutral-400">S (Saturação)</Label>
+              <Label className="text-xs text-neutral-400">S (saturation)</Label>
               <span className="text-xs text-neutral-400">{hsl[1]}%</span>
             </div>
             <Slider
@@ -281,7 +281,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <Label className="text-xs text-neutral-400">L (Luminosidade)</Label>
+              <Label className="text-xs text-neutral-400">L (lightness)</Label>
               <span className="text-xs text-neutral-400">{hsl[2]}%</span>
             </div>
             <Slider

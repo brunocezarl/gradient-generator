@@ -1,9 +1,9 @@
-// Fonte única do shader de gradiente orgânico.
+// Single source of the organic gradient shader.
 //
-// Antes existiam duas cópias divergentes deste GLSL (cena simples e camadas),
-// o que fazia a mesma configuração renderizar diferente nos dois modos: a
-// versão de camadas não tinha a 3ª cor nem grão. Qualquer mudança visual
-// acontece aqui e vale para os dois.
+// There used to be two divergent copies of this GLSL (simple scene and layers),
+// which made the same configuration render differently in each mode: the layer
+// version had neither the third color nor grain. Any visual change happens here
+// and applies to both.
 
 export const organicGradientVertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -22,8 +22,8 @@ export const organicGradientFragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uComplexity;
   uniform float uNoiseScale;
-  // Paradas de cor: cores em RGB linear (a conversão de sRGB acontece no JS,
-  // ver lib/color.ts) e posições em 0-1, ordenadas
+  // Color stops: colors in linear RGB (the sRGB conversion happens in JS, see
+  // lib/color.ts) and positions in 0-1, ascending
   uniform vec3 uStopColors[MAX_STOPS];
   uniform float uStopPositions[MAX_STOPS];
   uniform int uStopCount;
@@ -33,15 +33,15 @@ export const organicGradientFragmentShader = /* glsl */ `
   uniform float uThresholdMin;
   uniform float uThresholdMax;
   uniform float uVibrance;
-  uniform float uOklabMix;     // 1.0 = misturar em Oklab, 0.0 = em RGB linear
-  uniform vec2 uSeed;          // deslocamento no campo de ruído
-  uniform float uLoopDuration; // 0 = animação livre; > 0 = período do loop
+  uniform float uOklabMix;     // 1.0 = mix in Oklab, 0.0 = in linear RGB
+  uniform vec2 uSeed;          // offset into the noise field
+  uniform float uLoopDuration; // 0 = free animation; > 0 = loop period
 
   const float TAU = 6.28318530718;
 
   varying vec2 vUv;
 
-  // ─── Ruído ─────────────────────────────────────────────────────────────────
+  // ─── Noise ─────────────────────────────────────────────────────────────────
 
   // Simplex 2D noise
   vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -73,7 +73,7 @@ export const organicGradientFragmentShader = /* glsl */ `
     return 130.0 * dot(m, g);
   }
 
-  // Curl noise para fluxo orgânico
+  // Curl noise for organic flow
   vec2 curl(float x, float y) {
     float eps = 0.01;
     float n1 = snoise(vec2(x + eps, y));
@@ -85,10 +85,10 @@ export const organicGradientFragmentShader = /* glsl */ `
     return vec2(dy, -dx);
   }
 
-  // ─── Cor ───────────────────────────────────────────────────────────────────
+  // ─── Color ─────────────────────────────────────────────────────────────────
 
-  // Codificação sRGB (IEC 61966-2-1). O drawing buffer é interpretado como
-  // sRGB pelo compositor, então é aqui que a imagem sai do espaço linear.
+  // sRGB encoding (IEC 61966-2-1). The compositor reads the drawing buffer as
+  // sRGB, so this is where the image leaves linear space.
   vec3 linearToSrgb(vec3 c) {
     c = max(c, vec3(0.0));
     vec3 low = c * 12.92;
@@ -96,8 +96,8 @@ export const organicGradientFragmentShader = /* glsl */ `
     return mix(high, low, step(c, vec3(0.0031308)));
   }
 
-  // Oklab (Björn Ottosson): mistura perceptualmente uniforme — sem o meio
-  // escuro/acinzentado que a interpolação linear produz entre matizes opostos
+  // Oklab (Björn Ottosson): perceptually uniform mixing — without the dark,
+  // grayish middle that linear interpolation produces between opposing hues
   vec3 linearToOklab(vec3 c) {
     float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
     float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
@@ -122,26 +122,26 @@ export const organicGradientFragmentShader = /* glsl */ `
     );
   }
 
-  // Interpola duas cores lineares no espaço escolhido
+  // Interpolates two linear colors in the chosen space
   vec3 blendColors(vec3 a, vec3 b, float t) {
     vec3 linearMix = mix(a, b, t);
     vec3 oklabMix = oklabToLinear(mix(linearToOklab(a), linearToOklab(b), t));
     return mix(linearMix, oklabMix, uOklabMix);
   }
 
-  // Vibrância: afasta a cor do cinza de mesma luminância. Coeficientes Rec.709
-  // porque aqui a cor está em espaço linear.
+  // Vibrance: pushes the color away from the gray of equal luminance. Rec.709
+  // coefficients because the color is in linear space here.
   vec3 applyVibrance(vec3 color, float amount) {
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
     return mix(vec3(luminance), color, 1.0 + amount);
   }
 
-  // Cor do gradiente na posição t (0-1), percorrendo as paradas.
+  // Gradient color at position t (0-1), walking the stops.
   //
-  // A última parada cuja posição já foi ultrapassada vence: para segmentos
-  // anteriores a interpolação local satura em 1 e o resultado é sobrescrito
-  // pelo segmento seguinte. Nos extremos o resultado é exatamente a cor
-  // escolhida, então o HEX do picker sobrevive intacto até o pixel exportado.
+  // The last stop whose position has been passed wins: for earlier segments the
+  // local interpolation saturates at 1 and the result is overwritten by the next
+  // segment. At the extremes the result is exactly the chosen color, so the HEX
+  // from the picker survives intact all the way to the exported pixel.
   vec3 gradientColor(float t) {
     vec3 color = uStopColors[0];
 
@@ -167,9 +167,9 @@ export const organicGradientFragmentShader = /* glsl */ `
     return fract((p3.x + p3.y) * p3.z);
   }
 
-  // Ruído de PDF triangular em ±0.5 LSB: abaixo do passo de quantização de 8
-  // bits (invisível) mas suficiente para dissolver o banding que gradientes
-  // suaves em tela cheia sempre produzem
+  // Triangular-PDF noise at ±0.5 LSB: below the 8-bit quantization step
+  // (invisible) but enough to dissolve the banding that smooth full-screen
+  // gradients always produce
   float triangularDither(vec2 p) {
     return (hash12(p) + hash12(p + 17.13) - 1.0) * 0.5;
   }
@@ -179,21 +179,21 @@ export const organicGradientFragmentShader = /* glsl */ `
     vec2 noiseUv = uv + uSeed;
     float time = uTime * 0.5;
 
-    // Em modo loop o tempo percorre um círculo no campo de ruído em vez de
-    // derivar em linha reta: ao completar a volta o desenho volta a ser
-    // exatamente o mesmo, o que permite vídeo sem corte. O raio acompanha a
-    // duração para que a sensação de velocidade seja a mesma do modo livre.
+    // In loop mode time travels a circle through the noise field instead of
+    // drifting in a straight line: completing the turn brings the drawing back
+    // to exactly where it started, which is what allows seamless video. The
+    // radius follows the duration so the sense of speed matches free mode.
     bool looping = uLoopDuration > 0.0;
     float theta = looping ? TAU * (uTime / uLoopDuration) : 0.0;
 
-    // Somar oitavas de ruído: a complexidade define quantas entram
+    // Sum noise octaves: complexity decides how many take part
     float noise = 0.0;
     float maxLayers = min(max(1.0, uComplexity * 1.5), 10.0);
 
     for (float i = 1.0; i <= 10.0; i++) {
       if (i > maxLayers) break;
 
-      // Direção do fluxo vinda do curl noise
+      // Flow direction from the curl noise
       vec2 flow = curl(noiseUv.x * i * uNoiseScale, noiseUv.y * i * uNoiseScale) * uFlowIntensity;
 
       float modulation = looping ? sin(theta * i) : sin(time * i * 0.5);
@@ -201,28 +201,28 @@ export const organicGradientFragmentShader = /* glsl */ `
         ? vec2(cos(theta * i), sin(theta * i)) * (0.024 * i * uLoopDuration)
         : vec2(time * i * 0.3);
 
-      // Animar as coordenadas ao longo do fluxo
+      // Animate the coordinates along the flow
       vec2 animatedUV = noiseUv + flow * (modulation * 0.2);
 
-      // Frequências mais altas pesam menos
+      // Higher frequencies weigh less
       noise += snoise(animatedUV * i * uNoiseScale + phase) * (1.0 / i);
     }
 
-    // Normalizar para 0-1
+    // Normalize to 0-1
     noise = noise * 0.5 + 0.5;
 
-    // Formas orgânicas pelo limiar ajustável
+    // Organic shapes from the adjustable threshold
     float shape = smoothstep(uThresholdMin, uThresholdMax, noise);
 
     vec3 color = gradientColor(shape);
 
     color = applyVibrance(color, uVibrance);
 
-    // Saída para sRGB antes das texturas de superfície: grão e dither são
-    // efeitos sobre a imagem final, não sobre a luz da cena
+    // Encode to sRGB before the surface textures: grain and dither are effects
+    // on the final image, not on the light in the scene
     color = linearToSrgb(color);
 
-    // Grão sobre a composição (uv isotrópico → grão não estica com a proporção)
+    // Grain over the composition (isotropic uv → grain does not stretch with aspect)
     color += snoise(noiseUv * uGrainScale) * uGrainAmount;
 
     color += triangularDither(gl_FragCoord.xy) / 255.0;

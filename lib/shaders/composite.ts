@@ -1,9 +1,9 @@
-// Shader de composição de camadas.
+// Layer compositing shader.
 //
-// A composição acontece sobre valores já codificados em sRGB, que é o que
-// Photoshop e o CSS `mix-blend-mode` fazem — um "multiply" precisa dar o mesmo
-// resultado que o designer vê na ferramenta de onde ele veio. As fórmulas são
-// as do Compositing and Blending Level 1.
+// Compositing happens on values already encoded in sRGB, which is what Photoshop
+// and CSS `mix-blend-mode` do — a "multiply" has to give the same result the
+// designer saw in the tool they came from. The formulas are those of Compositing
+// and Blending Level 1.
 
 export const compositeVertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -14,13 +14,13 @@ export const compositeVertexShader = /* glsl */ `
   }
 `
 
-// Índices dos modos de mesclagem. Mantidos em sincronia com lib/layer-utils.ts
-// por `blendModeToShaderIndex`.
+// Blend mode indices, kept in sync with lib/layer-utils.ts through
+// `blendModeToShaderIndex`.
 export const compositeFragmentShader = /* glsl */ `
   precision highp float;
 
-  uniform sampler2D uBase;   // composição acumulada até aqui
-  uniform sampler2D uLayer;  // camada a aplicar
+  uniform sampler2D uBase;   // composition accumulated so far
+  uniform sampler2D uLayer;  // layer to apply
   uniform float uOpacity;
   uniform int uBlendMode;
 
@@ -59,8 +59,8 @@ export const compositeFragmentShader = /* glsl */ `
       blendChannel(uBlendMode, base.b, layer.b)
     );
 
-    // A camada é totalmente opaca; a opacidade interpola entre o fundo e o
-    // resultado da mesclagem, como em qualquer editor de camadas
+    // The layer itself is fully opaque; opacity interpolates between the backdrop
+    // and the blended result, as in any layer-based editor
     gl_FragColor = vec4(mix(base, blended, clamp(uOpacity, 0.0, 1.0)), 1.0);
   }
 `

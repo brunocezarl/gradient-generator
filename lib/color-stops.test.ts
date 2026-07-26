@@ -23,7 +23,7 @@ const stop = (r: number, g: number, b: number, position: number): ColorStop => (
 })
 
 describe("stopsFromColors", () => {
-  it("distribui as paradas uniformemente", () => {
+  it("spreads the stops evenly", () => {
     const stops = stopsFromColors([
       [1, 0, 0],
       [0, 1, 0],
@@ -32,12 +32,12 @@ describe("stopsFromColors", () => {
     expect(stops.map((s) => s.position)).toEqual([0, 0.5, 1])
   })
 
-  it("aceita posições explícitas e satura canais", () => {
+  it("accepts explicit positions and clamps channels", () => {
     const stops = stopsFromColors([[2, -1, 0.5]], [0.3])
     expect(stops[0]).toEqual({ color: [1, 0, 0.5], position: 0.3 })
   })
 
-  it("duas paradas ficam nos extremos", () => {
+  it("two stops sit at the extremes", () => {
     expect(evenlySpacedPositions(2)).toEqual([0, 1])
     expect(evenlySpacedPositions(1)).toEqual([0])
   })
@@ -49,7 +49,7 @@ describe("normalizeStops", () => {
     [0, 0, 0],
   ])
 
-  it("ordena por posição", () => {
+  it("sorts by position", () => {
     const normalized = normalizeStops(
       [stop(1, 0, 0, 0.8), stop(0, 1, 0, 0.1), stop(0, 0, 1, 0.5)],
       fallback
@@ -57,25 +57,25 @@ describe("normalizeStops", () => {
     expect(normalized.map((s) => s.position)).toEqual([0.1, 0.5, 0.8])
   })
 
-  it("satura posições e canais fora de 0-1", () => {
+  it("clamps positions and channels outside 0-1", () => {
     const normalized = normalizeStops([stop(5, -2, 0.4, 9), stop(0, 0, 0, -3)], fallback)
     expect(normalized[0]).toEqual({ color: [0, 0, 0], position: 0 })
     expect(normalized[1]).toEqual({ color: [1, 0, 0.4], position: 1 })
   })
 
-  it("descarta paradas inválidas e cai no fallback quando sobram poucas", () => {
+  it("drops invalid stops and falls back when too few remain", () => {
     expect(normalizeStops([{ color: ["a", 0, 0], position: 0 }], fallback)).toEqual(fallback)
-    expect(normalizeStops("lixo", fallback)).toEqual(fallback)
+    expect(normalizeStops("garbage", fallback)).toEqual(fallback)
     expect(normalizeStops(undefined, fallback)).toEqual(fallback)
     expect(normalizeStops([], fallback)).toEqual(fallback)
   })
 
-  it("limita ao máximo de paradas do shader", () => {
+  it("caps at the shader's maximum stop count", () => {
     const many = Array.from({ length: 20 }, (_, i) => stop(1, 0, 0, i / 19))
     expect(normalizeStops(many, fallback)).toHaveLength(MAX_STOPS)
   })
 
-  it("preenche posição ausente distribuindo uniformemente", () => {
+  it("fills a missing position by spreading evenly", () => {
     const normalized = normalizeStops(
       [{ color: [1, 0, 0] }, { color: [0, 0, 1] }],
       fallback
@@ -83,48 +83,48 @@ describe("normalizeStops", () => {
     expect(normalized.map((s) => s.position)).toEqual([0, 1])
   })
 
-  it("não devolve a mesma referência do fallback (evita alias de estado)", () => {
-    const normalized = normalizeStops("lixo", fallback)
+  it("does not return the fallback reference itself (avoids state aliasing)", () => {
+    const normalized = normalizeStops("garbage", fallback)
     expect(normalized).not.toBe(fallback)
     expect(normalized[0]).not.toBe(fallback[0])
   })
 })
 
 describe("insertStop", () => {
-  it("insere no maior intervalo com a cor que já estava ali", () => {
+  it("inserts in the largest gap with the color that was already there", () => {
     const stops = [stop(1, 0, 0, 0), stop(0, 0, 1, 0.2), stop(0, 1, 0, 1)]
     const result = insertStop(stops)
 
     expect(result).toHaveLength(4)
-    // Maior vão é 0.2 → 1
+    // The largest gap is 0.2 → 1
     expect(result[2].position).toBeCloseTo(0.6)
-    // Cor interpolada entre azul e verde, não uma cor nova qualquer
+    // Color interpolated between blue and green, not some new color
     const [r, g, b] = result[2].color
     expect(b).toBeGreaterThan(0.1)
     expect(g).toBeGreaterThan(0.1)
     expect(r).toBeLessThan(0.6)
   })
 
-  it("não passa do máximo de paradas", () => {
+  it("does not exceed the maximum stop count", () => {
     const full = Array.from({ length: MAX_STOPS }, (_, i) => stop(1, 0, 0, i / (MAX_STOPS - 1)))
     expect(insertStop(full)).toHaveLength(MAX_STOPS)
   })
 
-  it("devolve paradas ordenadas", () => {
+  it("returns sorted stops", () => {
     const result = insertStop([stop(1, 0, 0, 1), stop(0, 0, 1, 0)])
     expect(result.map((s) => s.position)).toEqual([0, 0.5, 1])
   })
 })
 
 describe("removeStopAt", () => {
-  it("remove a parada indicada", () => {
+  it("removes the given stop", () => {
     const stops = [stop(1, 0, 0, 0), stop(0, 1, 0, 0.5), stop(0, 0, 1, 1)]
     const result = removeStopAt(stops, 1)
     expect(result).toHaveLength(2)
     expect(result.map((s) => s.position)).toEqual([0, 1])
   })
 
-  it("respeita o mínimo de paradas", () => {
+  it("respects the minimum stop count", () => {
     const stops = [stop(1, 0, 0, 0), stop(0, 0, 1, 1)]
     expect(removeStopAt(stops, 0)).toHaveLength(MIN_STOPS)
   })
@@ -133,44 +133,44 @@ describe("removeStopAt", () => {
 describe("updateStop", () => {
   const stops = [stop(1, 0, 0, 0), stop(0, 0, 1, 1)]
 
-  it("troca a cor sem mexer na posição", () => {
+  it("changes the color without touching the position", () => {
     const result = updateStopColor(stops, 1, [0, 1, 0])
     expect(result[1]).toEqual({ color: [0, 1, 0], position: 1 })
     expect(result[0]).toEqual(stops[0])
   })
 
-  it("move a parada sem reordenar a lista", () => {
-    // Reordenar no meio do arraste faria o slider pular de parada na mão do
-    // usuário: a ordenação é responsabilidade do render
+  it("moves the stop without re-sorting the list", () => {
+    // Re-sorting mid-drag would make the slider jump to another stop under the
+    // user's cursor: sorting is the renderer's job
     const result = updateStopPosition(stops, 1, 0)
     expect(result.map((s) => s.position)).toEqual([0, 0])
     expect(result[1].color).toEqual([0, 0, 1])
   })
 
-  it("satura valores fora da faixa", () => {
+  it("clamps values outside the range", () => {
     expect(updateStopPosition(stops, 0, 5)[0].position).toBe(1)
     expect(updateStopColor(stops, 0, [-1, 2, 0.5])[0].color).toEqual([0, 1, 0.5])
   })
 })
 
 describe("mixStopColors", () => {
-  it("nos extremos devolve as cores originais", () => {
+  it("returns the original colors at the extremes", () => {
     const a: [number, number, number] = [0.9, 0.1, 0.1]
     const b: [number, number, number] = [0.1, 0.2, 0.9]
     expect(mixStopColors(a, b, 0)[0]).toBeCloseTo(a[0], 4)
     expect(mixStopColors(a, b, 1)[2]).toBeCloseTo(b[2], 4)
   })
 
-  it("o meio entre azul e amarelo não escurece (mistura em Oklab)", () => {
+  it("the middle between blue and yellow does not darken (Oklab mixing)", () => {
     const middle = mixStopColors([1, 0.9, 0], [0, 0.2, 1], 0.5)
     const luma = 0.2126 * middle[0] + 0.7152 * middle[1] + 0.0722 * middle[2]
-    // A interpolação ingênua em sRGB daria algo bem mais escuro que ~0.35
+    // Naive sRGB interpolation would give something much darker than ~0.35
     expect(luma).toBeGreaterThan(0.3)
   })
 })
 
 describe("legacyColorsToStops", () => {
-  it("converte três cores em paradas 0 / 0.5 / 1", () => {
+  it("converts three colors into stops at 0 / 0.5 / 1", () => {
     const stops = legacyColorsToStops({
       color1: [1, 0, 0],
       color2: [0, 1, 0],
@@ -183,7 +183,7 @@ describe("legacyColorsToStops", () => {
     ])
   })
 
-  it("aceita duas cores (esquemas mais antigos)", () => {
+  it("accepts two colors (older schemes)", () => {
     const stops = legacyColorsToStops({ color1: [1, 0, 0], color2: [0, 0, 1] })
     expect(stops).toEqual([
       { color: [1, 0, 0], position: 0 },
@@ -191,7 +191,7 @@ describe("legacyColorsToStops", () => {
     ])
   })
 
-  it("devolve null quando não há cores suficientes", () => {
+  it("returns null when there are not enough colors", () => {
     expect(legacyColorsToStops(undefined)).toBeNull()
     expect(legacyColorsToStops({})).toBeNull()
     expect(legacyColorsToStops({ color1: [1, 0, 0] })).toBeNull()
@@ -201,19 +201,19 @@ describe("legacyColorsToStops", () => {
 describe("stopsToCss", () => {
   const stops = [stop(1, 0, 0, 0), stop(0, 0, 1, 0.5), stop(0, 1, 0, 1)]
 
-  it("gera as paradas com posição e o espaço de interpolação do render", () => {
+  it("emits the stops with positions and the render's interpolation space", () => {
     expect(stopsToCss(stops, "oklab")).toBe(
       "linear-gradient(135deg in oklab, #ff0000 0.0%, #0000ff 50.0%, #00ff00 100.0%)"
     )
     expect(stopsToCss(stops, "linear")).toContain("in srgb-linear")
   })
 
-  it("ordena as paradas na saída", () => {
+  it("sorts the stops in the output", () => {
     const css = stopsToCss([stop(0, 1, 0, 1), stop(1, 0, 0, 0)])
     expect(css.indexOf("#ff0000")).toBeLessThan(css.indexOf("#00ff00"))
   })
 
-  it("stopToHex satura e formata com 2 dígitos por canal", () => {
+  it("stopToHex clamps and formats two digits per channel", () => {
     expect(stopToHex(stop(0, 0, 0, 0))).toBe("#000000")
     expect(stopToHex(stop(1, 1, 1, 0))).toBe("#ffffff")
     expect(stopToHex(stop(2, -1, 0.5, 0))).toBe("#ff0080")
@@ -221,7 +221,7 @@ describe("stopsToCss", () => {
 })
 
 describe("sortStops", () => {
-  it("não muta a lista original", () => {
+  it("does not mutate the original list", () => {
     const stops = [stop(0, 0, 1, 1), stop(1, 0, 0, 0)]
     const sorted = sortStops(stops)
     expect(sorted[0].position).toBe(0)

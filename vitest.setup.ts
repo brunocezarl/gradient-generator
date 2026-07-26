@@ -1,6 +1,6 @@
-// O store usa zustand/persist com localStorage; em ambiente node, fornecer
-// uma implementação em memória para evitar warnings e permitir testes de
-// persistência. Em ambiente happy-dom o localStorage nativo já existe.
+// The store uses zustand/persist with localStorage; under the node environment
+// we provide an in-memory implementation to avoid warnings and to allow testing
+// persistence. Under happy-dom the native localStorage already exists.
 if (typeof globalThis.localStorage === "undefined") {
   const memory = new Map<string, string>()
 

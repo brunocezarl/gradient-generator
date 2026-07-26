@@ -20,7 +20,7 @@ export function ShareGradient() {
   const gradientState = useGradientStore()
   const { toast } = useToast()
 
-  // Web Share API só existe em alguns navegadores e não está disponível no SSR
+  // The Web Share API only exists in some browsers and not during SSR
   useEffect(() => {
     setCanWebShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
   }, [])
@@ -36,7 +36,7 @@ export function ShareGradient() {
       
       toast({
         title: "Link copiado!",
-        description: "O link foi copiado para a área de transferência.",
+        description: "The link is on your clipboard.",
       })
       
       // Reset copied state after 2 seconds
@@ -45,7 +45,7 @@ export function ShareGradient() {
       console.error("Failed to copy:", error)
       toast({
         title: "Erro ao copiar",
-        description: "Não foi possível copiar o link. Tente selecionar e copiar manualmente.",
+        description: "Could not copy the link. Select it and copy manually.",
         variant: "destructive",
       })
     }
@@ -56,8 +56,8 @@ export function ShareGradient() {
     if (canWebShare) {
       try {
         await navigator.share({
-          title: "Meu Gradiente Orgânico",
-          text: "Confira este gradiente orgânico que eu criei!",
+          title: "My organic gradient",
+          text: "Check out this organic gradient I made",
           url: shareableURL,
         })
         
@@ -81,13 +81,13 @@ export function ShareGradient() {
         className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
         <Share className="mr-2 h-4 w-4" />
-        Compartilhar
+        Share
       </Button>
       
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-neutral-900 text-white border-neutral-700 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Compartilhar Gradiente</DialogTitle>
+            <DialogTitle>Share Gradient</DialogTitle>
           </DialogHeader>
           
           <Tabs defaultValue="link" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -102,7 +102,7 @@ export function ShareGradient() {
             
             <TabsContent value="link" className="mt-4 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="share-url" className="text-white">Link para compartilhar</Label>
+                <Label htmlFor="share-url" className="text-white">Share link</Label>
                 <div className="flex space-x-2">
                   <Input
                     id="share-url"
@@ -114,7 +114,7 @@ export function ShareGradient() {
                   <Button
                     size="icon"
                     onClick={copyToClipboard}
-                    aria-label="Copiar link"
+                    aria-label="Copy link"
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -128,7 +128,7 @@ export function ShareGradient() {
                   className="w-full bg-blue-600 hover:bg-blue-700"
                 >
                   <Share className="mr-2 h-4 w-4" />
-                  Compartilhar
+                  Share
                 </Button>
               )}
             </TabsContent>
@@ -138,7 +138,7 @@ export function ShareGradient() {
                 <QRCodeSVG value={shareableURL} size={200} />
               </div>
               <p className="text-sm text-neutral-400 text-center">
-                Escaneie o código QR com a câmera do seu dispositivo para abrir este gradiente.
+                Scan the QR code with your device camera to open this gradient.
               </p>
             </TabsContent>
           </Tabs>
@@ -148,7 +148,7 @@ export function ShareGradient() {
               onClick={() => setOpen(false)}
               className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
             >
-              Fechar
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

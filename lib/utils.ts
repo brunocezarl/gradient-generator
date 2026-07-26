@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// ─── Utilitários de Cor ──────────────────────────────────────────────────────
+// ─── Color utilities ─────────────────────────────────────────────────────────
 
 export function rgbToHex(r: number, g: number, b: number): string {
   return (

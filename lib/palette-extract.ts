@@ -1,18 +1,18 @@
 import { srgbToLinear, linearToSrgb, type RgbTriplet } from "@/lib/color"
 import { linearToOklab, oklabToLinear } from "@/lib/oklch"
 
-// Extração de paleta de uma imagem de referência.
+// Extracting a palette from a reference image.
 //
-// A clusterização acontece em Oklab, não em RGB: em RGB, distâncias iguais não
-// correspondem a diferenças visuais iguais, e o resultado tende a agrupar tons
-// que o olho vê como distintos (e separar os que vê como iguais).
+// Clustering happens in Oklab, not RGB: in RGB equal distances do not match
+// equal visual differences, so the result tends to group tones the eye reads as
+// distinct (and split ones it reads as the same).
 
 export interface ExtractPaletteOptions {
-  /** Quantidade de cores desejada */
+  /** How many colors to aim for */
   count?: number
-  /** Iterações do k-means */
+  /** k-means iterations */
   iterations?: number
-  /** Ignora pixels quase transparentes */
+  /** Skips near-transparent pixels */
   alphaThreshold?: number
 }
 
@@ -40,11 +40,11 @@ function distance(a: Lab, b: Lab): number {
 }
 
 /**
- * Cores dominantes de um buffer RGBA (como sai de `getImageData`).
+ * Dominant colors of an RGBA buffer (as returned by `getImageData`).
  *
- * A inicialização é determinística — amostras ordenadas por luminosidade,
- * divididas em quantis — para que a mesma imagem sempre produza a mesma paleta.
- * K-means com centros aleatórios daria uma paleta diferente a cada clique.
+ * Initialization is deterministic — samples sorted by lightness, split into
+ * quantiles — so the same image always yields the same palette. K-means with
+ * random centers would give a different palette on every click.
  */
 export function extractPalette(
   pixels: Uint8ClampedArray | number[],
@@ -100,18 +100,18 @@ export function extractPalette(
     })
 
     centroids = next
-    // Convergiu: mais iterações não mudam a paleta
+    // Converged: more iterations would not change the palette
     if (moved < 1e-6) break
   }
 
-  // Ordena por luminosidade: uma paleta clara→escura é o ponto de partida
-  // natural para um gradiente
+  // Sorted by lightness: a light→dark palette is the natural starting point for
+  // a gradient
   return centroids
     .sort((a, b) => a[0] - b[0])
     .map(labToSrgb)
     .filter((color, index, all) => {
-      // Descarta quase-duplicatas que sobram quando a imagem tem menos cores
-      // distintas que o pedido
+      // Drops near-duplicates left over when the image has fewer distinct
+      // colors than requested
       if (index === 0) return true
       const previous = all[index - 1]
       return (
@@ -124,8 +124,8 @@ export function extractPalette(
 }
 
 /**
- * Reduz a imagem antes de amostrar: 96px de lado bastam para as cores
- * dominantes e mantêm a extração instantânea mesmo com uma foto de 4000px.
+ * Downscales before sampling: 96px on the long side is enough for the dominant
+ * colors and keeps extraction instant even for a 4000px photo.
  */
 export const PALETTE_SAMPLE_SIZE = 96
 
@@ -142,7 +142,7 @@ export async function extractPaletteFromImage(
   canvas.height = Math.max(1, Math.round(height * scale))
 
   const context = canvas.getContext("2d", { willReadFrequently: true })
-  if (!context) throw new Error("Não foi possível ler a imagem")
+  if (!context) throw new Error("Could not read the image")
 
   context.drawImage(source as CanvasImageSource, 0, 0, canvas.width, canvas.height)
   const { data } = context.getImageData(0, 0, canvas.width, canvas.height)

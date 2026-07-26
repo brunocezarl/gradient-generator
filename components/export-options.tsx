@@ -26,16 +26,16 @@ interface ExportOptionsProps {
   ) => Promise<void>
 }
 
-// Tamanhos de saída. "artboard" (padrão) herda as dimensões da prancheta — o
-// arquivo sai no tamanho que o preview está mostrando; os demais forçam um
-// destino específico sem mexer na prancheta.
+// Output sizes. "artboard" (the default) inherits the artboard dimensions — the
+// file comes out at the size the preview is showing; the others force a specific
+// destination without touching the artboard.
 const SIZE_PRESETS: Record<string, { label: string; width?: number; height?: number }> = {
-  artboard: { label: "Prancheta atual" },
+  artboard: { label: "Current artboard" },
   fullhd: { label: "Full HD — 1920×1080", width: 1920, height: 1080 },
   uhd4k: { label: "4K — 3840×2160", width: 3840, height: 2160 },
-  qhd: { label: "Wallpaper QHD — 2560×1440", width: 2560, height: 1440 },
-  square: { label: "Post quadrado — 1080×1080", width: 1080, height: 1080 },
-  story: { label: "Story / Celular — 1080×1920", width: 1080, height: 1920 },
+  qhd: { label: "QHD wallpaper — 2560×1440", width: 2560, height: 1440 },
+  square: { label: "Square post — 1080×1080", width: 1080, height: 1080 },
+  story: { label: "Story / phone — 1080×1920", width: 1080, height: 1920 },
 }
 
 export function ExportOptions({ onExport }: ExportOptionsProps) {
@@ -75,14 +75,14 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
       await navigator.clipboard.writeText(tokens)
       setCssCopied(true)
       toast({
-        title: "Copiado!",
-        description: `${tokenFormatLabels[tokenFormat]} na área de transferência.`,
+        title: "Copied",
+        description: `${tokenFormatLabels[tokenFormat]} is on your clipboard.`,
       })
       setTimeout(() => setCssCopied(false), 2000)
     } catch {
       toast({
-        title: "Erro",
-        description: "Não foi possível copiar para a área de transferência.",
+        title: "Error",
+        description: "Could not copy to the clipboard.",
         variant: "destructive",
       })
     }
@@ -93,14 +93,14 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `paleta.${tokenFormatExtensions[tokenFormat]}`
+    link.download = `palette.${tokenFormatExtensions[tokenFormat]}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  // ─── Exportar imagem ────────────────────────────────────────────────────────
+  // ─── Image export ──────────────────────────────────────────────────────────
 
   const handleExport = async () => {
     try {
@@ -115,8 +115,8 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
     } catch (error) {
       console.error("Export error:", error)
       toast({
-        title: "Erro na Exportação",
-        description: "Ocorreu um erro ao exportar a imagem. Tente novamente.",
+        title: "Export failed",
+        description: "Something went wrong while exporting the image. Try again.",
         variant: "destructive",
       })
     } finally {
@@ -128,26 +128,26 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
     <>
       <Button
         onClick={() => setOpen(true)}
-        aria-label="Exportar Imagem"
+        aria-label="Export Image"
         size="sm"
         className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
         <ImageIcon className="mr-2 h-4 w-4" />
-        Imagem
+        Image
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-neutral-900 text-white border-neutral-700">
           <DialogHeader>
-            <DialogTitle>Opções de Exportação</DialogTitle>
+            <DialogTitle>Export Options</DialogTitle>
           </DialogHeader>
 
           <div className="py-4 space-y-4">
-            {/* Tokens da paleta */}
+            {/* Palette tokens */}
             <div className="space-y-2">
               <Label className="text-white flex items-center gap-1">
                 <Code2 className="h-4 w-4" />
-                Tokens da paleta
+                Palette tokens
               </Label>
               <div className="flex items-center gap-2">
                 <Select
@@ -173,7 +173,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   size="sm"
                   className="h-8 bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
                   onClick={copyTokens}
-                  aria-label="Copiar tokens"
+                  aria-label="Copy tokens"
                 >
                   {cssCopied ? (
                     <Check className="h-4 w-4 text-green-400" />
@@ -186,7 +186,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                   size="sm"
                   className="h-8 bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
                   onClick={downloadTokens}
-                  aria-label="Baixar tokens"
+                  aria-label="Download tokens"
                 >
                   <Download className="h-4 w-4" />
                 </Button>
@@ -195,60 +195,60 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                 {tokens}
               </pre>
               <p className="text-xs text-neutral-400">
-                As {stops.length} paradas com posição, matiz/croma/luminosidade em OKLCH e o
-                gradiente CSS no mesmo espaço de interpolação do render.
+All {stops.length} stops with their positions, hue/chroma/lightness in OKLCH, and
+                the CSS gradient in the same interpolation space as the render.
               </p>
             </div>
 
             <div className="border-t border-neutral-700 pt-4 space-y-4">
-              {/* Formato */}
+              {/* Format */}
               <div className="space-y-2">
                 <Label htmlFor="format" className="text-white">
-                  Formato
+                  Format
                 </Label>
                 <Select value={format} onValueChange={setFormat}>
                   <SelectTrigger id="format" className="bg-neutral-800 border-neutral-700 text-white">
-                    <SelectValue placeholder="Selecione o formato" />
+                    <SelectValue placeholder="Pick a format" />
                   </SelectTrigger>
                   <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
-                    <SelectItem value="png">PNG (Sem perdas)</SelectItem>
-                    <SelectItem value="jpeg">JPEG (Menor tamanho)</SelectItem>
-                    <SelectItem value="webp">WebP (Moderno)</SelectItem>
+                    <SelectItem value="png">PNG (lossless)</SelectItem>
+                    <SelectItem value="jpeg">JPEG (smaller file)</SelectItem>
+                    <SelectItem value="webp">WebP (modern)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Qualidade */}
+              {/* Quality */}
               {format !== "png" && (
                 <div className="space-y-2">
                   <Label htmlFor="quality" className="text-white">
-                    Qualidade
+                    Quality
                   </Label>
                   <Select
                     value={quality.toString()}
                     onValueChange={(value) => setQuality(Number(value))}
                   >
                     <SelectTrigger id="quality" className="bg-neutral-800 border-neutral-700 text-white">
-                      <SelectValue placeholder="Selecione a qualidade" />
+                      <SelectValue placeholder="Pick a quality" />
                     </SelectTrigger>
                     <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
-                      <SelectItem value="0.6">Baixa (60%)</SelectItem>
-                      <SelectItem value="0.8">Média (80%)</SelectItem>
-                      <SelectItem value="0.9">Alta (90%)</SelectItem>
-                      <SelectItem value="1">Máxima (100%)</SelectItem>
+                      <SelectItem value="0.6">Low (60%)</SelectItem>
+                      <SelectItem value="0.8">Medium (80%)</SelectItem>
+                      <SelectItem value="0.9">High (90%)</SelectItem>
+                      <SelectItem value="1">Maximum (100%)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               )}
 
-              {/* Dimensões */}
+              {/* Dimensions */}
               <div className="space-y-2">
                 <Label htmlFor="size-preset" className="text-white">
-                  Dimensões
+                  Dimensions
                 </Label>
                 <Select value={sizePreset} onValueChange={setSizePreset}>
                   <SelectTrigger id="size-preset" className="bg-neutral-800 border-neutral-700 text-white">
-                    <SelectValue placeholder="Selecione as dimensões" />
+                    <SelectValue placeholder="Pick the dimensions" />
                   </SelectTrigger>
                   <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
                     {Object.entries(SIZE_PRESETS).map(([key, preset]) => (
@@ -260,33 +260,33 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                 </Select>
               </div>
 
-              {/* Escala — apenas quando exportando no tamanho da tela */}
+              {/* Scale — only when exporting at artboard size */}
               {sizePreset === "artboard" && (
                 <div className="space-y-2">
                   <Label htmlFor="scale" className="text-white">
-                    Tamanho
+                    Scale
                   </Label>
                   <Select
                     value={scale.toString()}
                     onValueChange={(value) => setScale(Number(value))}
                   >
                     <SelectTrigger id="scale" className="bg-neutral-800 border-neutral-700 text-white">
-                      <SelectValue placeholder="Selecione o tamanho" />
+                      <SelectValue placeholder="Pick a scale" />
                     </SelectTrigger>
                     <SelectContent className="bg-neutral-800 border-neutral-700 text-white">
-                      <SelectItem value="0.5">Pequeno (50%)</SelectItem>
+                      <SelectItem value="0.5">Small (50%)</SelectItem>
                       <SelectItem value="1">Original (100%)</SelectItem>
-                      <SelectItem value="2">Grande (200%)</SelectItem>
-                      <SelectItem value="4">Extra Grande (400%)</SelectItem>
+                      <SelectItem value="2">Large (200%)</SelectItem>
+                      <SelectItem value="4">Extra large (400%)</SelectItem>
                       <SelectItem value="8">Ultra (800%)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               )}
               <p className="text-xs text-neutral-400">
-                O gradiente é renderizado nativamente na resolução final, com a câmera
-                reprojetada na proporção de saída — sem upscaling e sem distorção.
-                Tamanhos acima do limite da GPU são ajustados automaticamente.
+The gradient is rendered natively at the final resolution, with the camera
+                reprojected to the output aspect ratio — no upscaling, no distortion. Sizes
+                above the GPU limit are clamped automatically.
               </p>
             </div>
           </div>
@@ -297,7 +297,7 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
                 variant="outline"
                 className="bg-neutral-800 text-white border-neutral-700 hover:bg-neutral-700"
               >
-                Cancelar
+                Cancel
               </Button>
             </DialogClose>
             <Button
@@ -308,12 +308,12 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
               {isExporting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Exportando...
+                  Exporting…
                 </>
               ) : (
                 <>
                   <ImageIcon className="mr-2 h-4 w-4" />
-                  Exportar
+                  Export
                 </>
               )}
             </Button>

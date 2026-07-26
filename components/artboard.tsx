@@ -4,20 +4,19 @@ import { forwardRef, useEffect, useRef, useState } from "react"
 import { useGradientStore } from "@/lib/store"
 import { getArtboard, isFreeArtboard, SAFE_AREA_INSET } from "@/lib/artboards"
 
-// Prancheta: caixa com a proporção de saída, centrada num fundo neutro.
+// Artboard: a box at the output aspect ratio, centered on a neutral backdrop.
 //
-// O fundo é cinza médio de propósito — julgar cor sobre preto puro (ou sobre a
-// própria arte, como acontecia com os painéis translúcidos) distorce a
-// percepção. As guias de safe area ficam fora do canvas, então não entram na
-// exportação.
+// The backdrop is mid gray on purpose — judging color over pure black (or over
+// the art itself, as happened with the translucent panels) distorts perception.
+// Safe area guides live outside the canvas, so they never reach the export.
 
 interface ArtboardProps {
   children: React.ReactNode
 }
 
-// Encaixe medido em JS em vez de `aspect-ratio` + `max-*`: a interação entre
-// razão de aspecto e restrições máximas depende do navegador, e aqui um erro de
-// alguns pixels significaria preview e export com proporções diferentes.
+// The fit is measured in JS rather than with `aspect-ratio` + `max-*`: how
+// aspect ratio interacts with maximum constraints varies between browsers, and a
+// few pixels off here would mean preview and export at different ratios.
 function useFittedSize(aspect: number | null) {
   const frameRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
@@ -59,17 +58,17 @@ export const Artboard = forwardRef<HTMLDivElement, ArtboardProps>(function Artbo
   const { frameRef, size } = useFittedSize(free ? null : artboard.width / artboard.height)
 
   return (
-    // O padding fica no elemento externo e a medição no interno: getBoundingClientRect
-    // devolve a caixa de borda (padding incluído), e medir a caixa errada fazia a
-    // prancheta transbordar exatamente o valor do padding
+    // Padding sits on the outer element and the measurement on the inner one:
+    // getBoundingClientRect returns the border box (padding included), and
+    // measuring the wrong box made the artboard overflow by exactly the padding
     <div className="relative flex-1 min-h-0 bg-neutral-800 p-4 md:p-6">
       <div ref={frameRef} className="relative w-full h-full flex items-center justify-center">
         <div
           className={`relative ${free ? "w-full h-full" : "shadow-2xl ring-1 ring-black/40"}`}
           style={free ? undefined : { width: size?.width ?? 0, height: size?.height ?? 0 }}
         >
-          {/* O ref aponta para o elemento que contém apenas os canvases do
-              gradiente: é o que a exportação e o fullscreen usam */}
+          {/* The ref points at the element holding only the gradient canvases:
+              that is what export and full screen use */}
           <div ref={ref} className="absolute inset-0 overflow-hidden bg-black">
             {children}
           </div>
@@ -85,7 +84,7 @@ export const Artboard = forwardRef<HTMLDivElement, ArtboardProps>(function Artbo
                   right: `${SAFE_AREA_INSET * 100}%`,
                 }}
               />
-              {/* Eixos centrais: onde logo e texto costumam ser alinhados */}
+              {/* Center axes: where logos and text usually get aligned */}
               <div className="absolute left-1/2 top-0 bottom-0 border-l border-white/20" />
               <div className="absolute top-1/2 left-0 right-0 border-t border-white/20" />
             </div>

@@ -37,9 +37,9 @@ import { TooltipHelp } from "@/components/tooltip-help"
 
 const HARMONY_KINDS = Object.keys(harmonyLabels) as HarmonyKind[]
 
-// Editor das paradas de cor: lista com posição, cor e ordem, mais as
-// ferramentas que fazem a paleta ser uma decisão e não um sorteio — harmonias
-// derivadas da primeira parada e leitura de contraste WCAG.
+// Color stop editor: a list with position, color and order, plus the tools that
+// make the palette a decision rather than a lottery — harmonies derived from the
+// first stop and a WCAG contrast readout.
 export function StopsEditor() {
   const { stops, blendSpace, setStopColor, setStopPosition, setStops, addStop, removeStop } =
     useGradientStore(
@@ -71,8 +71,8 @@ export function StopsEditor() {
     )
   }
 
-  // Contraste no pior caso: o texto tem de funcionar sobre todas as cores por
-  // onde o gradiente passa, não sobre a média
+  // Worst-case contrast: text has to work over every color the gradient crosses,
+  // not over the average
   const colors = stops.map((stop) => stop.color)
   const whiteContrast = worstContrast(colors, [1, 1, 1])
   const blackContrast = worstContrast(colors, [0, 0, 0])
@@ -81,8 +81,8 @@ export function StopsEditor() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          <Label className="text-white">Paradas de Cor</Label>
-          <TooltipHelp content="De 2 a 8 paradas, cada uma com sua posição ao longo do gradiente. Clique numa parada para editar a cor." />
+          <Label className="text-white">Color Stops</Label>
+          <TooltipHelp content="From 2 to 8 stops, each with its own position along the gradient. Click a stop to edit its color." />
         </div>
         <Button
           variant="ghost"
@@ -92,18 +92,18 @@ export function StopsEditor() {
           disabled={stops.length >= MAX_STOPS}
           title={
             stops.length >= MAX_STOPS
-              ? `Máximo de ${MAX_STOPS} paradas`
-              : "Adicionar parada no maior intervalo"
+              ? `Maximum of ${MAX_STOPS} stops`
+              : "Add a stop in the largest gap"
           }
         >
           <Plus className="h-3.5 w-3.5 mr-1" />
-          Parada
+          Stop
         </Button>
       </div>
 
       <GradientSwatch stops={stops} blendSpace={blendSpace} className="h-6 w-full" />
 
-      {/* Lista de paradas */}
+      {/* Stop list */}
       <div className="space-y-1.5">
         {stops.map((stop: ColorStop, index: number) => (
           <div
@@ -117,7 +117,7 @@ export function StopsEditor() {
               onClick={() => setSelected(index)}
               className="h-6 w-6 shrink-0 rounded border border-neutral-600"
               style={{ backgroundColor: stopToHex(stop) }}
-              aria-label={`Editar parada ${index + 1} (${stopToHex(stop)})`}
+              aria-label={`Edit stop ${index + 1} (${stopToHex(stop)})`}
               title={stopToHex(stop)}
             />
             <span className="font-mono text-[10px] text-neutral-400 w-12 shrink-0">
@@ -133,7 +133,7 @@ export function StopsEditor() {
                 setStopPosition(index, value[0] / 100)
               }}
               className="h-2"
-              thumbLabel={`Posição da parada ${index + 1}`}
+              thumbLabel={`Stop ${index + 1} position`}
             />
             <span className="font-mono text-[10px] text-neutral-500 w-8 shrink-0 text-right">
               {Math.round(stop.position * 100)}%
@@ -144,11 +144,11 @@ export function StopsEditor() {
               className="h-6 w-6 shrink-0 text-neutral-500 hover:text-white"
               onClick={() => removeStop(index)}
               disabled={stops.length <= MIN_STOPS}
-              aria-label={`Remover parada ${index + 1}`}
+              aria-label={`Remove stop ${index + 1}`}
               title={
                 stops.length <= MIN_STOPS
-                  ? `Mínimo de ${MIN_STOPS} paradas`
-                  : "Remover parada"
+                  ? `Minimum of ${MIN_STOPS} stops`
+                  : "Remove stop"
               }
             >
               <Trash2 className="h-3 w-3" />
@@ -157,7 +157,7 @@ export function StopsEditor() {
         ))}
       </div>
 
-      {/* Harmonias */}
+      {/* Harmonies */}
       <div className="flex items-center gap-2 pt-1">
         <Select value={harmony} onValueChange={(value) => setHarmony(value as HarmonyKind)}>
           <SelectTrigger className="h-8 flex-1 bg-neutral-900 border-neutral-700 text-white text-xs">
@@ -175,25 +175,25 @@ export function StopsEditor() {
           size="sm"
           className="h-8 bg-neutral-700 hover:bg-neutral-600 text-white text-xs"
           onClick={applyHarmony}
-          title="Regerar as cores a partir da primeira parada, mantendo as posições"
+          title="Regenerate the colors from the first stop, keeping the positions"
         >
           <Sparkles className="h-3.5 w-3.5 mr-1" />
-          Aplicar
+          Apply
         </Button>
       </div>
 
       <PaletteFromImage />
 
-      {/* Contraste WCAG */}
+      {/* WCAG contrast */}
       <div className="rounded-md bg-neutral-900 px-2.5 py-2 space-y-1">
         <div className="flex items-center">
-          <Label className="text-xs text-neutral-400">Contraste de texto (pior caso)</Label>
-          <TooltipHelp content="Menor razão de contraste entre o texto e as cores do gradiente, segundo a WCAG 2.1. AA exige 4.5:1 para texto normal e 3:1 para texto grande." />
+          <Label className="text-xs text-neutral-400">Text contrast (worst case)</Label>
+          <TooltipHelp content="Lowest contrast ratio between the text and the gradient colors, per WCAG 2.1. AA needs 4.5:1 for body text and 3:1 for large text." />
         </div>
         {(
           [
-            ["Branco", whiteContrast],
-            ["Preto", blackContrast],
+            ["White", whiteContrast],
+            ["Black", blackContrast],
           ] as const
         ).map(([name, ratio]) => {
           const level = contrastLevel(ratio)
@@ -204,7 +204,7 @@ export function StopsEditor() {
                 <span className="font-mono text-neutral-400">{ratio.toFixed(2)}:1</span>
                 <span
                   className={`px-1.5 py-0.5 rounded text-[10px] ${
-                    level === "Insuficiente"
+                    level === "Fail"
                       ? "bg-red-500/20 text-red-300"
                       : level === "AA Large"
                         ? "bg-amber-500/20 text-amber-300"
@@ -219,11 +219,11 @@ export function StopsEditor() {
         })}
       </div>
 
-      {/* Editor da parada selecionada */}
+      {/* Editor for the selected stop */}
       {activeStop && (
         <div className="border-t border-neutral-800 pt-3">
           <ColorPicker
-            label={`Parada ${activeIndex + 1}`}
+            label={`Stop ${activeIndex + 1}`}
             color={activeStop.color}
             onChange={(color) => setStopColor(activeIndex, color)}
           />

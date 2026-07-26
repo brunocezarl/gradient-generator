@@ -1,10 +1,10 @@
 import type { ColorScheme, GradientPreset } from "@/lib/store"
 
-// Biblioteca portátil: presets e esquemas de cor em um arquivo.
+// Portable library: presets and color schemes in a single file.
 //
-// Sem isso a biblioteca do usuário fica presa no localStorage de um navegador —
-// não dá para levar para outra máquina, versionar junto do projeto nem entregar
-// a paleta para o resto do time.
+// Without it the user's library is stuck in one browser's localStorage — there
+// is no way to move it to another machine, version it alongside the project, or
+// hand the palette to the rest of the team.
 
 export const LIBRARY_FORMAT = "gradient-generator-library"
 export const LIBRARY_VERSION = 1
@@ -37,30 +37,30 @@ export interface ParsedLibrary {
 }
 
 /**
- * Lê um arquivo de biblioteca validando apenas a estrutura. A normalização das
- * cores e dos snapshots é feita pelo store, que já tem as regras de migração —
- * um arquivo exportado por uma versão antiga entra pelo mesmo caminho de um
- * localStorage antigo.
+ * Reads a library file, validating structure only. Normalizing colors and
+ * snapshots is the store's job, since it already owns the migration rules — a
+ * file exported by an older version comes in through the same path as an old
+ * localStorage entry.
  */
 export function parseLibrary(json: string): ParsedLibrary {
   let parsed: unknown
   try {
     parsed = JSON.parse(json)
   } catch {
-    throw new Error("Arquivo inválido: não é JSON")
+    throw new Error("Invalid file: not JSON")
   }
 
   if (!parsed || typeof parsed !== "object") {
-    throw new Error("Arquivo inválido: conteúdo inesperado")
+    throw new Error("Invalid file: unexpected content")
   }
 
   const file = parsed as Partial<LibraryFile>
   if (file.format !== LIBRARY_FORMAT) {
-    throw new Error("Arquivo inválido: não é uma biblioteca do Gradient Generator")
+    throw new Error("Invalid file: not a Gradient Generator library")
   }
   if (typeof file.version !== "number" || file.version > LIBRARY_VERSION) {
     throw new Error(
-      `Biblioteca gravada por uma versão mais nova (v${file.version}) — atualize o app`
+      `Library written by a newer version (v${file.version}) — update the app`
     )
   }
 
@@ -80,7 +80,7 @@ export function parseLibrary(json: string): ParsedLibrary {
       : {}
 
   if (presets.length === 0 && Object.keys(colorSchemes).length === 0) {
-    throw new Error("Arquivo sem presets nem esquemas de cor")
+    throw new Error("File has no presets and no color schemes")
   }
 
   return { presets, colorSchemes }

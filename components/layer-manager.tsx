@@ -29,7 +29,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { GradientLayer } from "@/lib/layer-utils"
 
-// ─── Item de camada arrastável ─────────────────────────────────────────────
+// ─── Draggable layer item ──────────────────────────────────────────────────
 
 interface SortableLayerItemProps {
   layer: GradientLayer
@@ -68,19 +68,19 @@ function SortableLayerItem({
       }`}
       onClick={onSelect}
     >
-      {/* Handle de arraste */}
+      {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
         className="cursor-grab active:cursor-grabbing text-neutral-500 hover:text-neutral-300 mr-1 touch-none"
         onClick={(e) => e.stopPropagation()}
-        title="Arrastar para reordenar"
-        aria-label="Arrastar para reordenar"
+        title="Drag to reorder"
+        aria-label="Drag to reorder"
       >
         <GripVertical className="h-3 w-3" />
       </button>
 
-      {/* Botão visibilidade */}
+      {/* Visibility toggle */}
       <Button
         variant="ghost"
         size="icon"
@@ -89,17 +89,17 @@ function SortableLayerItem({
           e.stopPropagation()
           onToggleVisibility()
         }}
-        title={layer.visible ? "Ocultar camada" : "Mostrar camada"}
-        aria-label={layer.visible ? "Ocultar camada" : "Mostrar camada"}
+        title={layer.visible ? "Hide layer" : "Show layer"}
+        aria-label={layer.visible ? "Hide layer" : "Show layer"}
       >
         {layer.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
       </Button>
 
       <div className="flex-1 mx-2 truncate">
-        <span className="text-sm text-white">Camada {index + 1}</span>
+        <span className="text-sm text-white">Layer {index + 1}</span>
       </div>
 
-      {/* Remover */}
+      {/* Remove */}
       <Button
         variant="ghost"
         size="icon"
@@ -109,8 +109,8 @@ function SortableLayerItem({
           onRemove()
         }}
         disabled={!canRemove}
-        title="Remover camada"
-        aria-label="Remover camada"
+        title="Remove layer"
+        aria-label="Remove layer"
       >
         <Trash2 className="h-3 w-3" />
       </Button>
@@ -118,7 +118,7 @@ function SortableLayerItem({
   )
 }
 
-// ─── Componente principal ──────────────────────────────────────────────────
+// ─── Main component ────────────────────────────────────────────────────────
 
 export function LayerManager() {
   const {
@@ -165,8 +165,8 @@ export function LayerManager() {
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Layers className="h-4 w-4 mr-2 text-neutral-400" />
-            <Label className="text-white">Modo Multi-Camadas</Label>
-            <TooltipHelp content="Ative para criar e gerenciar múltiplas camadas de gradiente." />
+            <Label className="text-white">Multi-layer Mode</Label>
+            <TooltipHelp content="Turn on to build and manage several gradient layers." />
           </div>
           <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} />
         </div>
@@ -181,24 +181,24 @@ export function LayerManager() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Layers className="h-4 w-4 mr-2 text-neutral-400" />
-          <Label className="text-white">Modo Multi-Camadas</Label>
-          <TooltipHelp content="Desative para voltar ao modo de camada única." />
+          <Label className="text-white">Multi-layer Mode</Label>
+          <TooltipHelp content="Turn off to go back to a single layer." />
         </div>
         <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} />
       </div>
 
       <div className="space-y-4">
-        {/* Lista de camadas com DnD */}
+        {/* Layer list with drag and drop */}
         <div className="bg-neutral-800 rounded-md p-2">
           <div className="flex justify-between items-center mb-2">
-            <Label className="text-white">Camadas</Label>
+            <Label className="text-white">Layers</Label>
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-neutral-400 hover:text-white"
               onClick={addLayer}
-              title="Adicionar camada"
-              aria-label="Adicionar camada"
+              title="Add layer"
+              aria-label="Add layer"
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -235,15 +235,15 @@ export function LayerManager() {
           </ScrollArea>
         </div>
 
-        {/* Configurações da camada ativa */}
+        {/* Active layer settings */}
         {activeLayer && (
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-white">Configurações da Camada</h4>
+            <h4 className="text-sm font-medium text-white">Layer Settings</h4>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-white">
-                  Opacidade: {Math.round(activeLayer.opacity * 100)}%
+                  Opacity: {Math.round(activeLayer.opacity * 100)}%
                 </Label>
               </div>
               <Slider
@@ -256,13 +256,13 @@ export function LayerManager() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-white">Modo de Mesclagem</Label>
+              <Label className="text-white">Blend Mode</Label>
               <Select
                 value={activeLayer.blendMode}
                 onValueChange={(value) => updateLayer(activeLayer.id, { blendMode: value })}
               >
                 <SelectTrigger className="bg-neutral-900 border-neutral-700 text-white">
-                  <SelectValue placeholder="Selecione o modo de mesclagem" />
+                  <SelectValue placeholder="Pick a blend mode" />
                 </SelectTrigger>
                 <SelectContent className="bg-neutral-900 border-neutral-700 text-white">
                   {Object.entries(blendModes).map(([value, label]) => (
@@ -275,7 +275,7 @@ export function LayerManager() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-white">Esquema de Cores</Label>
+              <Label className="text-white">Color Scheme</Label>
               <Select
                 value={activeLayer.colorScheme}
                 onValueChange={(value) =>
@@ -283,7 +283,7 @@ export function LayerManager() {
                 }
               >
                 <SelectTrigger className="bg-neutral-900 border-neutral-700 text-white">
-                  <SelectValue placeholder="Selecione o esquema de cores" />
+                  <SelectValue placeholder="Pick a color scheme" />
                 </SelectTrigger>
                 <SelectContent className="bg-neutral-900 border-neutral-700 text-white max-h-60">
                   {Object.entries(colorSchemes).map(([key, scheme]) => (
@@ -301,17 +301,17 @@ export function LayerManager() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-white">
-                  Escala de Ruído: {activeLayer.noiseScale.toFixed(1)}
+                  Noise Scale: {activeLayer.noiseScale.toFixed(1)}
                 </Label>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs text-neutral-400 hover:text-white"
                   onClick={() => updateLayer(activeLayer.id, { seed: generateSeed() })}
-                  title="Sortear outra forma para esta camada"
+                  title="Roll another shape for this layer"
                 >
                   <Waves className="h-3.5 w-3.5 mr-1" />
-                  Forma
+                  Shape
                 </Button>
               </div>
               <Slider
@@ -326,7 +326,7 @@ export function LayerManager() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-white">
-                  Intensidade do Fluxo: {activeLayer.flowIntensity.toFixed(2)}
+                  Flow Intensity: {activeLayer.flowIntensity.toFixed(2)}
                 </Label>
               </div>
               <Slider

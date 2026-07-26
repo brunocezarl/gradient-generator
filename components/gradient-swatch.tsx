@@ -4,9 +4,9 @@ import { stopsToCss, type ColorStop } from "@/lib/color-stops"
 import type { ColorBlendSpace } from "@/lib/color"
 import { cn } from "@/lib/utils"
 
-// Amostra do gradiente formado pelas paradas. Usada nos seletores de esquema,
-// nas miniaturas e no editor de paradas — uma única fonte para o preview, com o
-// mesmo espaço de interpolação do render.
+// Swatch of the gradient formed by the stops. Used in scheme selectors, in
+// thumbnails and in the stops editor — one source for the preview, in the same
+// interpolation space as the render.
 export function GradientSwatch({
   stops,
   blendSpace = "oklab",
@@ -26,7 +26,7 @@ export function GradientSwatch({
   )
 }
 
-// Bolinhas com as cores das paradas, para listas compactas (seletores)
+// Dots with the stop colors, for compact lists (selectors)
 export function StopDots({ stops }: { stops: readonly ColorStop[] }) {
   return (
     <span className="flex mr-2 shrink-0">

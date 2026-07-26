@@ -2,16 +2,16 @@ import { srgbTripletToLinear, linearTripletToSrgb, type RgbTriplet } from "@/lib
 import { linearToOklab, oklabToLinear } from "@/lib/oklch"
 import { MAX_COLOR_STOPS } from "@/lib/shaders/organic-gradient"
 
-// Paradas de cor com posição.
+// Color stops with positions.
 //
-// Antes o gradiente tinha exatamente três cores fixas em 0, 0.5 e 1 — o que
-// obriga o designer a aceitar a distribuição do gerador em vez de compor a
-// própria. Aqui são de 2 a 8 paradas, cada uma com posição própria.
+// The gradient used to have exactly three colors pinned at 0, 0.5 and 1 — which
+// forces the designer to accept the generator's distribution instead of
+// composing their own. Here there are 2 to 8 stops, each with its own position.
 
 export interface ColorStop {
-  /** Cor em sRGB 0-1 */
+  /** Color in sRGB 0-1 */
   color: RgbTriplet
-  /** Posição em 0-1 ao longo do gradiente */
+  /** Position in 0-1 along the gradient */
   position: number
 }
 
@@ -29,7 +29,7 @@ export function evenlySpacedPositions(count: number): number[] {
   return Array.from({ length: count }, (_, index) => index / (count - 1))
 }
 
-/** Cria paradas a partir de uma lista de cores, distribuídas uniformemente */
+/** Builds evenly spaced stops from a list of colors */
 export function stopsFromColors(
   colors: readonly (readonly number[])[],
   positions?: readonly number[]
@@ -42,9 +42,9 @@ export function stopsFromColors(
 }
 
 /**
- * Valida e ordena paradas vindas de fora (localStorage, link compartilhado,
- * arquivo de biblioteca). Sempre devolve algo renderizável: o shader recebe
- * posições ordenadas, e menos de duas paradas não formam gradiente.
+ * Validates and sorts stops coming from outside (localStorage, shared link,
+ * library file). Always returns something renderable: the shader needs ascending
+ * positions, and fewer than two stops is not a gradient.
  */
 export function normalizeStops(input: unknown, fallback: ColorStop[]): ColorStop[] {
   if (!Array.isArray(input)) return fallback.map((stop) => ({ ...stop }))
@@ -79,7 +79,7 @@ export function sortStops(stops: readonly ColorStop[]): ColorStop[] {
   return [...stops].sort((a, b) => a.position - b.position)
 }
 
-/** Interpola em Oklab: o meio entre duas paradas não escurece */
+/** Interpolates in Oklab: the middle between two stops does not darken */
 export function mixStopColors(a: RgbTriplet, b: RgbTriplet, t: number): RgbTriplet {
   const labA = linearToOklab(srgbTripletToLinear(a))
   const labB = linearToOklab(srgbTripletToLinear(b))
@@ -93,9 +93,9 @@ export function mixStopColors(a: RgbTriplet, b: RgbTriplet, t: number): RgbTripl
 }
 
 /**
- * Adiciona uma parada no maior vão entre paradas existentes, com a cor que já
- * estava ali — a nova parada não muda a aparência do gradiente, só dá controle
- * sobre aquele ponto.
+ * Adds a stop in the largest gap between existing stops, using the color that
+ * was already there — the new stop does not change how the gradient looks, it
+ * just gives control over that point.
  */
 export function insertStop(stops: readonly ColorStop[]): ColorStop[] {
   if (stops.length >= MAX_STOPS) return stops.map((stop) => ({ ...stop }))
@@ -138,8 +138,8 @@ export function updateStopColor(
 }
 
 /**
- * Move uma parada. A ordem não é reordenada durante o arraste: reordenar no
- * meio do gesto faria o slider "pular" para outra parada na mão do usuário.
+ * Moves a stop. The list is not re-sorted during the drag: re-sorting mid-gesture
+ * would make the slider jump to a different stop under the user's cursor.
  */
 export function updateStopPosition(
   stops: readonly ColorStop[],
@@ -155,7 +155,7 @@ export function cloneStops(stops: readonly ColorStop[]): ColorStop[] {
   return stops.map((stop) => ({ color: [...stop.color] as RgbTriplet, position: stop.position }))
 }
 
-// ─── Compatibilidade com o formato de 3 cores ────────────────────────────────
+// ─── Compatibility with the 3-color format ───────────────────────────────────
 
 export interface LegacyColorScheme {
   color1?: number[]
@@ -165,9 +165,9 @@ export interface LegacyColorScheme {
 }
 
 /**
- * Converte o formato antigo (color1/color2/color3) em paradas em 0, 0.5 e 1 —
- * exatamente a distribuição que o shader de três cores usava, então o visual
- * salvo pelo usuário é preservado.
+ * Converts the old format (color1/color2/color3) into stops at 0, 0.5 and 1 —
+ * exactly the distribution the three-color shader used, so whatever the user
+ * saved keeps looking the same.
  */
 export function legacyColorsToStops(legacy: LegacyColorScheme | undefined): ColorStop[] | null {
   if (!legacy) return null
@@ -192,9 +192,9 @@ export function stopToHex(stop: ColorStop): string {
 }
 
 /**
- * Gradiente CSS equivalente às paradas. O espaço de interpolação acompanha o do
- * render: sem `in oklab` o CSS misturaria em sRGB e produziria um meio de
- * gradiente diferente do canvas.
+ * CSS gradient equivalent to the stops. The interpolation space follows the
+ * render: without `in oklab` the CSS would mix in sRGB and produce a different
+ * middle than the canvas.
  */
 export function stopsToCss(
   stops: readonly ColorStop[],

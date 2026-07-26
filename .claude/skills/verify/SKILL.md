@@ -3,38 +3,39 @@ name: verify
 description: Build, launch and drive the gradient generator end-to-end in headless Chromium (WebGL via SwiftShader) to verify changes at the real UI.
 ---
 
-# Verificando o Gradient Generator
+# Verifying the Gradient Generator
 
-## Build e servidor
+## Build and server
 
 ```bash
-npm ci                 # se node_modules não existe
-npm run build          # inclui checagem de tipos
-nohup npm run start > /tmp/server.log 2>&1 &   # serve em http://localhost:3000
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/   # espera 200
+npm ci                 # if node_modules does not exist
+npm run build          # includes type checking
+nohup npm run start > /tmp/server.log 2>&1 &   # serves at http://localhost:3000
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/   # expect 200
 ```
 
-Gotcha: `next start` antigo segura a porta 3000 e serve HTML com referências a
-chunks obsoletos (páginas 400/404, canvas não monta). Antes de re-testar após
-um rebuild: `pkill -f next-server` e confirme que só há um processo.
+Gotcha: an old `next start` holds port 3000 and serves HTML referencing stale
+chunks (400/404 pages, the canvas never mounts). Before re-testing after a
+rebuild: `pkill -f next-server` and confirm only one process remains.
 
-## Drive (Playwright + WebGL headless)
+## Driving it (Playwright + headless WebGL)
 
-O Chromium pré-instalado renderiza o shader WebGL com SwiftShader:
+The pre-installed Chromium renders the WebGL shader through SwiftShader:
 
 ```js
-import { chromium } from "playwright-core" // npm install playwright-core no scratchpad
+import { chromium } from "playwright-core" // npm install playwright-core in the scratchpad
 const browser = await chromium.launch({
   executablePath: "/opt/pw-browsers/chromium",
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--no-sandbox"],
 })
 ```
 
-### Estado determinístico
+### Deterministic state
 
-`reducedMotion: "reduce"` no contexto faz o app iniciar pausado com o relógio da
-animação em exatamente 0 — dois renders da mesma configuração ficam comparáveis
-pixel a pixel. Para fixar a configuração, injete o store antes do load:
+`reducedMotion: "reduce"` on the context makes the app start paused with the
+animation clock at exactly 0 — two renders of the same configuration become
+comparable pixel by pixel. To pin the configuration, inject the store before
+load:
 
 ```js
 await page.addInitScript((value) => {
@@ -42,37 +43,42 @@ await page.addInitScript((value) => {
 }, JSON.stringify({ state: { /* ... */ }, version: 1 }))
 ```
 
-Omitir `version` reproduz o localStorage das versões antigas: o zustand não
-chama `migrate` nesse caso, e a normalização acontece no `merge` do persist.
+Omitting `version` reproduces the localStorage of older releases: zustand does
+not call `migrate` in that case, and normalization happens in the persist
+`merge`.
 
-### Fluxos que valem dirigir
+### Flows worth driving
 
-- **Canvas monta**: `page.locator("canvas").count()` ≥ 1 após ~2s. Em
-  multi-camadas o resultado é **1** canvas (a composição usa render targets, não
-  um contexto WebGL por camada).
-- **Estado do store**: leia `JSON.parse(localStorage.getItem("gradient-store")).state`
-  para asserções (speed, flowIntensity, randomHistory, savedPresets…).
-- **Prancheta**: o `<canvas>` assume a proporção da prancheta escolhida —
-  `boundingBox()` confirma. Exportar sem tocar em "Dimensões" herda as medidas
-  da prancheta.
-- **Exportar imagem**: botão com aria-label "Exportar Imagem" (texto visível
-  "Imagem") → dialog → botão "Exportar" → `waitForEvent("download")`; dimensões
-  do PNG baixado: `buf.readUInt32BE(16)` × `buf.readUInt32BE(20)`.
-- **Timeline**: o thumb tem nome acessível —
-  `page.getByRole("slider", { name: "Instante da animação" })` aceita foco e
-  setas (`Home`/`End` vão aos extremos). Play/pause: botões com aria-label
-  "Reproduzir animação" / "Pausar animação" (use `exact: true`, o painel tem
-  rótulos parecidos).
-- **Loop perfeito**: com `loopDuration > 0`, o frame em `t=0` (`Home`) é
-  idêntico ao frame em `t=T` (`End`).
-- **Exportar vídeo**: WebCodecs existe no Chromium headless, mas só com **VP9**
-  (não há encoder de software para AVC/H.264 aqui) — o app detecta em runtime e
-  oferece apenas WebM. Duração e dimensões do arquivo se medem carregando o blob
-  em um `<video>` na própria página; comparar o frame de `t=0` com o de um ciclo
-  depois verifica a emenda do loop.
-- **Compartilhar**: botão "Compartilhar" → input `#share-url`; abra a URL em um
-  `browser.newContext()` limpo e compare o estado importado.
-- **UI em português**: seletores por texto usam os rótulos PT-BR
-  ("Randomizar", "Restaurar Padrões", aba "Presets").
+- **Canvas mounts**: `page.locator("canvas").count()` ≥ 1 after ~2s. In
+  multi-layer mode the answer is **1** canvas (compositing uses render targets,
+  not one WebGL context per layer).
+- **Store state**: read
+  `JSON.parse(localStorage.getItem("gradient-store")).state` for assertions
+  (speed, customStops, randomHistory, savedPresets…).
+- **Artboard**: the `<canvas>` takes the aspect ratio of the selected artboard —
+  `boundingBox()` confirms it. Exporting without touching "Dimensions" inherits
+  the artboard size.
+- **Export image**: `getByRole("button", { name: "Export Image" })` (the visible
+  label is "Image", the accessible name is the full one) → dialog → "Export"
+  button → `waitForEvent("download")`; PNG dimensions: `buf.readUInt32BE(16)` ×
+  `buf.readUInt32BE(20)`.
+- **Timeline**: the thumb has an accessible name —
+  `page.getByRole("slider", { name: "Animation time" })` takes focus and arrow
+  keys (`Home`/`End` jump to the ends). Play/pause: buttons with aria-label
+  "Play animation" / "Pause animation".
+- **Seamless loop**: with `loopDuration > 0`, the frame at `t=0` (`Home`) is
+  identical to the frame at `t=T` (`End`).
+- **Export video**: WebCodecs exists in headless Chromium, but only with **VP9**
+  (there is no software AVC/H.264 encoder here) — the app detects this at
+  runtime and offers WebM only. Duration and dimensions can be measured by
+  loading the blob into a `<video>` on the page itself; comparing the frame at
+  `t=0` with the one a cycle later verifies the loop seam.
+- **Color stops**: the "Colors" tab exposes the stop list, harmonies, palette
+  extraction and the WCAG readout. Stop positions live in `state.customStops`.
+- **Share**: "Share" button → `#share-url` input; open the URL in a clean
+  `browser.newContext()` and compare the imported state.
+- **UI language**: the interface is English-only — selectors use labels such as
+  "Randomize", "Restore Defaults", the "Presets" tab.
 
-Um 404 no console ao carregar é o favicon ausente — pré-existente, ignorar.
+A 404 in the console used to be the missing favicon; `app/icon.svg` now covers
+it, so a 404 is worth investigating.

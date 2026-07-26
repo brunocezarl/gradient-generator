@@ -10,10 +10,11 @@ import { stopsFromColors } from "@/lib/color-stops"
 import { useToast } from "@/components/ui/use-toast"
 import type { RgbTriplet } from "@/lib/color"
 
-// Extrair a paleta de uma imagem de referência.
+// Extract the palette from a reference image.
 //
-// É como uma paleta nasce na prática: o designer já tem a foto, o frame ou o
-// print que define o clima da peça. Digitar os hex na mão é retrabalho.
+// This is how a palette is born in practice: the designer already has the photo,
+// the frame or the screenshot that sets the mood. Typing hex values by hand is
+// busywork.
 export function PaletteFromImage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<RgbTriplet[]>([])
@@ -30,15 +31,15 @@ export function PaletteFromImage() {
       const image = await new Promise<HTMLImageElement>((resolve, reject) => {
         const element = new Image()
         element.onload = () => resolve(element)
-        element.onerror = () => reject(new Error("Não foi possível abrir a imagem"))
+        element.onerror = () => reject(new Error("Could not open the image"))
         element.src = url
       })
 
       const extracted = await extractPaletteFromImage(image, { count: 4 })
       if (extracted.length < 2) {
         toast({
-          title: "Poucas cores",
-          description: "A imagem não tem cores distintas suficientes para uma paleta.",
+          title: "Not enough colors",
+          description: "This image has too few distinct colors for a palette.",
           variant: "destructive",
         })
         return
@@ -48,13 +49,13 @@ export function PaletteFromImage() {
       setCustomMode(true)
       setStops(stopsFromColors(extracted))
       toast({
-        title: "Paleta extraída",
-        description: `${extracted.length} cores dominantes viraram paradas do gradiente.`,
+        title: "Palette extracted",
+        description: `${extracted.length} dominant colors became gradient stops.`,
       })
     } catch (error) {
       toast({
-        title: "Erro ao ler a imagem",
-        description: error instanceof Error ? error.message : "Tente outro arquivo.",
+        title: "Could not read the image",
+        description: error instanceof Error ? error.message : "Try another file.",
         variant: "destructive",
       })
     } finally {
@@ -65,7 +66,7 @@ export function PaletteFromImage() {
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-neutral-400">Paleta de uma imagem</Label>
+      <Label className="text-xs text-neutral-400">Palette from an image</Label>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -79,7 +80,7 @@ export function PaletteFromImage() {
           ) : (
             <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
           )}
-          Extrair de imagem
+          Extract from image
         </Button>
 
         {palette.length > 0 && (
@@ -102,11 +103,11 @@ export function PaletteFromImage() {
         type="file"
         accept="image/*"
         className="hidden"
-        aria-label="Imagem de referência para extrair a paleta"
+        aria-label="Reference image to extract the palette from"
         onChange={(event) => {
           const file = event.target.files?.[0]
           if (file) handleFile(file)
-          // Permite reabrir o mesmo arquivo depois de ajustar a paleta
+          // Allows re-opening the same file after tweaking the palette
           event.target.value = ""
         }}
       />
