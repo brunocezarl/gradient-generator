@@ -6,9 +6,11 @@ noise, rendered through React Three Fiber.
 
 ## Features
 
-- **Artboard at the output ratio** (Full HD, 4K, story, 4:5 post, Open Graph,
-  A4…) with safe area guides: the preview shows the real framing and the export
-  inherits those dimensions
+- **Artboard at the output ratio** (Full HD, 4K, 4:3, story, 4:5 post, Open
+  Graph, A4…) with safe area guides: the preview shows the real framing and the
+  export inherits those dimensions. Ratio chips (Free, 16:9, 1:1, 4:3, 9:16)
+  make the framing one click, and the full list keeps the exact pixel sizes —
+  picking 4K leaves the 16:9 chip lit, because it is the same framing
 - **Timeline** with scrubbing, frame-by-frame stepping and frame freezing — the
   instant of the animation is a visible, reproducible value
 - **Seamless loop**: with a period set, the animation travels a closed path
@@ -19,7 +21,8 @@ noise, rendered through React Three Fiber.
   with sRGB encoding on output — the HEX picked in the picker is exactly the
   exported pixel. Sub-quantization triangular dither removes the banding smooth
   8-bit gradients always produce
-- **2 to 8 color stops**, each with its own position along the gradient
+- **2 to 8 color stops**, each with its own position along the gradient, set by
+  slider or typed as a percentage
 - **Color picker in OKLCH**, RGB, HSL or HEX: adjusting lightness or chroma in
   OKLCH does not shift the hue (lightening a red in HSL pulls it toward pink),
   and the chroma slider respects the real sRGB ceiling for that color
@@ -104,6 +107,11 @@ lib/shaders/  # single source of the GLSL (gradient + layer compositing)
 - **Persistence**: the store is versioned (`PERSIST_VERSION`) and normalized on
   hydration. Since zustand only calls `migrate` when the stored JSON has a
   numeric `version`, normalization runs in `merge`, which always executes.
+- **Controls**: the panel is a set of collapsible sections (Canvas, Adjustments,
+  Color, Presets, Shape, Grain, Motion, Layers) rather than tabs — the framing
+  and the palette are what a session opens with, and everything else stays
+  folded until it is needed. Framing lives in the panel, not the top bar, so the
+  ratio sits next to the colors it frames.
 - **Time**: the animation clock lives in `lib/playback.ts`, outside React and
   outside the render loop — each canvas used to accumulate its own time, which
   made speed in multi-layer mode depend on how many layers were visible. The

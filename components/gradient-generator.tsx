@@ -21,15 +21,6 @@ import { useFullscreen } from "@/hooks/use-fullscreen"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import { usePlaybackDriver } from "@/hooks/use-playback-driver"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -38,7 +29,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Keyboard, PanelLeftClose, PanelLeftOpen } from "lucide-react"
-import { artboards } from "@/lib/artboards"
 
 // ─── Shortcut table shown in the dialog ──────────────────────────────────────
 const SHORTCUTS = [
@@ -65,10 +55,6 @@ export default function GradientGenerator() {
   const resetToDefaults = useGradientStore((state) => state.resetToDefaults)
   const undo = useGradientStore((state) => state.undo)
   const redo = useGradientStore((state) => state.redo)
-  const artboardId = useGradientStore((state) => state.artboardId)
-  const setArtboard = useGradientStore((state) => state.setArtboard)
-  const showSafeAreas = useGradientStore((state) => state.showSafeAreas)
-  const setShowSafeAreas = useGradientStore((state) => state.setShowSafeAreas)
 
   const { toggleFullscreen } = useFullscreen()
 
@@ -201,36 +187,6 @@ export default function GradientGenerator() {
         <h1 className="text-sm font-medium tracking-tight mr-2 hidden sm:block">
           Organic Gradients
         </h1>
-
-        {/* Artboard: sets the preview ratio and the file size */}
-        <div className="flex items-center gap-2">
-          <Select value={artboardId} onValueChange={setArtboard}>
-            <SelectTrigger
-              className="h-8 w-[190px] md:w-[230px] bg-neutral-900 border-neutral-700 text-white text-xs"
-              aria-label="Artboard"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-neutral-900 border-neutral-700 text-white max-h-72">
-              {artboards.map((artboard) => (
-                <SelectItem key={artboard.id} value={artboard.id}>
-                  {artboard.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="hidden md:flex items-center gap-2">
-            <Switch
-              id="safe-areas"
-              checked={showSafeAreas}
-              onCheckedChange={setShowSafeAreas}
-            />
-            <Label htmlFor="safe-areas" className="text-xs text-neutral-400">
-              Guides
-            </Label>
-          </div>
-        </div>
 
         <div className="flex-1" />
 
