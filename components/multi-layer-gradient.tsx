@@ -47,6 +47,9 @@ function LayeredComposition({
     grainAmount: number
     grainScale: number
     vibrance: number
+    exposure: number
+    brightness: number
+    contrast: number
     blendSpace: "oklab" | "linear"
     loopDuration: number
   }
@@ -191,6 +194,9 @@ function LayeredComposition({
             grainAmount={globals.grainAmount}
             grainScale={globals.grainScale}
             vibrance={globals.vibrance}
+            exposure={globals.exposure}
+            brightness={globals.brightness}
+            contrast={globals.contrast}
             blendSpace={globals.blendSpace}
             loopDuration={globals.loopDuration}
             stops={layerStops(layer)}
@@ -222,6 +228,9 @@ export function MultiLayerGradient() {
       grainAmount: state.grainAmount,
       grainScale: state.grainScale,
       vibrance: state.vibrance,
+      exposure: state.exposure,
+      brightness: state.brightness,
+      contrast: state.contrast,
       blendSpace: state.blendSpace,
       loopDuration: state.loopDuration,
     }))

@@ -26,6 +26,8 @@ further passes went in on top of it.
 
 ### Color
 - OKLCH engine: conversions, gamut clamping on chroma, harmonies, WCAG contrast
+- Tone controls: exposure (linear, in stops) plus brightness and contrast on
+  Oklab lightness, neutral by default and skipped while neutral
 - 2 to 8 color stops with positions
 - Palette extraction from a reference image (k-means in Oklab)
 - Shader-rendered preset thumbnails and a portable JSON library

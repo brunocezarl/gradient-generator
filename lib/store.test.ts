@@ -8,6 +8,7 @@ import {
   migratePersistedState,
   normalizePersistedState,
   PERSIST_VERSION,
+  type StateSnapshot,
 } from "@/lib/store"
 
 // Snapshot of the initial state, restored between tests
@@ -762,12 +763,17 @@ describe("presets store the layer composition", () => {
       blendSpace: "oklab" as const,
       seed: [0, 0] as [number, number],
       loopDuration: 0,
-    }
+      // No exposure/brightness/contrast: this snapshot predates the tone controls
+    } as StateSnapshot
 
     useGradientStore.getState().applySnapshot(legacySnapshot)
 
     expect(useGradientStore.getState().speed).toBe(2)
     expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual(before)
+    // Missing tone falls back to neutral rather than reaching the shader as NaN
+    expect(useGradientStore.getState().exposure).toBe(0)
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1)
   })
 })
 
@@ -938,6 +944,9 @@ describe("migratePersistedState", () => {
     expect(migratePersistedState("garbage", 0)).toBe("garbage")
     expect(migratePersistedState({}, 0)).toEqual({
       vibrance: 0,
+      exposure: 0,
+      brightness: 0,
+      contrast: 1,
       blendSpace: "oklab",
       loopDuration: 0,
       seed: [0, 0],
@@ -1161,5 +1170,89 @@ describe("color stops", () => {
       })
       expect(saturated).toBe(true)
     }
+  })
+})
+
+// ─── Tone controls ───────────────────────────────────────────────────────────
+
+describe("tone controls", () => {
+  it("start neutral, so the pipeline is a no-op until touched", () => {
+    expect(useGradientStore.getState().exposure).toBe(0)
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1)
+  })
+
+  it("travel in snapshots and come back through undo", () => {
+    const store = useGradientStore.getState()
+    store.setExposure(0.5)
+    now += 2000
+    store.setContrast(1.6)
+    now += 2000
+    store.setBrightness(-0.1)
+
+    expect(useGradientStore.getState().exposure).toBe(0.5)
+    expect(useGradientStore.getState().contrast).toBe(1.6)
+    expect(useGradientStore.getState().brightness).toBe(-0.1)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1.6)
+  })
+
+  it("go back to neutral on reset", () => {
+    const store = useGradientStore.getState()
+    store.setExposure(1.5)
+    store.setBrightness(0.2)
+    store.setContrast(0.7)
+
+    useGradientStore.getState().resetToDefaults()
+
+    expect(useGradientStore.getState().exposure).toBe(0)
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1)
+  })
+
+  it("are filled in when hydrating a state that predates them", () => {
+    const normalized = normalizePersistedState({
+      speed: 1,
+      vibrance: 0,
+    }) as Record<string, unknown>
+
+    expect(normalized.exposure).toBe(0)
+    expect(normalized.brightness).toBe(0)
+    expect(normalized.contrast).toBe(1)
+  })
+
+  it("survive a stored value of the wrong type", () => {
+    const normalized = normalizePersistedState({
+      exposure: "bright",
+      brightness: null,
+      contrast: undefined,
+    }) as Record<string, unknown>
+
+    expect(normalized.exposure).toBe(0)
+    expect(normalized.brightness).toBe(0)
+    expect(normalized.contrast).toBe(1)
+  })
+
+  it("are clamped when they arrive from a link", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      exposure: 99,
+      brightness: -99,
+      contrast: 0,
+    })
+
+    expect(useGradientStore.getState().exposure).toBe(2)
+    expect(useGradientStore.getState().brightness).toBe(-0.3)
+    expect(useGradientStore.getState().contrast).toBe(0.5)
   })
 })

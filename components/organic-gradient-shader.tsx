@@ -24,6 +24,12 @@ export interface OrganicGradientParams {
   thresholdMin: number
   thresholdMax: number
   vibrance: number
+  /** Stops of light, applied as a linear multiply */
+  exposure: number
+  /** Offset on Oklab lightness */
+  brightness: number
+  /** Gain on Oklab lightness around the mid point */
+  contrast: number
   blendSpace: ColorBlendSpace
   seed: [number, number]
   // 0 = free animation; > 0 = period over which the drawing repeats exactly
@@ -80,6 +86,9 @@ export function OrganicGradientShader({
   thresholdMin,
   thresholdMax,
   vibrance,
+  exposure,
+  brightness,
+  contrast,
   blendSpace,
   seed,
   loopDuration,
@@ -104,6 +113,9 @@ export function OrganicGradientShader({
       uThresholdMin: { value: thresholdMin },
       uThresholdMax: { value: thresholdMax },
       uVibrance: { value: vibrance },
+      uExposure: { value: exposure },
+      uBrightness: { value: brightness },
+      uContrast: { value: contrast },
       uOklabMix: { value: blendSpace === "oklab" ? 1 : 0 },
       uSeed: { value: [seed[0], seed[1]] },
       uLoopDuration: { value: loopDuration },
@@ -124,6 +136,9 @@ export function OrganicGradientShader({
     material.uniforms.uThresholdMin.value = thresholdMin
     material.uniforms.uThresholdMax.value = thresholdMax
     material.uniforms.uVibrance.value = vibrance
+    material.uniforms.uExposure.value = exposure
+    material.uniforms.uBrightness.value = brightness
+    material.uniforms.uContrast.value = contrast
     material.uniforms.uOklabMix.value = blendSpace === "oklab" ? 1 : 0
     material.uniforms.uSeed.value = [seed[0], seed[1]]
     material.uniforms.uLoopDuration.value = loopDuration
@@ -141,6 +156,9 @@ export function OrganicGradientShader({
     thresholdMin,
     thresholdMax,
     vibrance,
+    exposure,
+    brightness,
+    contrast,
     blendSpace,
     seed,
     loopDuration,

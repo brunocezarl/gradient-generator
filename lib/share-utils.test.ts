@@ -9,6 +9,50 @@ beforeAll(() => {
 })
 
 describe("createShareableURL / parseShareableURL", () => {
+  it("carries the tone controls through a link", () => {
+    const url = createShareableURL({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customStops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      exposure: -0.75,
+      brightness: 0.12,
+      contrast: 1.4,
+    })
+
+    const parsed = parseShareableURL(url)
+    expect(parsed!.exposure).toBe(-0.75)
+    expect(parsed!.brightness).toBe(0.12)
+    expect(parsed!.contrast).toBe(1.4)
+  })
+
+  it("leaves tone undefined on a link that predates it", () => {
+    // A v1 link, hand-built the way an older release wrote them: no tone keys at
+    // all. They have to come back absent rather than zeroed, because
+    // importSettings only overrides what the link actually carries — a link from
+    // before the controls existed must not silently reset the tone in the app.
+    const legacy = encodeURIComponent(
+      JSON.stringify({
+        speed: 1,
+        complexity: 3,
+        noiseScale: 2,
+        colorScheme: "redBlue",
+        isCustomMode: false,
+      })
+    )
+
+    const parsed = parseShareableURL(`https://gradients.example/?gradient=${legacy}`)
+    expect(parsed).not.toBeNull()
+    expect(parsed!.exposure).toBeUndefined()
+    expect(parsed!.brightness).toBeUndefined()
+    expect(parsed!.contrast).toBeUndefined()
+  })
+
   it("round-trips the gradient parameters", () => {
     const url = createShareableURL({
       speed: 2.5,

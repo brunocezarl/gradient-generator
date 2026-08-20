@@ -29,6 +29,11 @@ export interface ThumbnailParams {
   thresholdMin: number
   thresholdMax: number
   vibrance: number
+  // Optional: presets written before the tone controls existed carry no value,
+  // and an undefined uniform would render the thumbnail black
+  exposure?: number
+  brightness?: number
+  contrast?: number
   blendSpace: "oklab" | "linear"
   seed: [number, number]
   loopDuration: number
@@ -143,6 +148,9 @@ export function renderThumbnail(
   uniforms.uThresholdMin.value = params.thresholdMin
   uniforms.uThresholdMax.value = params.thresholdMax
   uniforms.uVibrance.value = params.vibrance
+  uniforms.uExposure.value = params.exposure ?? 0
+  uniforms.uBrightness.value = params.brightness ?? 0
+  uniforms.uContrast.value = params.contrast ?? 1
   uniforms.uOklabMix.value = params.blendSpace === "oklab" ? 1 : 0
   uniforms.uSeed.value = [params.seed[0], params.seed[1]]
   uniforms.uLoopDuration.value = params.loopDuration

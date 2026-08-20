@@ -59,6 +59,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     thresholdMin,
     thresholdMax,
     vibrance,
+    exposure,
+    brightness,
+    contrast,
     blendSpace,
     multiLayerMode,
     setSpeed,
@@ -76,6 +79,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     setThresholdMin,
     setThresholdMax,
     setVibrance,
+    setExposure,
+    setBrightness,
+    setContrast,
     setBlendSpace,
     shuffleSeed,
   } = useGradientStore(
@@ -93,6 +99,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       thresholdMin: state.thresholdMin,
       thresholdMax: state.thresholdMax,
       vibrance: state.vibrance,
+      exposure: state.exposure,
+      brightness: state.brightness,
+      contrast: state.contrast,
       blendSpace: state.blendSpace,
       multiLayerMode: state.multiLayerMode,
       setSpeed: state.setSpeed,
@@ -110,6 +119,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       setThresholdMin: state.setThresholdMin,
       setThresholdMax: state.setThresholdMax,
       setVibrance: state.setVibrance,
+      setExposure: state.setExposure,
+      setBrightness: state.setBrightness,
+      setContrast: state.setContrast,
       setBlendSpace: state.setBlendSpace,
       shuffleSeed: state.shuffleSeed,
     }))
@@ -137,6 +149,55 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           <AccordionContent className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center">
+                <Label className="text-white">
+                  Exposure: {exposure > 0 ? "+" : ""}{exposure.toFixed(2)} EV
+                </Label>
+                <TooltipHelp content="Light, in stops: +1 is exactly twice as much. It multiplies in linear space, the way a camera does, so it can push colors past what the screen can show and clip them." />
+              </div>
+              <Slider
+                value={[exposure]}
+                min={-2}
+                max={2}
+                step={0.05}
+                onValueChange={(value) => setExposure(value[0])}
+                thumbLabel="Exposure"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label className="text-white">
+                  Brightness: {brightness > 0 ? "+" : ""}{brightness.toFixed(2)}
+                </Label>
+                <TooltipHelp content="Moves Oklab lightness. Unlike scaling the RGB channels, it leaves hue and chroma untouched — a red brightened here stays that red instead of drifting to orange." />
+              </div>
+              <Slider
+                value={[brightness]}
+                min={-0.3}
+                max={0.3}
+                step={0.01}
+                onValueChange={(value) => setBrightness(value[0])}
+                thumbLabel="Brightness"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label className="text-white">Contrast: {contrast.toFixed(2)}×</Label>
+                <TooltipHelp content="Opens and closes the lightness range around its perceptual middle. Below 1.00 the gradient flattens toward mid gray; above it the light and dark ends pull apart." />
+              </div>
+              <Slider
+                value={[contrast]}
+                min={0.5}
+                max={2}
+                step={0.05}
+                onValueChange={(value) => setContrast(value[0])}
+                thumbLabel="Contrast"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
                 <Label className="text-white">Vibrance: {vibrance.toFixed(2)}</Label>
                 <TooltipHelp content="Pushes colors away from the gray of equal lightness. At 0.00 the gradient delivers exactly the colors you picked — high values saturate and can clip channels." />
               </div>
@@ -149,6 +210,11 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                 thumbLabel="Vibrance"
               />
             </div>
+
+            <p className="text-xs text-neutral-500">
+              All four are neutral by default. Left alone, the pipeline hands back
+              exactly the colors you picked.
+            </p>
           </AccordionContent>
         </AccordionItem>
 

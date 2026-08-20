@@ -51,6 +51,9 @@ export type StateSnapshot = {
   thresholdMin: number
   thresholdMax: number
   vibrance: number
+  exposure: number
+  brightness: number
+  contrast: number
   blendSpace: ColorBlendSpace
   seed: [number, number]
   loopDuration: number
@@ -109,6 +112,9 @@ function captureSnapshot(state: GradientStore): StateSnapshot {
     thresholdMin: state.thresholdMin,
     thresholdMax: state.thresholdMax,
     vibrance: state.vibrance,
+    exposure: state.exposure,
+    brightness: state.brightness,
+    contrast: state.contrast,
     blendSpace: state.blendSpace,
     seed: [...state.seed] as [number, number],
     loopDuration: state.loopDuration,
@@ -137,6 +143,11 @@ function snapshotToState(
     thresholdMin: snapshot.thresholdMin,
     thresholdMax: snapshot.thresholdMax,
     vibrance: snapshot.vibrance,
+    // Presets written before the tone controls fall back to neutral rather than
+    // to NaN — a snapshot is data from an older version, not a promise
+    exposure: snapshot.exposure ?? defaultState.exposure,
+    brightness: snapshot.brightness ?? defaultState.brightness,
+    contrast: snapshot.contrast ?? defaultState.contrast,
     blendSpace: snapshot.blendSpace,
     seed: [...snapshot.seed] as [number, number],
     loopDuration: snapshot.loopDuration,
@@ -175,6 +186,11 @@ export type GradientStore = {
   thresholdMin: number
   thresholdMax: number
   vibrance: number
+  // Tone. Exposure is light (linear multiply, in stops); brightness and contrast
+  // move Oklab lightness, so they never drag hue with them.
+  exposure: number
+  brightness: number
+  contrast: number
   blendSpace: ColorBlendSpace
   // Loop duration in animation seconds. 0 = free animation (drifts without
   // repeating); > 0 brings the drawing back exactly to the start over that
@@ -233,6 +249,9 @@ export type GradientStore = {
   setThresholdMin: (value: number) => void
   setThresholdMax: (value: number) => void
   setVibrance: (value: number) => void
+  setExposure: (value: number) => void
+  setBrightness: (value: number) => void
+  setContrast: (value: number) => void
   setBlendSpace: (value: ColorBlendSpace) => void
   setLoopDuration: (value: number) => void
   shuffleSeed: () => void
@@ -289,6 +308,9 @@ type StoreActions = Pick<
   | "setThresholdMin"
   | "setThresholdMax"
   | "setVibrance"
+  | "setExposure"
+  | "setBrightness"
+  | "setContrast"
   | "setBlendSpace"
   | "setLoopDuration"
   | "shuffleSeed"
@@ -336,6 +358,11 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   // Neutral vibrance by default: the HEX picked in the picker is exactly the
   // exported pixel. Anyone who wants more saturation raises it deliberately.
   vibrance: 0,
+  // Neutral tone, for the same reason as vibrance: untouched, the pipeline hands
+  // back exactly the color that went in
+  exposure: 0,
+  brightness: 0,
+  contrast: 1,
   blendSpace: "oklab",
   loopDuration: 0,
   seed: [0, 0],
@@ -469,6 +496,10 @@ function migrateSnapshot(snapshot: unknown): unknown {
   return {
     ...source,
     vibrance: typeof source.vibrance === "number" ? source.vibrance : defaultState.vibrance,
+    exposure: typeof source.exposure === "number" ? source.exposure : defaultState.exposure,
+    brightness:
+      typeof source.brightness === "number" ? source.brightness : defaultState.brightness,
+    contrast: typeof source.contrast === "number" ? source.contrast : defaultState.contrast,
     blendSpace:
       typeof source.blendSpace === "string" && source.blendSpace in colorBlendSpaces
         ? source.blendSpace
@@ -493,6 +524,9 @@ export function normalizePersistedState(persisted: unknown): unknown {
   const state = { ...(persisted as Record<string, unknown>) }
 
   if (typeof state.vibrance !== "number") state.vibrance = defaultState.vibrance
+  if (typeof state.exposure !== "number") state.exposure = defaultState.exposure
+  if (typeof state.brightness !== "number") state.brightness = defaultState.brightness
+  if (typeof state.contrast !== "number") state.contrast = defaultState.contrast
   if (typeof state.blendSpace !== "string" || !(state.blendSpace in colorBlendSpaces)) {
     state.blendSpace = defaultState.blendSpace
   }
@@ -723,6 +757,18 @@ export const useGradientStore = create<GradientStore>()(
         recordEdit("vibrance")
         set({ vibrance: value })
       },
+      setExposure: (value) => {
+        recordEdit("exposure")
+        set({ exposure: value })
+      },
+      setBrightness: (value) => {
+        recordEdit("brightness")
+        set({ brightness: value })
+      },
+      setContrast: (value) => {
+        recordEdit("contrast")
+        set({ contrast: value })
+      },
       setBlendSpace: (value) => {
         get().pushHistory()
         set({ blendSpace: value })
@@ -807,6 +853,9 @@ export const useGradientStore = create<GradientStore>()(
           thresholdMin: defaultState.thresholdMin,
           thresholdMax: defaultState.thresholdMax,
           vibrance: defaultState.vibrance,
+          exposure: defaultState.exposure,
+          brightness: defaultState.brightness,
+          contrast: defaultState.contrast,
           blendSpace: defaultState.blendSpace,
           loopDuration: defaultState.loopDuration,
           seed: [...defaultState.seed] as [number, number],
@@ -860,6 +909,12 @@ export const useGradientStore = create<GradientStore>()(
         }
         if (settings.vibrance !== undefined)
           validatedSettings.vibrance = clampNum(settings.vibrance, -1, 1, 0)
+        if (settings.exposure !== undefined)
+          validatedSettings.exposure = clampNum(settings.exposure, -2, 2, 0)
+        if (settings.brightness !== undefined)
+          validatedSettings.brightness = clampNum(settings.brightness, -0.3, 0.3, 0)
+        if (settings.contrast !== undefined)
+          validatedSettings.contrast = clampNum(settings.contrast, 0.5, 2, 1)
         if (settings.blendSpace !== undefined)
           validatedSettings.blendSpace =
             settings.blendSpace in colorBlendSpaces
@@ -1065,6 +1120,9 @@ export const useGradientStore = create<GradientStore>()(
         thresholdMin: state.thresholdMin,
         thresholdMax: state.thresholdMax,
         vibrance: state.vibrance,
+        exposure: state.exposure,
+        brightness: state.brightness,
+        contrast: state.contrast,
         blendSpace: state.blendSpace,
         loopDuration: state.loopDuration,
         seed: state.seed,

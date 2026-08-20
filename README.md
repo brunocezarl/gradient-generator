@@ -26,6 +26,12 @@ noise, rendered through React Three Fiber.
 - **Color picker in OKLCH**, RGB, HSL or HEX: adjusting lightness or chroma in
   OKLCH does not shift the hue (lightening a red in HSL pulls it toward pink),
   and the chroma slider respects the real sRGB ceiling for that color
+- **Tone controls**: exposure in stops (a linear multiply, the way a camera
+  works), plus brightness and contrast acting on Oklab lightness — moving L
+  leaves hue and chroma where the picker put them, unlike scaling RGB channels,
+  which turns a brightened red into orange. All neutral by default, and the
+  shader skips the whole path while they are, so an untouched gradient is still
+  bit for bit the colors you picked
 - **Harmonies** (analogous, complementary, split complementary, triadic,
   monochromatic) derived from the first stop, keeping the positions
 - **Palette extracted from a reference image**, clustered in Oklab
@@ -107,6 +113,16 @@ lib/shaders/  # single source of the GLSL (gradient + layer compositing)
 - **Persistence**: the store is versioned (`PERSIST_VERSION`) and normalized on
   hydration. Since zustand only calls `migrate` when the stored JSON has a
   numeric `version`, normalization runs in `merge`, which always executes.
+- **Tone**: exposure multiplies in linear space before the sRGB encode — the
+  physical meaning of a stop of light. Brightness and contrast instead convert to
+  Oklab and move `L` alone (contrast pivots at `L = 0.5`, the middle of the
+  lightness axis), so hue and chroma survive; measured on in-gamut colors, hue
+  moves under 2°, which is 8-bit quantization rather than the maths. Pushing a
+  saturated color past the sRGB ceiling still clips, and clipping desaturates —
+  that is the gamut, not the transform. The Oklab round trip is skipped entirely
+  while brightness is 0 and contrast is 1, so the neutral pipeline is provably a
+  no-op: the exported PNG is byte-identical to the build from before the controls
+  existed.
 - **Controls**: the panel is a set of collapsible sections (Canvas, Adjustments,
   Color, Presets, Shape, Grain, Motion, Layers) rather than tabs — the framing
   and the palette are what a session opens with, and everything else stays

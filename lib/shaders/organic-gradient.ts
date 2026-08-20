@@ -33,6 +33,9 @@ export const organicGradientFragmentShader = /* glsl */ `
   uniform float uThresholdMin;
   uniform float uThresholdMax;
   uniform float uVibrance;
+  uniform float uExposure;   // stops of light, linear multiply
+  uniform float uBrightness; // offset on Oklab lightness
+  uniform float uContrast;   // gain on Oklab lightness around the mid point
   uniform float uOklabMix;     // 1.0 = mix in Oklab, 0.0 = in linear RGB
   uniform vec2 uSeed;          // offset into the noise field
   uniform float uLoopDuration; // 0 = free animation; > 0 = loop period
@@ -136,6 +139,20 @@ export const organicGradientFragmentShader = /* glsl */ `
     return mix(vec3(luminance), color, 1.0 + amount);
   }
 
+  // Brightness and contrast act on Oklab lightness, not on the RGB channels.
+  // Scaling channels drags hue along with it — a red pushed brighter turns
+  // orange, the same failure that makes lightening in HSL useless — while
+  // moving L alone leaves hue and chroma exactly where the picker put them.
+  //
+  // Contrast pivots at L = 0.5, the middle of the lightness axis, so it opens
+  // and closes symmetrically around the perceptual mid point rather than around
+  // some channel value.
+  vec3 applyTone(vec3 color, float brightness, float contrast) {
+    vec3 lab = linearToOklab(color);
+    lab.x = (lab.x - 0.5) * contrast + 0.5 + brightness;
+    return oklabToLinear(lab);
+  }
+
   // Gradient color at position t (0-1), walking the stops.
   //
   // The last stop whose position has been passed wins: for earlier segments the
@@ -217,6 +234,18 @@ export const organicGradientFragmentShader = /* glsl */ `
     vec3 color = gradientColor(shape);
 
     color = applyVibrance(color, uVibrance);
+
+    // Exposure is an amount of light, so it multiplies in linear space: +1 is
+    // one stop, exactly twice the light. exp2(0.0) is exactly 1.0, so the
+    // neutral setting leaves the color bit for bit alone.
+    color *= exp2(uExposure);
+
+    // Skipped while neutral: the Oklab round trip is a pair of cube roots, and
+    // running it for nothing would cost the exactness that makes the HEX from
+    // the picker the exported pixel.
+    if (uBrightness != 0.0 || uContrast != 1.0) {
+      color = applyTone(color, uBrightness, uContrast);
+    }
 
     // Encode to sRGB before the surface textures: grain and dither are effects
     // on the final image, not on the light in the scene
