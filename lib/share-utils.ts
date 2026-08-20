@@ -35,6 +35,18 @@ export interface ShareableGradient {
   // Color and shape (v3): without the seed, opening a link reproduced the colors
   // and the rhythm but drew a different shape
   vibrance?: number
+  // Tone (v3): exposure in stops, brightness and contrast on Oklab lightness
+  exposure?: number
+  brightness?: number
+  contrast?: number
+  // Post-processing (v3)
+  effect?: string
+  bloomThreshold?: number
+  bloomIntensity?: number
+  bloomRadius?: number
+  asciiColumns?: number
+  asciiBackground?: number
+  asciiRampContrast?: number
   blendSpace?: string
   seed?: [number, number]
   loopDuration?: number
@@ -98,6 +110,16 @@ type PackedGradient = {
   ml?: 0 | 1 // multiLayerMode
   ly?: PackedLayer[]
   vb?: number // vibrance
+  ex?: number // exposure
+  br?: number // brightness
+  ct?: number // contrast
+  ef?: string // effect
+  bt?: number // bloomThreshold
+  bi?: number // bloomIntensity
+  brd?: number // bloomRadius
+  ac?: number // asciiColumns
+  ab?: number // asciiBackground
+  arc?: number // asciiRampContrast
   bs?: string // blendSpace
   sd?: number[] // seed
   ld?: number // loopDuration
@@ -122,6 +144,20 @@ function pack(data: ShareableGradient): PackedGradient {
   if (data.thresholdMin !== undefined) packed.tn = round3(data.thresholdMin)
   if (data.thresholdMax !== undefined) packed.tx = round3(data.thresholdMax)
   if (data.vibrance !== undefined) packed.vb = round3(data.vibrance)
+  if (data.exposure !== undefined) packed.ex = round3(data.exposure)
+  if (data.brightness !== undefined) packed.br = round3(data.brightness)
+  if (data.contrast !== undefined) packed.ct = round3(data.contrast)
+  // Only a chain that is actually on travels: a link to a plain gradient should
+  // not carry three bloom numbers nobody will read
+  if (data.effect !== undefined && data.effect !== "none") {
+    packed.ef = data.effect
+    if (data.bloomThreshold !== undefined) packed.bt = round3(data.bloomThreshold)
+    if (data.bloomIntensity !== undefined) packed.bi = round3(data.bloomIntensity)
+    if (data.bloomRadius !== undefined) packed.brd = round3(data.bloomRadius)
+    if (data.asciiColumns !== undefined) packed.ac = Math.round(data.asciiColumns)
+    if (data.asciiBackground !== undefined) packed.ab = round3(data.asciiBackground)
+    if (data.asciiRampContrast !== undefined) packed.arc = round3(data.asciiRampContrast)
+  }
   if (data.blendSpace !== undefined) packed.bs = data.blendSpace
   if (data.seed !== undefined) packed.sd = data.seed.map(round3)
   if (data.loopDuration !== undefined) packed.ld = round3(data.loopDuration)
@@ -179,6 +215,16 @@ function unpack(packed: PackedGradient): ShareableGradient {
   if (packed.tn !== undefined) data.thresholdMin = packed.tn
   if (packed.tx !== undefined) data.thresholdMax = packed.tx
   if (packed.vb !== undefined) data.vibrance = packed.vb
+  if (packed.ex !== undefined) data.exposure = packed.ex
+  if (packed.br !== undefined) data.brightness = packed.br
+  if (packed.ct !== undefined) data.contrast = packed.ct
+  if (packed.ef !== undefined) data.effect = packed.ef
+  if (packed.bt !== undefined) data.bloomThreshold = packed.bt
+  if (packed.bi !== undefined) data.bloomIntensity = packed.bi
+  if (packed.brd !== undefined) data.bloomRadius = packed.brd
+  if (packed.ac !== undefined) data.asciiColumns = packed.ac
+  if (packed.ab !== undefined) data.asciiBackground = packed.ab
+  if (packed.arc !== undefined) data.asciiRampContrast = packed.arc
   if (packed.bs !== undefined) data.blendSpace = packed.bs
   if (packed.sd !== undefined && packed.sd.length >= 2)
     data.seed = [packed.sd[0], packed.sd[1]]
@@ -234,6 +280,16 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     thresholdMin: state.thresholdMin ?? 0.3,
     thresholdMax: state.thresholdMax ?? 0.7,
     vibrance: state.vibrance ?? 0,
+    exposure: state.exposure ?? 0,
+    brightness: state.brightness ?? 0,
+    contrast: state.contrast ?? 1,
+    effect: state.effect ?? "none",
+    bloomThreshold: state.bloomThreshold ?? 0.8,
+    bloomIntensity: state.bloomIntensity ?? 0.8,
+    bloomRadius: state.bloomRadius ?? 1,
+    asciiColumns: state.asciiColumns ?? 80,
+    asciiBackground: state.asciiBackground ?? 0.12,
+    asciiRampContrast: state.asciiRampContrast ?? 2.5,
     blendSpace: state.blendSpace ?? "oklab",
     seed: state.seed ?? [0, 0],
     loopDuration: state.loopDuration ?? 0,

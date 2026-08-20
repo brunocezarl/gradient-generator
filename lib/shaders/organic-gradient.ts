@@ -1,3 +1,5 @@
+import * as THREE from "three"
+
 // Single source of the organic gradient shader.
 //
 // There used to be two divergent copies of this GLSL (simple scene and layers),
@@ -5,88 +7,15 @@
 // version had neither the third color nor grain. Any visual change happens here
 // and applies to both.
 
-export const organicGradientVertexShader = /* glsl */ `
-  varying vec2 vUv;
+// ─── Shared GLSL chunks ──────────────────────────────────────────────────────
+//
+// The post-processing chain (lib/shaders/post.ts) finishes the image this shader
+// starts: feeding a chain, the gradient hands over unclamped linear light, and
+// the encode, grain and dither happen at the far end instead. Both ends need the
+// same conversions, and there is exactly one copy of them — a second, drifting
+// copy is the thing this file exists to prevent.
 
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-export const MAX_COLOR_STOPS = 8
-
-export const organicGradientFragmentShader = /* glsl */ `
-  #define MAX_STOPS ${MAX_COLOR_STOPS}
-
-  uniform float uTime;
-  uniform float uComplexity;
-  uniform float uNoiseScale;
-  // Color stops: colors in linear RGB (the sRGB conversion happens in JS, see
-  // lib/color.ts) and positions in 0-1, ascending
-  uniform vec3 uStopColors[MAX_STOPS];
-  uniform float uStopPositions[MAX_STOPS];
-  uniform int uStopCount;
-  uniform float uFlowIntensity;
-  uniform float uGrainAmount;
-  uniform float uGrainScale;
-  uniform float uThresholdMin;
-  uniform float uThresholdMax;
-  uniform float uVibrance;
-  uniform float uOklabMix;     // 1.0 = mix in Oklab, 0.0 = in linear RGB
-  uniform vec2 uSeed;          // offset into the noise field
-  uniform float uLoopDuration; // 0 = free animation; > 0 = loop period
-
-  const float TAU = 6.28318530718;
-
-  varying vec2 vUv;
-
-  // ─── Noise ─────────────────────────────────────────────────────────────────
-
-  // Simplex 2D noise
-  vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
-
-  float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-             -0.577350269189626, 0.024390243902439);
-    vec2 i  = floor(v + dot(v, C.yy));
-    vec2 x0 = v -   i + dot(i, C.xx);
-    vec2 i1;
-    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod(i, 289.0);
-    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
-    + i.x + vec3(0.0, i1.x, 1.0 ));
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
-      dot(x12.zw,x12.zw)), 0.0);
-    m = m*m;
-    m = m*m;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
-    vec3 g;
-    g.x  = a0.x  * x0.x  + h.x  * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
-  }
-
-  // Curl noise for organic flow
-  vec2 curl(float x, float y) {
-    float eps = 0.01;
-    float n1 = snoise(vec2(x + eps, y));
-    float n2 = snoise(vec2(x - eps, y));
-    float n3 = snoise(vec2(x, y + eps));
-    float n4 = snoise(vec2(x, y - eps));
-    float dy = (n1 - n2) / (2.0 * eps);
-    float dx = (n3 - n4) / (2.0 * eps);
-    return vec2(dy, -dx);
-  }
-
-  // ─── Color ─────────────────────────────────────────────────────────────────
-
+export const colorSpaceChunk = /* glsl */ `
   // sRGB encoding (IEC 61966-2-1). The compositor reads the drawing buffer as
   // sRGB, so this is where the image leaves linear space.
   vec3 linearToSrgb(vec3 c) {
@@ -121,6 +50,148 @@ export const organicGradientFragmentShader = /* glsl */ `
       -0.0041960863 * lms.x - 0.7034186147 * lms.y + 1.7076147010 * lms.z
     );
   }
+`
+
+export const simplexNoiseChunk = /* glsl */ `
+  // Simplex 2D noise
+  vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+
+  float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+             -0.577350269189626, 0.024390243902439);
+    vec2 i  = floor(v + dot(v, C.yy));
+    vec2 x0 = v -   i + dot(i, C.xx);
+    vec2 i1;
+    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod(i, 289.0);
+    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+    + i.x + vec3(0.0, i1.x, 1.0 ));
+    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+      dot(x12.zw,x12.zw)), 0.0);
+    m = m*m;
+    m = m*m;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+    vec3 g;
+    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+  }
+`
+
+export const ditherChunk = /* glsl */ `
+  float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  // Triangular-PDF noise at ±0.5 LSB: below the 8-bit quantization step
+  // (invisible) but enough to dissolve the banding that smooth full-screen
+  // gradients always produce
+  float triangularDither(vec2 p) {
+    return (hash12(p) + hash12(p + 17.13) - 1.0) * 0.5;
+  }
+`
+
+export const organicGradientVertexShader = /* glsl */ `
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+export const MAX_COLOR_STOPS = 8
+
+// The shader's uniform surface, built in one place.
+//
+// There were two hand-written copies of this list — one in the React component,
+// one in the off-screen thumbnail renderer — and adding a uniform to the shader
+// meant remembering both. Forgetting the second one is not a compile error and
+// not a visible one either: the thumbnail renderer threw only once a saved
+// preset existed to draw. The factory makes the shader own its own inputs.
+export function createGradientUniforms(): Record<string, { value: unknown }> {
+  return {
+    uTime: { value: 0 },
+    uComplexity: { value: 3 },
+    uNoiseScale: { value: 2 },
+    uStopColors: {
+      value: Array.from({ length: MAX_COLOR_STOPS }, () => new THREE.Vector3()),
+    },
+    uStopPositions: { value: new Array(MAX_COLOR_STOPS).fill(0) },
+    uStopCount: { value: 2 },
+    uFlowIntensity: { value: 0.3 },
+    uGrainAmount: { value: 0 },
+    uGrainScale: { value: 500 },
+    uThresholdMin: { value: 0.3 },
+    uThresholdMax: { value: 0.7 },
+    uVibrance: { value: 0 },
+    uExposure: { value: 0 },
+    uBrightness: { value: 0 },
+    uContrast: { value: 1 },
+    uOklabMix: { value: 1 },
+    uSeed: { value: [0, 0] },
+    uLoopDuration: { value: 0 },
+    uOutputLinear: { value: 0 },
+  }
+}
+
+export const organicGradientFragmentShader = /* glsl */ `
+  #define MAX_STOPS ${MAX_COLOR_STOPS}
+
+  uniform float uTime;
+  uniform float uComplexity;
+  uniform float uNoiseScale;
+  // Color stops: colors in linear RGB (the sRGB conversion happens in JS, see
+  // lib/color.ts) and positions in 0-1, ascending
+  uniform vec3 uStopColors[MAX_STOPS];
+  uniform float uStopPositions[MAX_STOPS];
+  uniform int uStopCount;
+  uniform float uFlowIntensity;
+  uniform float uGrainAmount;
+  uniform float uGrainScale;
+  uniform float uThresholdMin;
+  uniform float uThresholdMax;
+  uniform float uVibrance;
+  uniform float uExposure;   // stops of light, linear multiply
+  uniform float uBrightness; // offset on Oklab lightness
+  uniform float uContrast;   // gain on Oklab lightness around the mid point
+  uniform float uOklabMix;     // 1.0 = mix in Oklab, 0.0 = in linear RGB
+  uniform vec2 uSeed;          // offset into the noise field
+  uniform float uLoopDuration; // 0 = free animation; > 0 = loop period
+  // 1.0 = hand the light to a post-processing chain instead of to the screen
+  uniform float uOutputLinear;
+
+  const float TAU = 6.28318530718;
+
+  varying vec2 vUv;
+
+  // ─── Noise ─────────────────────────────────────────────────────────────────
+
+${simplexNoiseChunk}
+
+  // Curl noise for organic flow
+  vec2 curl(float x, float y) {
+    float eps = 0.01;
+    float n1 = snoise(vec2(x + eps, y));
+    float n2 = snoise(vec2(x - eps, y));
+    float n3 = snoise(vec2(x, y + eps));
+    float n4 = snoise(vec2(x, y - eps));
+    float dy = (n1 - n2) / (2.0 * eps);
+    float dx = (n3 - n4) / (2.0 * eps);
+    return vec2(dy, -dx);
+  }
+
+  // ─── Color ─────────────────────────────────────────────────────────────────
+
+${colorSpaceChunk}
 
   // Interpolates two linear colors in the chosen space
   vec3 blendColors(vec3 a, vec3 b, float t) {
@@ -134,6 +205,20 @@ export const organicGradientFragmentShader = /* glsl */ `
   vec3 applyVibrance(vec3 color, float amount) {
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
     return mix(vec3(luminance), color, 1.0 + amount);
+  }
+
+  // Brightness and contrast act on Oklab lightness, not on the RGB channels.
+  // Scaling channels drags hue along with it — a red pushed brighter turns
+  // orange, the same failure that makes lightening in HSL useless — while
+  // moving L alone leaves hue and chroma exactly where the picker put them.
+  //
+  // Contrast pivots at L = 0.5, the middle of the lightness axis, so it opens
+  // and closes symmetrically around the perceptual mid point rather than around
+  // some channel value.
+  vec3 applyTone(vec3 color, float brightness, float contrast) {
+    vec3 lab = linearToOklab(color);
+    lab.x = (lab.x - 0.5) * contrast + 0.5 + brightness;
+    return oklabToLinear(lab);
   }
 
   // Gradient color at position t (0-1), walking the stops.
@@ -161,18 +246,7 @@ export const organicGradientFragmentShader = /* glsl */ `
 
   // ─── Dither ────────────────────────────────────────────────────────────────
 
-  float hash12(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-
-  // Triangular-PDF noise at ±0.5 LSB: below the 8-bit quantization step
-  // (invisible) but enough to dissolve the banding that smooth full-screen
-  // gradients always produce
-  float triangularDither(vec2 p) {
-    return (hash12(p) + hash12(p + 17.13) - 1.0) * 0.5;
-  }
+${ditherChunk}
 
   void main() {
     vec2 uv = vUv;
@@ -218,8 +292,30 @@ export const organicGradientFragmentShader = /* glsl */ `
 
     color = applyVibrance(color, uVibrance);
 
+    // Exposure is an amount of light, so it multiplies in linear space: +1 is
+    // one stop, exactly twice the light. exp2(0.0) is exactly 1.0, so the
+    // neutral setting leaves the color bit for bit alone.
+    color *= exp2(uExposure);
+
+    // Skipped while neutral: the Oklab round trip is a pair of cube roots, and
+    // running it for nothing would cost the exactness that makes the HEX from
+    // the picker the exported pixel.
+    if (uBrightness != 0.0 || uContrast != 1.0) {
+      color = applyTone(color, uBrightness, uContrast);
+    }
+
     // Encode to sRGB before the surface textures: grain and dither are effects
     // on the final image, not on the light in the scene
+    // Feeding a post-processing chain: the light leaves here still linear and
+    // unclamped, because bloom has to sum energy rather than encoded values, and
+    // the bright pass needs the headroom exposure opens above 1.0. Encode, grain
+    // and dither happen at the end of that chain instead — grain blurred into a
+    // halo would be grain no longer.
+    if (uOutputLinear > 0.5) {
+      gl_FragColor = vec4(color, 1.0);
+      return;
+    }
+
     color = linearToSrgb(color);
 
     // Grain over the composition (isotropic uv → grain does not stretch with aspect)

@@ -8,6 +8,7 @@ import {
   migratePersistedState,
   normalizePersistedState,
   PERSIST_VERSION,
+  type StateSnapshot,
 } from "@/lib/store"
 
 // Snapshot of the initial state, restored between tests
@@ -762,12 +763,17 @@ describe("presets store the layer composition", () => {
       blendSpace: "oklab" as const,
       seed: [0, 0] as [number, number],
       loopDuration: 0,
-    }
+      // No exposure/brightness/contrast: this snapshot predates the tone controls
+    } as StateSnapshot
 
     useGradientStore.getState().applySnapshot(legacySnapshot)
 
     expect(useGradientStore.getState().speed).toBe(2)
     expect(useGradientStore.getState().layers.map((l) => l.id)).toEqual(before)
+    // Missing tone falls back to neutral rather than reaching the shader as NaN
+    expect(useGradientStore.getState().exposure).toBe(0)
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1)
   })
 })
 
@@ -938,6 +944,16 @@ describe("migratePersistedState", () => {
     expect(migratePersistedState("garbage", 0)).toBe("garbage")
     expect(migratePersistedState({}, 0)).toEqual({
       vibrance: 0,
+      exposure: 0,
+      brightness: 0,
+      contrast: 1,
+      effect: "none",
+      bloomThreshold: 0.6,
+      bloomIntensity: 0.8,
+      bloomRadius: 1,
+      asciiColumns: 80,
+      asciiBackground: 0.12,
+      asciiRampContrast: 2.5,
       blendSpace: "oklab",
       loopDuration: 0,
       seed: [0, 0],
@@ -1161,5 +1177,243 @@ describe("color stops", () => {
       })
       expect(saturated).toBe(true)
     }
+  })
+})
+
+// ─── Tone controls ───────────────────────────────────────────────────────────
+
+describe("tone controls", () => {
+  it("start neutral, so the pipeline is a no-op until touched", () => {
+    expect(useGradientStore.getState().exposure).toBe(0)
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1)
+  })
+
+  it("travel in snapshots and come back through undo", () => {
+    const store = useGradientStore.getState()
+    store.setExposure(0.5)
+    now += 2000
+    store.setContrast(1.6)
+    now += 2000
+    store.setBrightness(-0.1)
+
+    expect(useGradientStore.getState().exposure).toBe(0.5)
+    expect(useGradientStore.getState().contrast).toBe(1.6)
+    expect(useGradientStore.getState().brightness).toBe(-0.1)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1.6)
+  })
+
+  it("go back to neutral on reset", () => {
+    const store = useGradientStore.getState()
+    store.setExposure(1.5)
+    store.setBrightness(0.2)
+    store.setContrast(0.7)
+
+    useGradientStore.getState().resetToDefaults()
+
+    expect(useGradientStore.getState().exposure).toBe(0)
+    expect(useGradientStore.getState().brightness).toBe(0)
+    expect(useGradientStore.getState().contrast).toBe(1)
+  })
+
+  it("are filled in when hydrating a state that predates them", () => {
+    const normalized = normalizePersistedState({
+      speed: 1,
+      vibrance: 0,
+    }) as Record<string, unknown>
+
+    expect(normalized.exposure).toBe(0)
+    expect(normalized.brightness).toBe(0)
+    expect(normalized.contrast).toBe(1)
+  })
+
+  it("survive a stored value of the wrong type", () => {
+    const normalized = normalizePersistedState({
+      exposure: "bright",
+      brightness: null,
+      contrast: undefined,
+    }) as Record<string, unknown>
+
+    expect(normalized.exposure).toBe(0)
+    expect(normalized.brightness).toBe(0)
+    expect(normalized.contrast).toBe(1)
+  })
+
+  it("are clamped when they arrive from a link", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      exposure: 99,
+      brightness: -99,
+      contrast: 0,
+    })
+
+    expect(useGradientStore.getState().exposure).toBe(2)
+    expect(useGradientStore.getState().brightness).toBe(-0.3)
+    expect(useGradientStore.getState().contrast).toBe(0.5)
+  })
+})
+
+// ─── Effects ─────────────────────────────────────────────────────────────────
+
+describe("effects", () => {
+  it("start with no chain, which is the untouched render path", () => {
+    expect(useGradientStore.getState().effect).toBe("none")
+  })
+
+  it("travel in snapshots and come back through undo", () => {
+    const store = useGradientStore.getState()
+    store.setEffect("bloom")
+    now += 2000
+    store.setBloomIntensity(1.7)
+
+    expect(useGradientStore.getState().effect).toBe("bloom")
+    expect(useGradientStore.getState().bloomIntensity).toBe(1.7)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().bloomIntensity).toBe(0.8)
+    expect(useGradientStore.getState().effect).toBe("bloom")
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().effect).toBe("none")
+  })
+
+  it("go back to none on reset", () => {
+    const store = useGradientStore.getState()
+    store.setEffect("bloom")
+    store.setBloomRadius(2.5)
+
+    useGradientStore.getState().resetToDefaults()
+
+    expect(useGradientStore.getState().effect).toBe("none")
+    expect(useGradientStore.getState().bloomRadius).toBe(1)
+  })
+
+  it("are filled in when hydrating a state that predates them", () => {
+    const normalized = normalizePersistedState({ speed: 1 }) as Record<string, unknown>
+
+    expect(normalized.effect).toBe("none")
+    expect(normalized.bloomThreshold).toBe(0.6)
+    expect(normalized.bloomIntensity).toBe(0.8)
+    expect(normalized.bloomRadius).toBe(1)
+  })
+
+  it("reject an effect name this build does not know", () => {
+    const normalized = normalizePersistedState({ effect: "kaleidoscope" }) as Record<
+      string,
+      unknown
+    >
+    // A link or a stored state from a newer build must not leave the renderer
+    // asking for a chain that does not exist here
+    expect(normalized.effect).toBe("none")
+  })
+
+  it("keep an effect name this build does know", () => {
+    const normalized = normalizePersistedState({ effect: "ascii" }) as Record<string, unknown>
+    expect(normalized.effect).toBe("ascii")
+  })
+
+  it("are clamped when they arrive from a link", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "bloom",
+      bloomThreshold: -5,
+      bloomIntensity: 99,
+      bloomRadius: 0,
+    })
+
+    expect(useGradientStore.getState().effect).toBe("bloom")
+    expect(useGradientStore.getState().bloomThreshold).toBe(0)
+    expect(useGradientStore.getState().bloomIntensity).toBe(3)
+    expect(useGradientStore.getState().bloomRadius).toBe(0.5)
+  })
+
+  it("fall back to none when a link names an unknown effect", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "kaleidoscope",
+    })
+
+    expect(useGradientStore.getState().effect).toBe("none")
+  })
+})
+
+describe("ascii settings", () => {
+  it("count columns, not pixels", () => {
+    // The unit is the promise: the same setting has to compose the same picture
+    // at preview size and at export size
+    expect(useGradientStore.getState().asciiColumns).toBe(80)
+  })
+
+  it("round the column count, since half a character is not a thing", () => {
+    useGradientStore.getState().setAsciiColumns(42.7)
+    expect(useGradientStore.getState().asciiColumns).toBe(43)
+  })
+
+  it("never fall to zero columns, which would divide by zero in the shader", () => {
+    useGradientStore.getState().setAsciiColumns(0)
+    expect(useGradientStore.getState().asciiColumns).toBeGreaterThanOrEqual(1)
+    useGradientStore.getState().setAsciiColumns(-40)
+    expect(useGradientStore.getState().asciiColumns).toBeGreaterThanOrEqual(1)
+  })
+
+  it("start with the ramp stretched, or most of it would go unused", () => {
+    expect(useGradientStore.getState().asciiRampContrast).toBeGreaterThan(1)
+  })
+
+  it("are filled in when hydrating a state that predates them", () => {
+    const normalized = normalizePersistedState({ effect: "bloom" }) as Record<string, unknown>
+    expect(normalized.asciiColumns).toBe(80)
+    expect(normalized.asciiBackground).toBe(0.12)
+    expect(normalized.asciiRampContrast).toBe(2.5)
+  })
+
+  it("are clamped when they arrive from a link", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "ascii",
+      asciiColumns: 99999,
+      asciiBackground: -3,
+      asciiRampContrast: 100,
+    })
+
+    expect(useGradientStore.getState().effect).toBe("ascii")
+    expect(useGradientStore.getState().asciiColumns).toBe(300)
+    expect(useGradientStore.getState().asciiBackground).toBe(0)
+    expect(useGradientStore.getState().asciiRampContrast).toBe(6)
   })
 })

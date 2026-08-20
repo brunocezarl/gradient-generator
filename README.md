@@ -6,9 +6,11 @@ noise, rendered through React Three Fiber.
 
 ## Features
 
-- **Artboard at the output ratio** (Full HD, 4K, story, 4:5 post, Open Graph,
-  A4…) with safe area guides: the preview shows the real framing and the export
-  inherits those dimensions
+- **Artboard at the output ratio** (Full HD, 4K, 4:3, story, 4:5 post, Open
+  Graph, A4…) with safe area guides: the preview shows the real framing and the
+  export inherits those dimensions. Ratio chips (Free, 16:9, 1:1, 4:3, 9:16)
+  make the framing one click, and the full list keeps the exact pixel sizes —
+  picking 4K leaves the 16:9 chip lit, because it is the same framing
 - **Timeline** with scrubbing, frame-by-frame stepping and frame freezing — the
   instant of the animation is a visible, reproducible value
 - **Seamless loop**: with a period set, the animation travels a closed path
@@ -19,10 +21,25 @@ noise, rendered through React Three Fiber.
   with sRGB encoding on output — the HEX picked in the picker is exactly the
   exported pixel. Sub-quantization triangular dither removes the banding smooth
   8-bit gradients always produce
-- **2 to 8 color stops**, each with its own position along the gradient
+- **2 to 8 color stops**, each with its own position along the gradient, set by
+  slider or typed as a percentage
 - **Color picker in OKLCH**, RGB, HSL or HEX: adjusting lightness or chroma in
   OKLCH does not shift the hue (lightening a red in HSL pulls it toward pink),
   and the chroma slider respects the real sRGB ceiling for that color
+- **ASCII**: the image redrawn as a grid of characters, tinted by the colors
+  underneath. Density is set in **columns**, not in pixels, so the same setting
+  composes the same picture on the preview and in a 4K export
+- **Bloom**: light spilling past what emitted it, summed in linear space on
+  unclamped values — raise exposure and the same intensity glows harder, because
+  the bright end really is brighter. Threshold, intensity and spread; off by
+  default, and off means the gradient draws straight to the screen with nothing
+  in the way
+- **Tone controls**: exposure in stops (a linear multiply, the way a camera
+  works), plus brightness and contrast acting on Oklab lightness — moving L
+  leaves hue and chroma where the picker put them, unlike scaling RGB channels,
+  which turns a brightened red into orange. All neutral by default, and the
+  shader skips the whole path while they are, so an untouched gradient is still
+  bit for bit the colors you picked
 - **Harmonies** (analogous, complementary, split complementary, triadic,
   monochromatic) derived from the first stop, keeping the positions
 - **Palette extracted from a reference image**, clustered in Oklab
@@ -104,6 +121,47 @@ lib/shaders/  # single source of the GLSL (gradient + layer compositing)
 - **Persistence**: the store is versioned (`PERSIST_VERSION`) and normalized on
   hydration. Since zustand only calls `migrate` when the stored JSON has a
   numeric `version`, normalization runs in `merge`, which always executes.
+- **ASCII**: glyphs are picked by Oklab lightness — a different question from the
+  one bloom's bright pass asks, so a different answer. Bloom asks whether
+  something emits light, and a saturated red and blue both do (0.79 each on the
+  strongest channel); ASCII asks how light something *looks*, where those two
+  differ (0.59 against 0.42). Gate ASCII on the strongest channel and a
+  red-to-blue gradient comes out at flat density; gate it on luminance and the
+  whole palette crushes into the bottom fifth of the ramp. Even in Oklab the
+  content occupies a narrow band, so Ramp Contrast stretches it — at 1.00 only
+  three of the ten characters ever appear, at 4.50 seven do. The ramp is
+  rasterized into a texture at runtime, since it is a string, not artwork.
+- **Post-processing**: with an effect on, the gradient stops encoding and hands
+  the chain raw linear light (`uOutputLinear`); the sRGB encode, grain and dither
+  move to the far end, in the resolve pass. Bloom has to sum energy rather than
+  encoded values, and grain blurred into a halo would be grain no longer. Both
+  ends share one copy of the conversions (`colorSpaceChunk`, `simplexNoiseChunk`,
+  `ditherChunk`), so the two paths cannot drift. The chain is a
+  progressive-downsample pyramid — bright pass at half size, five levels down,
+  summed back on the way up — and the resolve pass draws the gradient's own plane
+  through the gradient's own camera, so grain lands in the same place with the
+  chain running as without it (measured: one 8-bit step of difference, the
+  half-float round trip). Its bright pass gates on the strongest channel rather
+  than on Rec.709 luminance: a saturated blue scores 0.06 in luminance against a
+  mid gray's 0.22, so a luminance gate would let dull grays glow while vivid
+  blues never could. With the effect off the chain is not mounted at all, which
+  is why the untouched path still exports pixels identical to the build from
+  before any of it existed.
+- **Tone**: exposure multiplies in linear space before the sRGB encode — the
+  physical meaning of a stop of light. Brightness and contrast instead convert to
+  Oklab and move `L` alone (contrast pivots at `L = 0.5`, the middle of the
+  lightness axis), so hue and chroma survive; measured on in-gamut colors, hue
+  moves under 2°, which is 8-bit quantization rather than the maths. Pushing a
+  saturated color past the sRGB ceiling still clips, and clipping desaturates —
+  that is the gamut, not the transform. The Oklab round trip is skipped entirely
+  while brightness is 0 and contrast is 1, so the neutral pipeline is provably a
+  no-op: the exported PNG is byte-identical to the build from before the controls
+  existed.
+- **Controls**: the panel is a set of collapsible sections (Canvas, Adjustments,
+  Color, Presets, Shape, Grain, Motion, Layers) rather than tabs — the framing
+  and the palette are what a session opens with, and everything else stays
+  folded until it is needed. Framing lives in the panel, not the top bar, so the
+  ratio sits next to the colors it frames.
 - **Time**: the animation clock lives in `lib/playback.ts`, outside React and
   outside the render loop — each canvas used to accumulate its own time, which
   made speed in multi-layer mode depend on how many layers were visible. The

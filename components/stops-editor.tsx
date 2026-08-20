@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import {
   Select,
@@ -56,6 +57,10 @@ export function StopsEditor() {
 
   const [selected, setSelected] = useState(0)
   const [harmony, setHarmony] = useState<HarmonyKind>("analogous")
+  // Position field being typed into. Held locally so intermediate states ("",
+  // "1" on the way to "100") survive: writing every keystroke straight to the
+  // store would snap the caret back as the value is normalized under it.
+  const [draft, setDraft] = useState<{ index: number; value: string } | null>(null)
 
   const activeIndex = Math.min(selected, stops.length - 1)
   const activeStop = stops[activeIndex]
@@ -135,9 +140,28 @@ export function StopsEditor() {
               className="h-2"
               thumbLabel={`Stop ${index + 1} position`}
             />
-            <span className="font-mono text-[10px] text-neutral-500 w-8 shrink-0 text-right">
-              {Math.round(stop.position * 100)}%
-            </span>
+            <div className="flex items-center shrink-0">
+              <Input
+                value={
+                  draft?.index === index ? draft.value : String(Math.round(stop.position * 100))
+                }
+                onChange={(event) => {
+                  const value = event.target.value
+                  setDraft({ index, value })
+                  const parsed = Number(value)
+                  if (value.trim() !== "" && Number.isFinite(parsed)) {
+                    setSelected(index)
+                    setStopPosition(index, Math.min(100, Math.max(0, parsed)) / 100)
+                  }
+                }}
+                onFocus={() => setSelected(index)}
+                onBlur={() => setDraft(null)}
+                inputMode="numeric"
+                className="h-6 w-10 px-1 bg-neutral-900 border-neutral-700 text-right font-mono text-[10px] text-neutral-300"
+                aria-label={`Stop ${index + 1} position in percent`}
+              />
+              <span className="font-mono text-[10px] text-neutral-500 pl-0.5">%</span>
+            </div>
             <Button
               variant="ghost"
               size="icon"

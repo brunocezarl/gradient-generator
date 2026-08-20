@@ -24,8 +24,17 @@ further passes went in on top of it.
 - Deterministic video export (WebCodecs): exact frame rate and duration,
   independent of GPU performance
 
+### Effects
+- Bloom in a progressive-downsample chain, summed in linear light with half-float
+  headroom above 1.0, shared by the single-layer scene, the layer compositor and
+  the thumbnail renderer
+- ASCII over the same chain: a runtime glyph atlas, glyphs chosen by Oklab
+  lightness, density set in columns so the export matches the preview
+
 ### Color
 - OKLCH engine: conversions, gamut clamping on chroma, harmonies, WCAG contrast
+- Tone controls: exposure (linear, in stops) plus brightness and contrast on
+  Oklab lightness, neutral by default and skipped while neutral
 - 2 to 8 color stops with positions
 - Palette extraction from a reference image (k-means in Oklab)
 - Shader-rendered preset thumbnails and a portable JSON library
