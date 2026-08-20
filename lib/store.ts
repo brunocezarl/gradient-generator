@@ -29,6 +29,16 @@ import {
 // Define color type
 type GradientColor = [number, number, number]
 
+// Post-processing effect applied to the finished image. "none" is not a
+// degraded mode: it renders straight to the screen, exactly as the tool did
+// before any chain existed.
+export const effects = {
+  none: "None",
+  bloom: "Bloom",
+} as const
+
+export type GradientEffect = keyof typeof effects
+
 // Color scheme: stops with positions (these used to be three colors pinned at 0,
 // 0.5 and 1)
 export type ColorScheme = {
@@ -54,6 +64,10 @@ export type StateSnapshot = {
   exposure: number
   brightness: number
   contrast: number
+  effect: GradientEffect
+  bloomThreshold: number
+  bloomIntensity: number
+  bloomRadius: number
   blendSpace: ColorBlendSpace
   seed: [number, number]
   loopDuration: number
@@ -115,6 +129,10 @@ function captureSnapshot(state: GradientStore): StateSnapshot {
     exposure: state.exposure,
     brightness: state.brightness,
     contrast: state.contrast,
+    effect: state.effect,
+    bloomThreshold: state.bloomThreshold,
+    bloomIntensity: state.bloomIntensity,
+    bloomRadius: state.bloomRadius,
     blendSpace: state.blendSpace,
     seed: [...state.seed] as [number, number],
     loopDuration: state.loopDuration,
@@ -148,6 +166,10 @@ function snapshotToState(
     exposure: snapshot.exposure ?? defaultState.exposure,
     brightness: snapshot.brightness ?? defaultState.brightness,
     contrast: snapshot.contrast ?? defaultState.contrast,
+    effect: snapshot.effect ?? defaultState.effect,
+    bloomThreshold: snapshot.bloomThreshold ?? defaultState.bloomThreshold,
+    bloomIntensity: snapshot.bloomIntensity ?? defaultState.bloomIntensity,
+    bloomRadius: snapshot.bloomRadius ?? defaultState.bloomRadius,
     blendSpace: snapshot.blendSpace,
     seed: [...snapshot.seed] as [number, number],
     loopDuration: snapshot.loopDuration,
@@ -191,6 +213,12 @@ export type GradientStore = {
   exposure: number
   brightness: number
   contrast: number
+  // Post-processing. Bloom sums the halo in linear light, which is why the
+  // gradient hands the chain unencoded values (see lib/post-chain.ts).
+  effect: GradientEffect
+  bloomThreshold: number
+  bloomIntensity: number
+  bloomRadius: number
   blendSpace: ColorBlendSpace
   // Loop duration in animation seconds. 0 = free animation (drifts without
   // repeating); > 0 brings the drawing back exactly to the start over that
@@ -252,6 +280,10 @@ export type GradientStore = {
   setExposure: (value: number) => void
   setBrightness: (value: number) => void
   setContrast: (value: number) => void
+  setEffect: (value: GradientEffect) => void
+  setBloomThreshold: (value: number) => void
+  setBloomIntensity: (value: number) => void
+  setBloomRadius: (value: number) => void
   setBlendSpace: (value: ColorBlendSpace) => void
   setLoopDuration: (value: number) => void
   shuffleSeed: () => void
@@ -311,6 +343,10 @@ type StoreActions = Pick<
   | "setExposure"
   | "setBrightness"
   | "setContrast"
+  | "setEffect"
+  | "setBloomThreshold"
+  | "setBloomIntensity"
+  | "setBloomRadius"
   | "setBlendSpace"
   | "setLoopDuration"
   | "shuffleSeed"
@@ -363,6 +399,15 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   exposure: 0,
   brightness: 0,
   contrast: 1,
+  // No chain by default: the gradient draws straight to the screen, which is
+  // both the cheapest path and the one whose pixels are the picked colors
+  effect: "none",
+  // In linear light, between the 0.22 of a mid tone and the 0.79 of a saturated
+  // primary: the pure ends of a gradient glow and the muddle between them does
+  // not, which is where bloom reads as light rather than as a brightness slider
+  bloomThreshold: 0.6,
+  bloomIntensity: 0.8,
+  bloomRadius: 1,
   blendSpace: "oklab",
   loopDuration: 0,
   seed: [0, 0],
@@ -500,6 +545,20 @@ function migrateSnapshot(snapshot: unknown): unknown {
     brightness:
       typeof source.brightness === "number" ? source.brightness : defaultState.brightness,
     contrast: typeof source.contrast === "number" ? source.contrast : defaultState.contrast,
+    effect:
+      typeof source.effect === "string" && source.effect in effects
+        ? source.effect
+        : defaultState.effect,
+    bloomThreshold:
+      typeof source.bloomThreshold === "number"
+        ? source.bloomThreshold
+        : defaultState.bloomThreshold,
+    bloomIntensity:
+      typeof source.bloomIntensity === "number"
+        ? source.bloomIntensity
+        : defaultState.bloomIntensity,
+    bloomRadius:
+      typeof source.bloomRadius === "number" ? source.bloomRadius : defaultState.bloomRadius,
     blendSpace:
       typeof source.blendSpace === "string" && source.blendSpace in colorBlendSpaces
         ? source.blendSpace
@@ -527,6 +586,16 @@ export function normalizePersistedState(persisted: unknown): unknown {
   if (typeof state.exposure !== "number") state.exposure = defaultState.exposure
   if (typeof state.brightness !== "number") state.brightness = defaultState.brightness
   if (typeof state.contrast !== "number") state.contrast = defaultState.contrast
+  if (typeof state.effect !== "string" || !(state.effect in effects)) {
+    state.effect = defaultState.effect
+  }
+  if (typeof state.bloomThreshold !== "number") {
+    state.bloomThreshold = defaultState.bloomThreshold
+  }
+  if (typeof state.bloomIntensity !== "number") {
+    state.bloomIntensity = defaultState.bloomIntensity
+  }
+  if (typeof state.bloomRadius !== "number") state.bloomRadius = defaultState.bloomRadius
   if (typeof state.blendSpace !== "string" || !(state.blendSpace in colorBlendSpaces)) {
     state.blendSpace = defaultState.blendSpace
   }
@@ -769,6 +838,22 @@ export const useGradientStore = create<GradientStore>()(
         recordEdit("contrast")
         set({ contrast: value })
       },
+      setEffect: (value) => {
+        get().pushHistory()
+        set({ effect: value })
+      },
+      setBloomThreshold: (value) => {
+        recordEdit("bloomThreshold")
+        set({ bloomThreshold: value })
+      },
+      setBloomIntensity: (value) => {
+        recordEdit("bloomIntensity")
+        set({ bloomIntensity: value })
+      },
+      setBloomRadius: (value) => {
+        recordEdit("bloomRadius")
+        set({ bloomRadius: value })
+      },
       setBlendSpace: (value) => {
         get().pushHistory()
         set({ blendSpace: value })
@@ -856,6 +941,10 @@ export const useGradientStore = create<GradientStore>()(
           exposure: defaultState.exposure,
           brightness: defaultState.brightness,
           contrast: defaultState.contrast,
+          effect: defaultState.effect,
+          bloomThreshold: defaultState.bloomThreshold,
+          bloomIntensity: defaultState.bloomIntensity,
+          bloomRadius: defaultState.bloomRadius,
           blendSpace: defaultState.blendSpace,
           loopDuration: defaultState.loopDuration,
           seed: [...defaultState.seed] as [number, number],
@@ -915,6 +1004,15 @@ export const useGradientStore = create<GradientStore>()(
           validatedSettings.brightness = clampNum(settings.brightness, -0.3, 0.3, 0)
         if (settings.contrast !== undefined)
           validatedSettings.contrast = clampNum(settings.contrast, 0.5, 2, 1)
+        if (settings.effect !== undefined)
+          validatedSettings.effect =
+            settings.effect in effects ? (settings.effect as GradientEffect) : "none"
+        if (settings.bloomThreshold !== undefined)
+          validatedSettings.bloomThreshold = clampNum(settings.bloomThreshold, 0, 3, 0.8)
+        if (settings.bloomIntensity !== undefined)
+          validatedSettings.bloomIntensity = clampNum(settings.bloomIntensity, 0, 3, 0.8)
+        if (settings.bloomRadius !== undefined)
+          validatedSettings.bloomRadius = clampNum(settings.bloomRadius, 0.5, 3, 1)
         if (settings.blendSpace !== undefined)
           validatedSettings.blendSpace =
             settings.blendSpace in colorBlendSpaces
@@ -1123,6 +1221,10 @@ export const useGradientStore = create<GradientStore>()(
         exposure: state.exposure,
         brightness: state.brightness,
         contrast: state.contrast,
+        effect: state.effect,
+        bloomThreshold: state.bloomThreshold,
+        bloomIntensity: state.bloomIntensity,
+        bloomRadius: state.bloomRadius,
         blendSpace: state.blendSpace,
         loopDuration: state.loopDuration,
         seed: state.seed,

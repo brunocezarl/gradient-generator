@@ -947,6 +947,10 @@ describe("migratePersistedState", () => {
       exposure: 0,
       brightness: 0,
       contrast: 1,
+      effect: "none",
+      bloomThreshold: 0.6,
+      bloomIntensity: 0.8,
+      bloomRadius: 1,
       blendSpace: "oklab",
       loopDuration: 0,
       seed: [0, 0],
@@ -1254,5 +1258,97 @@ describe("tone controls", () => {
     expect(useGradientStore.getState().exposure).toBe(2)
     expect(useGradientStore.getState().brightness).toBe(-0.3)
     expect(useGradientStore.getState().contrast).toBe(0.5)
+  })
+})
+
+// ─── Effects ─────────────────────────────────────────────────────────────────
+
+describe("effects", () => {
+  it("start with no chain, which is the untouched render path", () => {
+    expect(useGradientStore.getState().effect).toBe("none")
+  })
+
+  it("travel in snapshots and come back through undo", () => {
+    const store = useGradientStore.getState()
+    store.setEffect("bloom")
+    now += 2000
+    store.setBloomIntensity(1.7)
+
+    expect(useGradientStore.getState().effect).toBe("bloom")
+    expect(useGradientStore.getState().bloomIntensity).toBe(1.7)
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().bloomIntensity).toBe(0.8)
+    expect(useGradientStore.getState().effect).toBe("bloom")
+
+    useGradientStore.getState().undo()
+    expect(useGradientStore.getState().effect).toBe("none")
+  })
+
+  it("go back to none on reset", () => {
+    const store = useGradientStore.getState()
+    store.setEffect("bloom")
+    store.setBloomRadius(2.5)
+
+    useGradientStore.getState().resetToDefaults()
+
+    expect(useGradientStore.getState().effect).toBe("none")
+    expect(useGradientStore.getState().bloomRadius).toBe(1)
+  })
+
+  it("are filled in when hydrating a state that predates them", () => {
+    const normalized = normalizePersistedState({ speed: 1 }) as Record<string, unknown>
+
+    expect(normalized.effect).toBe("none")
+    expect(normalized.bloomThreshold).toBe(0.6)
+    expect(normalized.bloomIntensity).toBe(0.8)
+    expect(normalized.bloomRadius).toBe(1)
+  })
+
+  it("reject an effect name this build does not know", () => {
+    const normalized = normalizePersistedState({ effect: "ascii" }) as Record<string, unknown>
+    // A link or a stored state from a newer build must not leave the renderer
+    // asking for a chain that does not exist here
+    expect(normalized.effect).toBe("none")
+  })
+
+  it("are clamped when they arrive from a link", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "bloom",
+      bloomThreshold: -5,
+      bloomIntensity: 99,
+      bloomRadius: 0,
+    })
+
+    expect(useGradientStore.getState().effect).toBe("bloom")
+    expect(useGradientStore.getState().bloomThreshold).toBe(0)
+    expect(useGradientStore.getState().bloomIntensity).toBe(3)
+    expect(useGradientStore.getState().bloomRadius).toBe(0.5)
+  })
+
+  it("fall back to none when a link names an unknown effect", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "kaleidoscope",
+    })
+
+    expect(useGradientStore.getState().effect).toBe("none")
   })
 })

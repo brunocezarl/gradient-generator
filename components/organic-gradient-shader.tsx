@@ -4,6 +4,7 @@ import { useRef, useMemo, useEffect } from "react"
 import { useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
 import {
+  createGradientUniforms,
   MAX_COLOR_STOPS,
   organicGradientFragmentShader,
   organicGradientVertexShader,
@@ -34,6 +35,12 @@ export interface OrganicGradientParams {
   seed: [number, number]
   // 0 = free animation; > 0 = period over which the drawing repeats exactly
   loopDuration: number
+  /**
+   * Write unclamped linear light instead of a finished sRGB image. Set while a
+   * post-processing chain is running: it needs energy to sum, and the encode,
+   * grain and dither move to the end of that chain.
+   */
+  outputLinear?: boolean
 }
 
 interface StopUniforms {
@@ -92,6 +99,7 @@ export function OrganicGradientShader({
   blendSpace,
   seed,
   loopDuration,
+  outputLinear = false,
 }: OrganicGradientParams) {
   const meshRef = useRef<THREE.Mesh>(null)
   const invalidate = useThree((state) => state.invalidate)
@@ -103,10 +111,10 @@ export function OrganicGradientShader({
     const stopUniforms = createStopUniforms()
     writeStopUniforms(stopUniforms, stops)
     return {
-      uTime: { value: 0 },
+      ...createGradientUniforms(),
+      ...stopUniforms,
       uComplexity: { value: complexity },
       uNoiseScale: { value: noiseScale },
-      ...stopUniforms,
       uFlowIntensity: { value: flowIntensity },
       uGrainAmount: { value: grainAmount },
       uGrainScale: { value: grainScale },
@@ -119,6 +127,7 @@ export function OrganicGradientShader({
       uOklabMix: { value: blendSpace === "oklab" ? 1 : 0 },
       uSeed: { value: [seed[0], seed[1]] },
       uLoopDuration: { value: loopDuration },
+      uOutputLinear: { value: outputLinear ? 1 : 0 },
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -142,6 +151,7 @@ export function OrganicGradientShader({
     material.uniforms.uOklabMix.value = blendSpace === "oklab" ? 1 : 0
     material.uniforms.uSeed.value = [seed[0], seed[1]]
     material.uniforms.uLoopDuration.value = loopDuration
+    material.uniforms.uOutputLinear.value = outputLinear ? 1 : 0
 
     // With the animation paused the canvas runs on the "demand" frameloop:
     // without this the screen would keep the old image while controls change
@@ -162,6 +172,7 @@ export function OrganicGradientShader({
     blendSpace,
     seed,
     loopDuration,
+    outputLinear,
     invalidate,
   ])
 

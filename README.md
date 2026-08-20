@@ -26,6 +26,11 @@ noise, rendered through React Three Fiber.
 - **Color picker in OKLCH**, RGB, HSL or HEX: adjusting lightness or chroma in
   OKLCH does not shift the hue (lightening a red in HSL pulls it toward pink),
   and the chroma slider respects the real sRGB ceiling for that color
+- **Bloom**: light spilling past what emitted it, summed in linear space on
+  unclamped values — raise exposure and the same intensity glows harder, because
+  the bright end really is brighter. Threshold, intensity and spread; off by
+  default, and off means the gradient draws straight to the screen with nothing
+  in the way
 - **Tone controls**: exposure in stops (a linear multiply, the way a camera
   works), plus brightness and contrast acting on Oklab lightness — moving L
   leaves hue and chroma where the picker put them, unlike scaling RGB channels,
@@ -113,6 +118,22 @@ lib/shaders/  # single source of the GLSL (gradient + layer compositing)
 - **Persistence**: the store is versioned (`PERSIST_VERSION`) and normalized on
   hydration. Since zustand only calls `migrate` when the stored JSON has a
   numeric `version`, normalization runs in `merge`, which always executes.
+- **Post-processing**: with an effect on, the gradient stops encoding and hands
+  the chain raw linear light (`uOutputLinear`); the sRGB encode, grain and dither
+  move to the far end, in the resolve pass. Bloom has to sum energy rather than
+  encoded values, and grain blurred into a halo would be grain no longer. Both
+  ends share one copy of the conversions (`colorSpaceChunk`, `simplexNoiseChunk`,
+  `ditherChunk`), so the two paths cannot drift. The chain is a
+  progressive-downsample pyramid — bright pass at half size, five levels down,
+  summed back on the way up — and the resolve pass draws the gradient's own plane
+  through the gradient's own camera, so grain lands in the same place with the
+  chain running as without it (measured: one 8-bit step of difference, the
+  half-float round trip). Its bright pass gates on the strongest channel rather
+  than on Rec.709 luminance: a saturated blue scores 0.06 in luminance against a
+  mid gray's 0.22, so a luminance gate would let dull grays glow while vivid
+  blues never could. With the effect off the chain is not mounted at all, which
+  is why the untouched path still exports pixels identical to the build from
+  before any of it existed.
 - **Tone**: exposure multiplies in linear space before the sRGB encode — the
   physical meaning of a stop of light. Brightness and contrast instead convert to
   Oklab and move `L` alone (contrast pivots at `L = 0.5`, the middle of the

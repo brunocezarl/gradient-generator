@@ -24,6 +24,11 @@ further passes went in on top of it.
 - Deterministic video export (WebCodecs): exact frame rate and duration,
   independent of GPU performance
 
+### Effects
+- Bloom in a progressive-downsample chain, summed in linear light with half-float
+  headroom above 1.0, shared by the single-layer scene, the layer compositor and
+  the thumbnail renderer
+
 ### Color
 - OKLCH engine: conversions, gamut clamping on chroma, harmonies, WCAG contrast
 - Tone controls: exposure (linear, in stops) plus brightness and contrast on
@@ -42,12 +47,15 @@ Ideas that came out of the codebase review and have not been built yet:
    the tool in the first minute.
 2. **Batch export** — shipping one gradient as post, story, cover, OG and
    wallpaper in a single action is the real delivery flow.
-3. **PNG with alpha and mask output** — needed to composite the gradient into
+3. **ASCII effect** — the second entry in the Effect section: a glyph atlas
+   built at runtime and a cell size defined as a fraction of the artboard, so the
+   export matches the preview instead of gaining detail with resolution.
+4. **PNG with alpha and mask output** — needed to composite the gradient into
    other artwork.
-4. **Adaptive resolution scaling** with an FPS target, instead of the current
+5. **Adaptive resolution scaling** with an FPS target, instead of the current
    fixed per-device pixel ratio.
-5. **Golden-image tests in CI** — the `verify` skill already drives headless
+6. **Golden-image tests in CI** — the `verify` skill already drives headless
    WebGL; turning it into a suite would catch color and composition regressions
    automatically.
-6. **Dynamic OG image** rendering the shared gradient, so a pasted link previews
+7. **Dynamic OG image** rendering the shared gradient, so a pasted link previews
    the actual artwork.

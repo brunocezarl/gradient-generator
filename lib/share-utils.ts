@@ -39,6 +39,11 @@ export interface ShareableGradient {
   exposure?: number
   brightness?: number
   contrast?: number
+  // Post-processing (v3)
+  effect?: string
+  bloomThreshold?: number
+  bloomIntensity?: number
+  bloomRadius?: number
   blendSpace?: string
   seed?: [number, number]
   loopDuration?: number
@@ -105,6 +110,10 @@ type PackedGradient = {
   ex?: number // exposure
   br?: number // brightness
   ct?: number // contrast
+  ef?: string // effect
+  bt?: number // bloomThreshold
+  bi?: number // bloomIntensity
+  brd?: number // bloomRadius
   bs?: string // blendSpace
   sd?: number[] // seed
   ld?: number // loopDuration
@@ -132,6 +141,14 @@ function pack(data: ShareableGradient): PackedGradient {
   if (data.exposure !== undefined) packed.ex = round3(data.exposure)
   if (data.brightness !== undefined) packed.br = round3(data.brightness)
   if (data.contrast !== undefined) packed.ct = round3(data.contrast)
+  // Only a chain that is actually on travels: a link to a plain gradient should
+  // not carry three bloom numbers nobody will read
+  if (data.effect !== undefined && data.effect !== "none") {
+    packed.ef = data.effect
+    if (data.bloomThreshold !== undefined) packed.bt = round3(data.bloomThreshold)
+    if (data.bloomIntensity !== undefined) packed.bi = round3(data.bloomIntensity)
+    if (data.bloomRadius !== undefined) packed.brd = round3(data.bloomRadius)
+  }
   if (data.blendSpace !== undefined) packed.bs = data.blendSpace
   if (data.seed !== undefined) packed.sd = data.seed.map(round3)
   if (data.loopDuration !== undefined) packed.ld = round3(data.loopDuration)
@@ -192,6 +209,10 @@ function unpack(packed: PackedGradient): ShareableGradient {
   if (packed.ex !== undefined) data.exposure = packed.ex
   if (packed.br !== undefined) data.brightness = packed.br
   if (packed.ct !== undefined) data.contrast = packed.ct
+  if (packed.ef !== undefined) data.effect = packed.ef
+  if (packed.bt !== undefined) data.bloomThreshold = packed.bt
+  if (packed.bi !== undefined) data.bloomIntensity = packed.bi
+  if (packed.brd !== undefined) data.bloomRadius = packed.brd
   if (packed.bs !== undefined) data.blendSpace = packed.bs
   if (packed.sd !== undefined && packed.sd.length >= 2)
     data.seed = [packed.sd[0], packed.sd[1]]
@@ -250,6 +271,10 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     exposure: state.exposure ?? 0,
     brightness: state.brightness ?? 0,
     contrast: state.contrast ?? 1,
+    effect: state.effect ?? "none",
+    bloomThreshold: state.bloomThreshold ?? 0.8,
+    bloomIntensity: state.bloomIntensity ?? 0.8,
+    bloomRadius: state.bloomRadius ?? 1,
     blendSpace: state.blendSpace ?? "oklab",
     seed: state.seed ?? [0, 0],
     loopDuration: state.loopDuration ?? 0,

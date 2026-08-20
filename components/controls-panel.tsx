@@ -17,7 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { useGradientStore } from "@/lib/store"
+import { effects, useGradientStore, type GradientEffect } from "@/lib/store"
 import { CanvasSection } from "@/components/canvas-section"
 import { StopsEditor } from "@/components/stops-editor"
 import { StopDots } from "@/components/gradient-swatch"
@@ -34,7 +34,7 @@ interface ControlsPanelProps {
 
 // Sections open on first paint: the framing and the colors are what a session
 // starts with. Everything else is a refinement and stays folded away.
-const DEFAULT_OPEN = ["canvas", "color"]
+const DEFAULT_OPEN = ["effect", "canvas", "color"]
 
 export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -62,6 +62,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     exposure,
     brightness,
     contrast,
+    effect,
+    bloomThreshold,
+    bloomIntensity,
+    bloomRadius,
     blendSpace,
     multiLayerMode,
     setSpeed,
@@ -82,6 +86,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     setExposure,
     setBrightness,
     setContrast,
+    setEffect,
+    setBloomThreshold,
+    setBloomIntensity,
+    setBloomRadius,
     setBlendSpace,
     shuffleSeed,
   } = useGradientStore(
@@ -102,6 +110,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       exposure: state.exposure,
       brightness: state.brightness,
       contrast: state.contrast,
+      effect: state.effect,
+      bloomThreshold: state.bloomThreshold,
+      bloomIntensity: state.bloomIntensity,
+      bloomRadius: state.bloomRadius,
       blendSpace: state.blendSpace,
       multiLayerMode: state.multiLayerMode,
       setSpeed: state.setSpeed,
@@ -122,6 +134,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       setExposure: state.setExposure,
       setBrightness: state.setBrightness,
       setContrast: state.setContrast,
+      setEffect: state.setEffect,
+      setBloomThreshold: state.setBloomThreshold,
+      setBloomIntensity: state.setBloomIntensity,
+      setBloomRadius: state.setBloomRadius,
       setBlendSpace: state.setBlendSpace,
       shuffleSeed: state.shuffleSeed,
     }))
@@ -135,6 +151,89 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         onValueChange={setOpenSections}
         className="w-full"
       >
+        {/* ─── Effect ──────────────────────────────────────────────────── */}
+        <AccordionItem value="effect">
+          <AccordionTrigger>Effect</AccordionTrigger>
+          <AccordionContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-1">
+              {(Object.entries(effects) as [GradientEffect, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => effect !== key && setEffect(key)}
+                  aria-pressed={effect === key}
+                  className={`h-7 rounded text-[11px] font-medium tracking-wide transition-colors ${
+                    effect === key
+                      ? "bg-white text-neutral-950"
+                      : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {effect === "bloom" ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Threshold: {bloomThreshold.toFixed(2)}</Label>
+                    <TooltipHelp content="Where the glow starts, measured on the strongest channel in linear light: a mid tone sits near 0.22 and a saturated primary near 0.79. Lower values pull more of the gradient into the halo." />
+                  </div>
+                  <Slider
+                    value={[bloomThreshold]}
+                    min={0}
+                    max={2}
+                    step={0.02}
+                    onValueChange={(value) => setBloomThreshold(value[0])}
+                    thumbLabel="Bloom threshold"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Intensity: {bloomIntensity.toFixed(2)}</Label>
+                    <TooltipHelp content="How much of the halo is added back to the image. It is summed in linear light, so raising exposure makes the same intensity glow harder." />
+                  </div>
+                  <Slider
+                    value={[bloomIntensity]}
+                    min={0}
+                    max={3}
+                    step={0.05}
+                    onValueChange={(value) => setBloomIntensity(value[0])}
+                    thumbLabel="Bloom intensity"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Spread: {bloomRadius.toFixed(2)}</Label>
+                    <TooltipHelp content="How far the light travels from what emitted it. It widens the filter taps rather than adding passes, so a broad halo costs no more than a tight one." />
+                  </div>
+                  <Slider
+                    value={[bloomRadius]}
+                    min={0.5}
+                    max={3}
+                    step={0.05}
+                    onValueChange={(value) => setBloomRadius(value[0])}
+                    thumbLabel="Bloom spread"
+                  />
+                </div>
+
+                <p className="text-xs text-neutral-500">
+                  Bloom feeds on light above the threshold, so it pairs with Exposure:
+                  push exposure up and the bright end blows out into the halo.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-neutral-500">
+                No chain: the gradient draws straight to the screen, and the exported
+                pixels are the colors you picked.
+              </p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
         {/* ─── Canvas ──────────────────────────────────────────────────── */}
         <AccordionItem value="canvas">
           <AccordionTrigger>Canvas</AccordionTrigger>

@@ -11,6 +11,7 @@ import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
 import { registerFrameRenderer } from "@/lib/capture"
+import { BloomChain } from "@/lib/post-chain"
 import {
   blendModeToShaderIndex,
   compositeFragmentShader,
@@ -52,6 +53,11 @@ function LayeredComposition({
     contrast: number
     blendSpace: "oklab" | "linear"
     loopDuration: number
+    effect: "none" | "bloom"
+    bloomThreshold: number
+    bloomIntensity: number
+    bloomRadius: number
+    seed: [number, number]
   }
   colorSchemes: Record<string, { stops: ColorStop[] }>
 }) {
@@ -102,6 +108,12 @@ function LayeredComposition({
     // so any camera works
     return { scene, material, camera: new THREE.Camera() }
   }, [])
+
+  // Built only while the effect is on, and torn down when it goes off: a
+  // composition with no effect should not hold a pyramid of render targets
+  const bloomOn = globals.effect === "bloom"
+  const chain = useMemo(() => (bloomOn ? new BloomChain(gl) : null), [bloomOn, gl])
+  useEffect(() => () => chain?.dispose(), [chain])
 
   useEffect(
     () => () => {
@@ -156,17 +168,40 @@ function LayeredComposition({
       ;[accumulation, swap] = [swap, accumulation]
     })
 
-    // Result to the screen
+    // Result to the screen — or into the effect chain, when there is one
     composite.material.uniforms.uBase.value = accumulation.texture
     composite.material.uniforms.uLayer.value = accumulation.texture
     composite.material.uniforms.uOpacity.value = 1
     composite.material.uniforms.uBlendMode.value = 0
-    gl.setRenderTarget(null)
+    // Sized before the composition is drawn into it, not after: `apply` would
+    // otherwise resize the target out from under the image it is about to read
+    chain?.prepare(gl)
+    gl.setRenderTarget(chain ? chain.sceneRenderTarget : null)
     gl.render(composite.scene, composite.camera)
+
+    if (chain) {
+      // The composition arrives encoded, not as linear light, and that is on
+      // purpose: the blend modes are the Compositing and Blending Level 1
+      // formulas, which are defined on encoded values — blending in linear would
+      // silently change what every existing "multiply" looks like. The chain
+      // decodes it to sum the halo. The cost is that a layered composition has
+      // no headroom above 1.0 for bloom to feed on, since the compositor clamped
+      // it; grain is likewise already baked into each layer, so the resolve pass
+      // must not add a second helping.
+      chain.apply(gl, camera, {
+        threshold: globals.bloomThreshold,
+        intensity: globals.bloomIntensity,
+        radius: globals.bloomRadius,
+        grainAmount: 0,
+        grainScale: globals.grainScale,
+        seed: globals.seed,
+        sceneIsSrgb: true,
+      })
+    }
 
     gl.setRenderTarget(previousTarget)
     gl.setClearColor(previousClear, previousClearAlpha)
-  }, [gl, camera, visibleLayers, layerScenes, targets, composite])
+  }, [gl, camera, visibleLayers, layerScenes, targets, composite, chain, globals])
 
   // Priority > 0 takes over the render loop: react-three-fiber stops drawing the
   // root scene on its own and the composition controls the passes
@@ -233,6 +268,11 @@ export function MultiLayerGradient() {
       contrast: state.contrast,
       blendSpace: state.blendSpace,
       loopDuration: state.loopDuration,
+      effect: state.effect,
+      bloomThreshold: state.bloomThreshold,
+      bloomIntensity: state.bloomIntensity,
+      bloomRadius: state.bloomRadius,
+      seed: state.seed,
     }))
   )
 

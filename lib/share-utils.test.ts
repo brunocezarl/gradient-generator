@@ -9,6 +9,63 @@ beforeAll(() => {
 })
 
 describe("createShareableURL / parseShareableURL", () => {
+  it("carries a running effect through a link", () => {
+    const url = createShareableURL({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customStops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "bloom",
+      bloomThreshold: 0.45,
+      bloomIntensity: 1.3,
+      bloomRadius: 2.2,
+    })
+
+    const parsed = parseShareableURL(url)
+    expect(parsed!.effect).toBe("bloom")
+    expect(parsed!.bloomThreshold).toBe(0.45)
+    expect(parsed!.bloomIntensity).toBe(1.3)
+    expect(parsed!.bloomRadius).toBe(2.2)
+  })
+
+  it("keeps the effect settings out of a link with no effect", () => {
+    const withEffect = createShareableURL({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customStops: [{ color: [1, 0, 0], position: 0 }],
+      effect: "bloom",
+      bloomThreshold: 0.45,
+      bloomIntensity: 1.3,
+      bloomRadius: 2.2,
+    })
+    const without = createShareableURL({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      customStops: [{ color: [1, 0, 0], position: 0 }],
+      effect: "none",
+      bloomThreshold: 0.45,
+      bloomIntensity: 1.3,
+      bloomRadius: 2.2,
+    })
+
+    // Three numbers nobody will read are three numbers of URL — a link to a
+    // plain gradient should not carry the settings of a chain that is off
+    expect(without.length).toBeLessThan(withEffect.length)
+    expect(parseShareableURL(without)!.effect).toBeUndefined()
+    expect(parseShareableURL(without)!.bloomIntensity).toBeUndefined()
+  })
+
   it("carries the tone controls through a link", () => {
     const url = createShareableURL({
       speed: 1,

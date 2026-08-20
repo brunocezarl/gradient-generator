@@ -1,7 +1,9 @@
 "use client"
 
 import * as THREE from "three"
+import { BloomChain } from "@/lib/post-chain"
 import {
+  createGradientUniforms,
   MAX_COLOR_STOPS,
   organicGradientFragmentShader,
   organicGradientVertexShader,
@@ -34,6 +36,12 @@ export interface ThumbnailParams {
   exposure?: number
   brightness?: number
   contrast?: number
+  // A preset carries its effect, so the thumbnail has to show it: two presets
+  // with the same colors, one blooming, are not the same look
+  effect?: "none" | "bloom"
+  bloomThreshold?: number
+  bloomIntensity?: number
+  bloomRadius?: number
   blendSpace: "oklab" | "linear"
   seed: [number, number]
   loopDuration: number
@@ -45,6 +53,9 @@ interface ThumbnailRenderer {
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
   material: THREE.ShaderMaterial
+  // Built on first use: a gallery of gradients with no effect should not pay
+  // for a pyramid of render targets
+  bloom: BloomChain | null
 }
 
 let shared: ThumbnailRenderer | null = null
@@ -66,25 +77,7 @@ function getRenderer(width: number, height: number): ThumbnailRenderer | null {
       const material = new THREE.ShaderMaterial({
         vertexShader: organicGradientVertexShader,
         fragmentShader: organicGradientFragmentShader,
-        uniforms: {
-          uTime: { value: 0 },
-          uComplexity: { value: 3 },
-          uNoiseScale: { value: 2 },
-          uStopColors: {
-            value: Array.from({ length: MAX_COLOR_STOPS }, () => new THREE.Vector3()),
-          },
-          uStopPositions: { value: new Array(MAX_COLOR_STOPS).fill(0) },
-          uStopCount: { value: 2 },
-          uFlowIntensity: { value: 0.3 },
-          uGrainAmount: { value: 0 },
-          uGrainScale: { value: 500 },
-          uThresholdMin: { value: 0.3 },
-          uThresholdMax: { value: 0.7 },
-          uVibrance: { value: 0 },
-          uOklabMix: { value: 1 },
-          uSeed: { value: [0, 0] },
-          uLoopDuration: { value: 0 },
-        },
+        uniforms: createGradientUniforms(),
       })
 
       const scene = new THREE.Scene()
@@ -95,7 +88,7 @@ function getRenderer(width: number, height: number): ThumbnailRenderer | null {
       const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100)
       camera.position.set(0, 0, 5)
 
-      shared = { renderer, scene, camera, material }
+      shared = { renderer, scene, camera, material, bloom: null }
     } catch {
       // No WebGL context available (tab with too many canvases, blocked GPU):
       // the caller falls back to the CSS preview
@@ -113,6 +106,7 @@ function getRenderer(width: number, height: number): ThumbnailRenderer | null {
 /** Releases the shared renderer (used when the gallery unmounts) */
 export function disposeThumbnailRenderer() {
   if (!shared) return
+  shared.bloom?.dispose()
   shared.material.dispose()
   shared.renderer.dispose()
   shared = null
@@ -155,8 +149,34 @@ export function renderThumbnail(
   uniforms.uSeed.value = [params.seed[0], params.seed[1]]
   uniforms.uLoopDuration.value = params.loopDuration
 
+  const bloomOn = params.effect === "bloom"
+  uniforms.uOutputLinear.value = bloomOn ? 1 : 0
+
   try {
-    renderer.render(scene, camera)
+    if (bloomOn) {
+      if (!context.bloom) context.bloom = new BloomChain(renderer)
+      const chain = context.bloom
+      // A thumbnail is a single render with no second chance, so the targets
+      // have to be the right size before the scene goes into them
+      chain.prepare(renderer)
+      renderer.setRenderTarget(chain.sceneRenderTarget)
+      renderer.clear(true, false, false)
+      renderer.render(scene, camera)
+      chain.apply(renderer, camera, {
+        threshold: params.bloomThreshold ?? 0.6,
+        intensity: params.bloomIntensity ?? 0.8,
+        radius: params.bloomRadius ?? 1,
+        // Grain is off in thumbnails at this size either way
+        grainAmount: 0,
+        grainScale: params.grainScale,
+        seed: params.seed,
+      })
+      // apply restores whatever target it found, which here is the chain's own —
+      // the next preset in the gallery would otherwise render off screen
+      renderer.setRenderTarget(null)
+    } else {
+      renderer.render(scene, camera)
+    }
     return renderer.domElement.toDataURL("image/png")
   } catch {
     return null
