@@ -4,35 +4,39 @@ import { useCallback, useEffect, useMemo } from "react"
 import { useFrame, useThree } from "@react-three/fiber"
 import { useShallow } from "zustand/react/shallow"
 import { useGradientStore } from "@/lib/store"
-import { BloomChain } from "@/lib/post-chain"
+import { PostChain } from "@/lib/post-chain"
 import { registerFrameRenderer } from "@/lib/capture"
 
-// Drives the bloom chain over the single-layer scene.
+// Drives the post-processing chain over the single-layer scene.
 //
-// Mounted only while the effect is on. That is the whole reason the "none" path
+// Mounted only while an effect is on. That is the whole reason the "none" path
 // stays byte for byte what it always was: with this component unmounted nothing
 // in the render path has changed — react-three-fiber draws the root scene
 // straight to the screen, as before.
-export function BloomPass() {
+export function EffectPass() {
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
   const camera = useThree((state) => state.camera)
 
   const params = useGradientStore(
     useShallow((state) => ({
+      effect: state.effect as "bloom" | "ascii",
       threshold: state.bloomThreshold,
       intensity: state.bloomIntensity,
       radius: state.bloomRadius,
+      columns: state.asciiColumns,
+      background: state.asciiBackground,
+      rampContrast: state.asciiRampContrast,
       grainAmount: state.grainAmount,
       grainScale: state.grainScale,
       seed: state.seed,
     }))
   )
 
-  const chain = useMemo(() => new BloomChain(gl), [gl])
+  const chain = useMemo(() => new PostChain(gl), [gl])
   useEffect(() => () => chain.dispose(), [chain])
 
-  const renderWithBloom = useCallback(() => {
+  const renderWithEffect = useCallback(() => {
     const previousTarget = gl.getRenderTarget()
 
     // Size the targets first: rendering into a target that `apply` is about to
@@ -53,13 +57,13 @@ export function BloomPass() {
 
   // Priority > 0 takes the render loop away from react-three-fiber, the same way
   // the layer compositor does — the passes have to run in order
-  useFrame(renderWithBloom, 1)
+  useFrame(renderWithEffect, 1)
 
   // Image and video export re-render at the output resolution through here, so
   // the file gets the halo the preview shows
   useEffect(
-    () => registerFrameRenderer(gl.domElement, renderWithBloom),
-    [gl, renderWithBloom]
+    () => registerFrameRenderer(gl.domElement, renderWithEffect),
+    [gl, renderWithEffect]
   )
 
   return null

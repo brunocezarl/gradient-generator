@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import {
+  asciiResolveFragmentShader,
   brightPassFragmentShader,
   downsampleFragmentShader,
   postVertexShader,
@@ -7,21 +8,33 @@ import {
   resolveVertexShader,
   upsampleFragmentShader,
 } from "@/lib/shaders/post"
+import { createGlyphAtlas, type GlyphAtlas } from "@/lib/glyph-atlas"
 
-// The bloom chain, owning its render targets and materials.
+// The post-processing chain, owning its render targets and materials.
 //
 // Deliberately free of React: the on-screen scene, the layer compositor and the
 // off-screen thumbnail renderer all need the same passes, and only two of those
 // three live inside a component tree. What varies between them is the source
 // texture and the size — everything else is this object's business.
+//
+// Every effect ends in a resolve pass, and every resolve pass finishes the image
+// the same way: out of linear space, then grain, then dither. What differs is
+// what it does before that.
 
-export interface BloomParams {
-  /** Luminance where the glow starts, in linear light */
+export interface PostParams {
+  effect: "bloom" | "ascii"
+  /** Brightness where the glow starts, in linear light */
   threshold: number
   /** How much of the halo is added back */
   intensity: number
   /** Scales the upsample taps: wider taps, wider halo */
   radius: number
+  /** Characters across the image; the rows follow from the aspect ratio */
+  columns: number
+  /** How much of the source shows through behind the glyphs */
+  background: number
+  /** Gain on lightness before it picks a character */
+  rampContrast: number
   grainAmount: number
   grainScale: number
   seed: [number, number]
@@ -61,7 +74,7 @@ export function supportsHdrTargets(renderer: THREE.WebGLRenderer): boolean {
   return renderer.extensions.has("EXT_color_buffer_half_float")
 }
 
-export class BloomChain {
+export class PostChain {
   private levels: THREE.WebGLRenderTarget[] = []
   private sceneTarget: THREE.WebGLRenderTarget
   private textureType: THREE.TextureDataType
@@ -70,6 +83,10 @@ export class BloomChain {
   private downsample: THREE.ShaderMaterial
   private upsample: THREE.ShaderMaterial
   private resolve: THREE.ShaderMaterial
+  private asciiResolve: THREE.ShaderMaterial
+  // Rasterized on first use: a gradient with no ASCII should not build a texture
+  // it will never sample
+  private glyphs: GlyphAtlas | null = null
 
   private quadScene: THREE.Scene
   private quadCamera: THREE.Camera
@@ -134,6 +151,25 @@ export class BloomChain {
         uScene: { value: null },
         uBloom: { value: null },
         uIntensity: { value: 1 },
+        uGrainAmount: { value: 0 },
+        uGrainScale: { value: 500 },
+        uSeed: { value: new THREE.Vector2() },
+        uResolution: { value: new THREE.Vector2(1, 1) },
+        uSceneIsSrgb: { value: 0 },
+      },
+    })
+
+    this.asciiResolve = new THREE.ShaderMaterial({
+      ...base,
+      vertexShader: resolveVertexShader,
+      fragmentShader: asciiResolveFragmentShader,
+      uniforms: {
+        uScene: { value: null },
+        uGlyphs: { value: null },
+        uGlyphCount: { value: 1 },
+        uColumns: { value: 80 },
+        uBackground: { value: 0.12 },
+        uRampContrast: { value: 2.5 },
         uGrainAmount: { value: 0 },
         uGrainScale: { value: 500 },
         uSeed: { value: new THREE.Vector2() },
@@ -235,7 +271,7 @@ export class BloomChain {
   apply(
     renderer: THREE.WebGLRenderer,
     camera: THREE.Camera,
-    params: BloomParams,
+    params: PostParams,
     output: THREE.WebGLRenderTarget | null = null
   ) {
     // Idempotent, and the caller was supposed to have done it already — but a
@@ -244,10 +280,53 @@ export class BloomChain {
     const width = this.width
     const height = this.height
 
-    const levels = this.activeLevels()
     const previousTarget = renderer.getRenderTarget()
     const previousAutoClear = renderer.autoClear
     renderer.autoClear = false
+
+    const resolveMaterial =
+      params.effect === "ascii"
+        ? this.prepareAscii(params, width, height)
+        : this.prepareBloom(renderer, params, width, height)
+
+    this.resolveMesh.material = resolveMaterial
+    renderer.setRenderTarget(output)
+    renderer.clear(true, false, false)
+    renderer.render(this.resolveScene, camera)
+
+    renderer.autoClear = previousAutoClear
+    renderer.setRenderTarget(previousTarget)
+    return
+  }
+
+  // ASCII reads the scene straight: no pyramid, one pass, the grid does the work
+  private prepareAscii(params: PostParams, width: number, height: number) {
+    if (!this.glyphs) this.glyphs = createGlyphAtlas()
+
+    const uniforms = this.asciiResolve.uniforms
+    uniforms.uScene.value = this.sceneTarget.texture
+    uniforms.uGlyphs.value = this.glyphs?.texture ?? null
+    uniforms.uGlyphCount.value = this.glyphs?.count ?? 1
+    // At least one column, or the cell size divides by zero and the whole frame
+    // becomes a single glyph stretched across it
+    uniforms.uColumns.value = Math.max(1, params.columns)
+    uniforms.uBackground.value = params.background
+    uniforms.uRampContrast.value = params.rampContrast
+    uniforms.uGrainAmount.value = params.grainAmount
+    uniforms.uGrainScale.value = params.grainScale
+    uniforms.uSeed.value.set(params.seed[0], params.seed[1])
+    uniforms.uResolution.value.set(width, height)
+    uniforms.uSceneIsSrgb.value = params.sceneIsSrgb ? 1 : 0
+    return this.asciiResolve
+  }
+
+  private prepareBloom(
+    renderer: THREE.WebGLRenderer,
+    params: PostParams,
+    width: number,
+    height: number
+  ): THREE.ShaderMaterial {
+    const levels = this.activeLevels()
 
     // Bright pass, straight into the first (half size) level
     this.brightPass.uniforms.uScene.value = this.sceneTarget.texture
@@ -281,13 +360,7 @@ export class BloomChain {
     this.resolve.uniforms.uSeed.value.set(params.seed[0], params.seed[1])
     this.resolve.uniforms.uResolution.value.set(width, height)
     this.resolve.uniforms.uSceneIsSrgb.value = params.sceneIsSrgb ? 1 : 0
-
-    renderer.setRenderTarget(output)
-    renderer.clear(true, false, false)
-    renderer.render(this.resolveScene, camera)
-
-    renderer.autoClear = previousAutoClear
-    renderer.setRenderTarget(previousTarget)
+    return this.resolve
   }
 
   dispose() {
@@ -297,6 +370,8 @@ export class BloomChain {
     this.downsample.dispose()
     this.upsample.dispose()
     this.resolve.dispose()
+    this.asciiResolve.dispose()
+    this.glyphs?.texture.dispose()
     this.quadMaterialSlot.geometry.dispose()
     this.resolveMesh.geometry.dispose()
   }

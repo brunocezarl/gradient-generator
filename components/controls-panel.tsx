@@ -66,6 +66,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     bloomThreshold,
     bloomIntensity,
     bloomRadius,
+    asciiColumns,
+    asciiBackground,
+    asciiRampContrast,
     blendSpace,
     multiLayerMode,
     setSpeed,
@@ -90,6 +93,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     setBloomThreshold,
     setBloomIntensity,
     setBloomRadius,
+    setAsciiColumns,
+    setAsciiBackground,
+    setAsciiRampContrast,
     setBlendSpace,
     shuffleSeed,
   } = useGradientStore(
@@ -114,6 +120,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       bloomThreshold: state.bloomThreshold,
       bloomIntensity: state.bloomIntensity,
       bloomRadius: state.bloomRadius,
+      asciiColumns: state.asciiColumns,
+      asciiBackground: state.asciiBackground,
+      asciiRampContrast: state.asciiRampContrast,
       blendSpace: state.blendSpace,
       multiLayerMode: state.multiLayerMode,
       setSpeed: state.setSpeed,
@@ -138,6 +147,9 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       setBloomThreshold: state.setBloomThreshold,
       setBloomIntensity: state.setBloomIntensity,
       setBloomRadius: state.setBloomRadius,
+      setAsciiColumns: state.setAsciiColumns,
+      setAsciiBackground: state.setAsciiBackground,
+      setAsciiRampContrast: state.setAsciiRampContrast,
       setBlendSpace: state.setBlendSpace,
       shuffleSeed: state.shuffleSeed,
     }))
@@ -155,7 +167,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         <AccordionItem value="effect">
           <AccordionTrigger>Effect</AccordionTrigger>
           <AccordionContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-3 gap-1">
               {(Object.entries(effects) as [GradientEffect, string][]).map(([key, label]) => (
                 <button
                   key={key}
@@ -223,6 +235,58 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                 <p className="text-xs text-neutral-500">
                   Bloom feeds on light above the threshold, so it pairs with Exposure:
                   push exposure up and the bright end blows out into the halo.
+                </p>
+              </>
+            ) : effect === "ascii" ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Columns: {asciiColumns}</Label>
+                    <TooltipHelp content="Characters across the image. Density is set in columns, not in pixels, so the same setting composes the same picture on the preview and in a 4K export." />
+                  </div>
+                  <Slider
+                    value={[asciiColumns]}
+                    min={10}
+                    max={300}
+                    step={1}
+                    onValueChange={(value) => setAsciiColumns(value[0])}
+                    thumbLabel="ASCII columns"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Ramp Contrast: {asciiRampContrast.toFixed(2)}×</Label>
+                    <TooltipHelp content="Stretches lightness across the character ramp before a glyph is picked. A gradient of saturated colors occupies a narrow band of lightness, so at 1.00 only the middle two or three characters ever appear." />
+                  </div>
+                  <Slider
+                    value={[asciiRampContrast]}
+                    min={0.5}
+                    max={6}
+                    step={0.1}
+                    onValueChange={(value) => setAsciiRampContrast(value[0])}
+                    thumbLabel="ASCII ramp contrast"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Background: {asciiBackground.toFixed(2)}</Label>
+                    <TooltipHelp content="How much of the gradient shows through behind the characters. At 0 they sit on black and the composition is only legible through the glyphs." />
+                  </div>
+                  <Slider
+                    value={[asciiBackground]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={(value) => setAsciiBackground(value[0])}
+                    thumbLabel="ASCII background"
+                  />
+                </div>
+
+                <p className="text-xs text-neutral-500">
+                  Characters are picked by perceptual lightness, so a saturated blue and
+                  a saturated red land on different glyphs instead of the same one.
                 </p>
               </>
             ) : (

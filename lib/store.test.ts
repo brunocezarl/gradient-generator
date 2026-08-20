@@ -951,6 +951,9 @@ describe("migratePersistedState", () => {
       bloomThreshold: 0.6,
       bloomIntensity: 0.8,
       bloomRadius: 1,
+      asciiColumns: 80,
+      asciiBackground: 0.12,
+      asciiRampContrast: 2.5,
       blendSpace: "oklab",
       loopDuration: 0,
       seed: [0, 0],
@@ -1306,10 +1309,18 @@ describe("effects", () => {
   })
 
   it("reject an effect name this build does not know", () => {
-    const normalized = normalizePersistedState({ effect: "ascii" }) as Record<string, unknown>
+    const normalized = normalizePersistedState({ effect: "kaleidoscope" }) as Record<
+      string,
+      unknown
+    >
     // A link or a stored state from a newer build must not leave the renderer
     // asking for a chain that does not exist here
     expect(normalized.effect).toBe("none")
+  })
+
+  it("keep an effect name this build does know", () => {
+    const normalized = normalizePersistedState({ effect: "ascii" }) as Record<string, unknown>
+    expect(normalized.effect).toBe("ascii")
   })
 
   it("are clamped when they arrive from a link", () => {
@@ -1350,5 +1361,59 @@ describe("effects", () => {
     })
 
     expect(useGradientStore.getState().effect).toBe("none")
+  })
+})
+
+describe("ascii settings", () => {
+  it("count columns, not pixels", () => {
+    // The unit is the promise: the same setting has to compose the same picture
+    // at preview size and at export size
+    expect(useGradientStore.getState().asciiColumns).toBe(80)
+  })
+
+  it("round the column count, since half a character is not a thing", () => {
+    useGradientStore.getState().setAsciiColumns(42.7)
+    expect(useGradientStore.getState().asciiColumns).toBe(43)
+  })
+
+  it("never fall to zero columns, which would divide by zero in the shader", () => {
+    useGradientStore.getState().setAsciiColumns(0)
+    expect(useGradientStore.getState().asciiColumns).toBeGreaterThanOrEqual(1)
+    useGradientStore.getState().setAsciiColumns(-40)
+    expect(useGradientStore.getState().asciiColumns).toBeGreaterThanOrEqual(1)
+  })
+
+  it("start with the ramp stretched, or most of it would go unused", () => {
+    expect(useGradientStore.getState().asciiRampContrast).toBeGreaterThan(1)
+  })
+
+  it("are filled in when hydrating a state that predates them", () => {
+    const normalized = normalizePersistedState({ effect: "bloom" }) as Record<string, unknown>
+    expect(normalized.asciiColumns).toBe(80)
+    expect(normalized.asciiBackground).toBe(0.12)
+    expect(normalized.asciiRampContrast).toBe(2.5)
+  })
+
+  it("are clamped when they arrive from a link", () => {
+    useGradientStore.getState().importSettings({
+      speed: 1,
+      complexity: 3,
+      noiseScale: 2,
+      colorScheme: "redBlue",
+      isCustomMode: false,
+      stops: [
+        { color: [1, 0, 0], position: 0 },
+        { color: [0, 0, 1], position: 1 },
+      ],
+      effect: "ascii",
+      asciiColumns: 99999,
+      asciiBackground: -3,
+      asciiRampContrast: 100,
+    })
+
+    expect(useGradientStore.getState().effect).toBe("ascii")
+    expect(useGradientStore.getState().asciiColumns).toBe(300)
+    expect(useGradientStore.getState().asciiBackground).toBe(0)
+    expect(useGradientStore.getState().asciiRampContrast).toBe(6)
   })
 })

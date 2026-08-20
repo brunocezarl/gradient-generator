@@ -1,7 +1,7 @@
 "use client"
 
 import * as THREE from "three"
-import { BloomChain } from "@/lib/post-chain"
+import { PostChain } from "@/lib/post-chain"
 import {
   createGradientUniforms,
   MAX_COLOR_STOPS,
@@ -38,10 +38,13 @@ export interface ThumbnailParams {
   contrast?: number
   // A preset carries its effect, so the thumbnail has to show it: two presets
   // with the same colors, one blooming, are not the same look
-  effect?: "none" | "bloom"
+  effect?: "none" | "bloom" | "ascii"
   bloomThreshold?: number
   bloomIntensity?: number
   bloomRadius?: number
+  asciiColumns?: number
+  asciiBackground?: number
+  asciiRampContrast?: number
   blendSpace: "oklab" | "linear"
   seed: [number, number]
   loopDuration: number
@@ -55,7 +58,7 @@ interface ThumbnailRenderer {
   material: THREE.ShaderMaterial
   // Built on first use: a gallery of gradients with no effect should not pay
   // for a pyramid of render targets
-  bloom: BloomChain | null
+  bloom: PostChain | null
 }
 
 let shared: ThumbnailRenderer | null = null
@@ -149,12 +152,12 @@ export function renderThumbnail(
   uniforms.uSeed.value = [params.seed[0], params.seed[1]]
   uniforms.uLoopDuration.value = params.loopDuration
 
-  const bloomOn = params.effect === "bloom"
-  uniforms.uOutputLinear.value = bloomOn ? 1 : 0
+  const effectOn = params.effect === "bloom" || params.effect === "ascii"
+  uniforms.uOutputLinear.value = effectOn ? 1 : 0
 
   try {
-    if (bloomOn) {
-      if (!context.bloom) context.bloom = new BloomChain(renderer)
+    if (effectOn) {
+      if (!context.bloom) context.bloom = new PostChain(renderer)
       const chain = context.bloom
       // A thumbnail is a single render with no second chance, so the targets
       // have to be the right size before the scene goes into them
@@ -163,9 +166,15 @@ export function renderThumbnail(
       renderer.clear(true, false, false)
       renderer.render(scene, camera)
       chain.apply(renderer, camera, {
+        effect: params.effect === "ascii" ? "ascii" : "bloom",
         threshold: params.bloomThreshold ?? 0.6,
         intensity: params.bloomIntensity ?? 0.8,
         radius: params.bloomRadius ?? 1,
+        // Fewer columns than the artboard uses: at thumbnail size the composed
+        // count would be sub-pixel cells and read as mush
+        columns: Math.max(12, Math.round((params.asciiColumns ?? 80) / 3)),
+        background: params.asciiBackground ?? 0.12,
+        rampContrast: params.asciiRampContrast ?? 2.5,
         // Grain is off in thumbnails at this size either way
         grainAmount: 0,
         grainScale: params.grainScale,

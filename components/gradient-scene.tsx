@@ -7,7 +7,7 @@ import { useGradientStore, resolveActiveStops } from "@/lib/store"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
 import { OrganicGradientShader } from "@/components/organic-gradient-shader"
-import { BloomPass } from "@/components/bloom-pass"
+import { EffectPass } from "@/components/effect-pass"
 
 // Single-layer scene. The GLSL lives in lib/shaders/organic-gradient.ts and is
 // the same one the multi-layer mode uses.
@@ -34,8 +34,9 @@ function GradientShader() {
   )
 
   // With a chain running, the gradient stops encoding and hands over linear
-  // light — bloom has to sum energy, and grain must not be blurred into the halo
-  const bloomOn = useGradientStore((state) => state.effect === "bloom")
+  // light: bloom has to sum energy, ASCII has to read lightness before the
+  // transfer curve bends it, and neither wants grain baked in beforehand
+  const effectOn = useGradientStore((state) => state.effect !== "none")
 
   const stops = useGradientStore((state) =>
     resolveActiveStops({
@@ -46,13 +47,13 @@ function GradientShader() {
     })
   )
 
-  return <OrganicGradientShader stops={stops} outputLinear={bloomOn} {...params} />
+  return <OrganicGradientShader stops={stops} outputLinear={effectOn} {...params} />
 }
 
 export function GradientScene() {
   const { quality, pixelRatio, antialias } = useDeviceOptimizations()
   const isPlaying = useGradientStore((state) => state.isPlaying)
-  const bloomOn = useGradientStore((state) => state.effect === "bloom")
+  const effectOn = useGradientStore((state) => state.effect !== "none")
 
   const glConfig = useMemo(() => {
     return {
@@ -77,7 +78,7 @@ export function GradientScene() {
       frameloop={isPlaying ? "always" : "demand"}
     >
       <GradientShader />
-      {bloomOn && <BloomPass />}
+      {effectOn && <EffectPass />}
       <CaptureHelper />
     </Canvas>
   )

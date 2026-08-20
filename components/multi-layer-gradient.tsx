@@ -11,7 +11,7 @@ import { OrganicGradientShader } from "@/components/organic-gradient-shader"
 import { useDeviceOptimizations } from "@/hooks/use-device-optimizations"
 import { CaptureHelper } from "@/components/capture-helper"
 import { registerFrameRenderer } from "@/lib/capture"
-import { BloomChain } from "@/lib/post-chain"
+import { PostChain } from "@/lib/post-chain"
 import {
   blendModeToShaderIndex,
   compositeFragmentShader,
@@ -53,10 +53,13 @@ function LayeredComposition({
     contrast: number
     blendSpace: "oklab" | "linear"
     loopDuration: number
-    effect: "none" | "bloom"
+    effect: "none" | "bloom" | "ascii"
     bloomThreshold: number
     bloomIntensity: number
     bloomRadius: number
+    asciiColumns: number
+    asciiBackground: number
+    asciiRampContrast: number
     seed: [number, number]
   }
   colorSchemes: Record<string, { stops: ColorStop[] }>
@@ -111,8 +114,8 @@ function LayeredComposition({
 
   // Built only while the effect is on, and torn down when it goes off: a
   // composition with no effect should not hold a pyramid of render targets
-  const bloomOn = globals.effect === "bloom"
-  const chain = useMemo(() => (bloomOn ? new BloomChain(gl) : null), [bloomOn, gl])
+  const effectOn = globals.effect !== "none"
+  const chain = useMemo(() => (effectOn ? new PostChain(gl) : null), [effectOn, gl])
   useEffect(() => () => chain?.dispose(), [chain])
 
   useEffect(
@@ -189,9 +192,13 @@ function LayeredComposition({
       // it; grain is likewise already baked into each layer, so the resolve pass
       // must not add a second helping.
       chain.apply(gl, camera, {
+        effect: globals.effect as "bloom" | "ascii",
         threshold: globals.bloomThreshold,
         intensity: globals.bloomIntensity,
         radius: globals.bloomRadius,
+        columns: globals.asciiColumns,
+        background: globals.asciiBackground,
+        rampContrast: globals.asciiRampContrast,
         grainAmount: 0,
         grainScale: globals.grainScale,
         seed: globals.seed,
@@ -272,6 +279,9 @@ export function MultiLayerGradient() {
       bloomThreshold: state.bloomThreshold,
       bloomIntensity: state.bloomIntensity,
       bloomRadius: state.bloomRadius,
+      asciiColumns: state.asciiColumns,
+      asciiBackground: state.asciiBackground,
+      asciiRampContrast: state.asciiRampContrast,
       seed: state.seed,
     }))
   )

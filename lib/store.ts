@@ -35,6 +35,7 @@ type GradientColor = [number, number, number]
 export const effects = {
   none: "None",
   bloom: "Bloom",
+  ascii: "ASCII",
 } as const
 
 export type GradientEffect = keyof typeof effects
@@ -68,6 +69,9 @@ export type StateSnapshot = {
   bloomThreshold: number
   bloomIntensity: number
   bloomRadius: number
+  asciiColumns: number
+  asciiBackground: number
+  asciiRampContrast: number
   blendSpace: ColorBlendSpace
   seed: [number, number]
   loopDuration: number
@@ -133,6 +137,9 @@ function captureSnapshot(state: GradientStore): StateSnapshot {
     bloomThreshold: state.bloomThreshold,
     bloomIntensity: state.bloomIntensity,
     bloomRadius: state.bloomRadius,
+    asciiColumns: state.asciiColumns,
+    asciiBackground: state.asciiBackground,
+    asciiRampContrast: state.asciiRampContrast,
     blendSpace: state.blendSpace,
     seed: [...state.seed] as [number, number],
     loopDuration: state.loopDuration,
@@ -170,6 +177,9 @@ function snapshotToState(
     bloomThreshold: snapshot.bloomThreshold ?? defaultState.bloomThreshold,
     bloomIntensity: snapshot.bloomIntensity ?? defaultState.bloomIntensity,
     bloomRadius: snapshot.bloomRadius ?? defaultState.bloomRadius,
+    asciiColumns: snapshot.asciiColumns ?? defaultState.asciiColumns,
+    asciiBackground: snapshot.asciiBackground ?? defaultState.asciiBackground,
+    asciiRampContrast: snapshot.asciiRampContrast ?? defaultState.asciiRampContrast,
     blendSpace: snapshot.blendSpace,
     seed: [...snapshot.seed] as [number, number],
     loopDuration: snapshot.loopDuration,
@@ -219,6 +229,11 @@ export type GradientStore = {
   bloomThreshold: number
   bloomIntensity: number
   bloomRadius: number
+  // Characters across the image, not a cell size in pixels: the same setting has
+  // to compose the same picture at preview size and at export size
+  asciiColumns: number
+  asciiBackground: number
+  asciiRampContrast: number
   blendSpace: ColorBlendSpace
   // Loop duration in animation seconds. 0 = free animation (drifts without
   // repeating); > 0 brings the drawing back exactly to the start over that
@@ -284,6 +299,9 @@ export type GradientStore = {
   setBloomThreshold: (value: number) => void
   setBloomIntensity: (value: number) => void
   setBloomRadius: (value: number) => void
+  setAsciiColumns: (value: number) => void
+  setAsciiBackground: (value: number) => void
+  setAsciiRampContrast: (value: number) => void
   setBlendSpace: (value: ColorBlendSpace) => void
   setLoopDuration: (value: number) => void
   shuffleSeed: () => void
@@ -347,6 +365,9 @@ type StoreActions = Pick<
   | "setBloomThreshold"
   | "setBloomIntensity"
   | "setBloomRadius"
+  | "setAsciiColumns"
+  | "setAsciiBackground"
+  | "setAsciiRampContrast"
   | "setBlendSpace"
   | "setLoopDuration"
   | "shuffleSeed"
@@ -408,6 +429,13 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   bloomThreshold: 0.6,
   bloomIntensity: 0.8,
   bloomRadius: 1,
+  asciiColumns: 80,
+  // A little of the source behind the glyphs: on pure black the composition is
+  // only legible through the characters, which loses the gradient the tool exists
+  // to make
+  asciiBackground: 0.12,
+  // Above 1 by default: the ramp would otherwise sit unused at both ends
+  asciiRampContrast: 2.5,
   blendSpace: "oklab",
   loopDuration: 0,
   seed: [0, 0],
@@ -559,6 +587,16 @@ function migrateSnapshot(snapshot: unknown): unknown {
         : defaultState.bloomIntensity,
     bloomRadius:
       typeof source.bloomRadius === "number" ? source.bloomRadius : defaultState.bloomRadius,
+    asciiColumns:
+      typeof source.asciiColumns === "number" ? source.asciiColumns : defaultState.asciiColumns,
+    asciiBackground:
+      typeof source.asciiBackground === "number"
+        ? source.asciiBackground
+        : defaultState.asciiBackground,
+    asciiRampContrast:
+      typeof source.asciiRampContrast === "number"
+        ? source.asciiRampContrast
+        : defaultState.asciiRampContrast,
     blendSpace:
       typeof source.blendSpace === "string" && source.blendSpace in colorBlendSpaces
         ? source.blendSpace
@@ -596,6 +634,13 @@ export function normalizePersistedState(persisted: unknown): unknown {
     state.bloomIntensity = defaultState.bloomIntensity
   }
   if (typeof state.bloomRadius !== "number") state.bloomRadius = defaultState.bloomRadius
+  if (typeof state.asciiColumns !== "number") state.asciiColumns = defaultState.asciiColumns
+  if (typeof state.asciiBackground !== "number") {
+    state.asciiBackground = defaultState.asciiBackground
+  }
+  if (typeof state.asciiRampContrast !== "number") {
+    state.asciiRampContrast = defaultState.asciiRampContrast
+  }
   if (typeof state.blendSpace !== "string" || !(state.blendSpace in colorBlendSpaces)) {
     state.blendSpace = defaultState.blendSpace
   }
@@ -854,6 +899,18 @@ export const useGradientStore = create<GradientStore>()(
         recordEdit("bloomRadius")
         set({ bloomRadius: value })
       },
+      setAsciiColumns: (value) => {
+        recordEdit("asciiColumns")
+        set({ asciiColumns: Math.max(1, Math.round(value)) })
+      },
+      setAsciiBackground: (value) => {
+        recordEdit("asciiBackground")
+        set({ asciiBackground: value })
+      },
+      setAsciiRampContrast: (value) => {
+        recordEdit("asciiRampContrast")
+        set({ asciiRampContrast: value })
+      },
       setBlendSpace: (value) => {
         get().pushHistory()
         set({ blendSpace: value })
@@ -945,6 +1002,9 @@ export const useGradientStore = create<GradientStore>()(
           bloomThreshold: defaultState.bloomThreshold,
           bloomIntensity: defaultState.bloomIntensity,
           bloomRadius: defaultState.bloomRadius,
+          asciiColumns: defaultState.asciiColumns,
+          asciiBackground: defaultState.asciiBackground,
+          asciiRampContrast: defaultState.asciiRampContrast,
           blendSpace: defaultState.blendSpace,
           loopDuration: defaultState.loopDuration,
           seed: [...defaultState.seed] as [number, number],
@@ -1013,6 +1073,14 @@ export const useGradientStore = create<GradientStore>()(
           validatedSettings.bloomIntensity = clampNum(settings.bloomIntensity, 0, 3, 0.8)
         if (settings.bloomRadius !== undefined)
           validatedSettings.bloomRadius = clampNum(settings.bloomRadius, 0.5, 3, 1)
+        if (settings.asciiColumns !== undefined)
+          validatedSettings.asciiColumns = Math.round(
+            clampNum(settings.asciiColumns, 10, 300, 80)
+          )
+        if (settings.asciiBackground !== undefined)
+          validatedSettings.asciiBackground = clampNum(settings.asciiBackground, 0, 1, 0.12)
+        if (settings.asciiRampContrast !== undefined)
+          validatedSettings.asciiRampContrast = clampNum(settings.asciiRampContrast, 0.5, 6, 2.5)
         if (settings.blendSpace !== undefined)
           validatedSettings.blendSpace =
             settings.blendSpace in colorBlendSpaces
@@ -1225,6 +1293,9 @@ export const useGradientStore = create<GradientStore>()(
         bloomThreshold: state.bloomThreshold,
         bloomIntensity: state.bloomIntensity,
         bloomRadius: state.bloomRadius,
+        asciiColumns: state.asciiColumns,
+        asciiBackground: state.asciiBackground,
+        asciiRampContrast: state.asciiRampContrast,
         blendSpace: state.blendSpace,
         loopDuration: state.loopDuration,
         seed: state.seed,

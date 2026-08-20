@@ -44,6 +44,9 @@ export interface ShareableGradient {
   bloomThreshold?: number
   bloomIntensity?: number
   bloomRadius?: number
+  asciiColumns?: number
+  asciiBackground?: number
+  asciiRampContrast?: number
   blendSpace?: string
   seed?: [number, number]
   loopDuration?: number
@@ -114,6 +117,9 @@ type PackedGradient = {
   bt?: number // bloomThreshold
   bi?: number // bloomIntensity
   brd?: number // bloomRadius
+  ac?: number // asciiColumns
+  ab?: number // asciiBackground
+  arc?: number // asciiRampContrast
   bs?: string // blendSpace
   sd?: number[] // seed
   ld?: number // loopDuration
@@ -148,6 +154,9 @@ function pack(data: ShareableGradient): PackedGradient {
     if (data.bloomThreshold !== undefined) packed.bt = round3(data.bloomThreshold)
     if (data.bloomIntensity !== undefined) packed.bi = round3(data.bloomIntensity)
     if (data.bloomRadius !== undefined) packed.brd = round3(data.bloomRadius)
+    if (data.asciiColumns !== undefined) packed.ac = Math.round(data.asciiColumns)
+    if (data.asciiBackground !== undefined) packed.ab = round3(data.asciiBackground)
+    if (data.asciiRampContrast !== undefined) packed.arc = round3(data.asciiRampContrast)
   }
   if (data.blendSpace !== undefined) packed.bs = data.blendSpace
   if (data.seed !== undefined) packed.sd = data.seed.map(round3)
@@ -213,6 +222,9 @@ function unpack(packed: PackedGradient): ShareableGradient {
   if (packed.bt !== undefined) data.bloomThreshold = packed.bt
   if (packed.bi !== undefined) data.bloomIntensity = packed.bi
   if (packed.brd !== undefined) data.bloomRadius = packed.brd
+  if (packed.ac !== undefined) data.asciiColumns = packed.ac
+  if (packed.ab !== undefined) data.asciiBackground = packed.ab
+  if (packed.arc !== undefined) data.asciiRampContrast = packed.arc
   if (packed.bs !== undefined) data.blendSpace = packed.bs
   if (packed.sd !== undefined && packed.sd.length >= 2)
     data.seed = [packed.sd[0], packed.sd[1]]
@@ -275,6 +287,9 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     bloomThreshold: state.bloomThreshold ?? 0.8,
     bloomIntensity: state.bloomIntensity ?? 0.8,
     bloomRadius: state.bloomRadius ?? 1,
+    asciiColumns: state.asciiColumns ?? 80,
+    asciiBackground: state.asciiBackground ?? 0.12,
+    asciiRampContrast: state.asciiRampContrast ?? 2.5,
     blendSpace: state.blendSpace ?? "oklab",
     seed: state.seed ?? [0, 0],
     loopDuration: state.loopDuration ?? 0,

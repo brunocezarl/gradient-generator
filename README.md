@@ -26,6 +26,9 @@ noise, rendered through React Three Fiber.
 - **Color picker in OKLCH**, RGB, HSL or HEX: adjusting lightness or chroma in
   OKLCH does not shift the hue (lightening a red in HSL pulls it toward pink),
   and the chroma slider respects the real sRGB ceiling for that color
+- **ASCII**: the image redrawn as a grid of characters, tinted by the colors
+  underneath. Density is set in **columns**, not in pixels, so the same setting
+  composes the same picture on the preview and in a 4K export
 - **Bloom**: light spilling past what emitted it, summed in linear space on
   unclamped values — raise exposure and the same intensity glows harder, because
   the bright end really is brighter. Threshold, intensity and spread; off by
@@ -118,6 +121,16 @@ lib/shaders/  # single source of the GLSL (gradient + layer compositing)
 - **Persistence**: the store is versioned (`PERSIST_VERSION`) and normalized on
   hydration. Since zustand only calls `migrate` when the stored JSON has a
   numeric `version`, normalization runs in `merge`, which always executes.
+- **ASCII**: glyphs are picked by Oklab lightness — a different question from the
+  one bloom's bright pass asks, so a different answer. Bloom asks whether
+  something emits light, and a saturated red and blue both do (0.79 each on the
+  strongest channel); ASCII asks how light something *looks*, where those two
+  differ (0.59 against 0.42). Gate ASCII on the strongest channel and a
+  red-to-blue gradient comes out at flat density; gate it on luminance and the
+  whole palette crushes into the bottom fifth of the ramp. Even in Oklab the
+  content occupies a narrow band, so Ramp Contrast stretches it — at 1.00 only
+  three of the ten characters ever appear, at 4.50 seven do. The ramp is
+  rasterized into a texture at runtime, since it is a string, not artwork.
 - **Post-processing**: with an effect on, the gradient stops encoding and hands
   the chain raw linear light (`uOutputLinear`); the sRGB encode, grain and dither
   move to the far end, in the resolve pass. Bloom has to sum energy rather than

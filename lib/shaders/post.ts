@@ -204,3 +204,100 @@ export const resolveFragmentShader = /* glsl */ `
     gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
   }
 `
+
+// The ASCII resolve pass: the image redrawn as a grid of characters.
+//
+// Density comes from Oklab lightness, not from luminance or from the strongest
+// channel — a different question from the one the bright pass above asks, so a
+// different answer. Bloom asks "is this emitting light?", and a saturated red
+// and a saturated blue both are, which is why the strongest channel suits it.
+// ASCII asks "how light does this look?", where those two differ: on the
+// strongest channel they score identically (0.79 each) and a red-to-blue
+// gradient would come out at flat density with no structure at all, while
+// luminance crushes both into the bottom fifth of the range. Oklab lightness
+// separates them (0.59 against 0.42) and spreads the palette across the ramp.
+export const asciiResolveFragmentShader = /* glsl */ `
+  precision highp float;
+
+  uniform sampler2D uScene;
+  uniform sampler2D uGlyphs;
+  uniform float uGlyphCount;
+  uniform float uColumns;
+  // How much of the source shows through behind the characters. At 0 the glyphs
+  // sit on black and the composition is only legible through them; a little
+  // light keeps the gradient readable underneath.
+  uniform float uBackground;
+  // Gain on lightness before it picks a character. Without it the ramp goes
+  // mostly unused: a gradient of saturated colors lives between roughly 0.4 and
+  // 0.6 in Oklab lightness, which is two glyphs out of ten, so the sparse and
+  // dense ends of the ramp would never be reached.
+  uniform float uRampContrast;
+  uniform float uGrainAmount;
+  uniform float uGrainScale;
+  uniform vec2 uSeed;
+  uniform vec2 uResolution;
+  uniform float uSceneIsSrgb;
+
+  varying vec2 vUv;
+
+  ${colorSpaceChunk}
+
+  ${simplexNoiseChunk}
+
+  ${ditherChunk}
+
+  vec3 srgbToLinear(vec3 c) {
+    c = max(c, vec3(0.0));
+    vec3 low = c / 12.92;
+    vec3 high = pow((c + 0.055) / 1.055, vec3(2.4));
+    return mix(high, low, step(c, vec3(0.04045)));
+  }
+
+  void main() {
+    // Square cells, sized from the column count rather than from a pixel value:
+    // the same setting has to give the same picture on a 400px preview and a 4K
+    // export, and a cell fixed in pixels would give the export four times the
+    // characters the designer composed with.
+    float cell = uResolution.x / uColumns;
+    vec2 cellIndex = floor(gl_FragCoord.xy / cell);
+
+    // Four taps across the cell rather than one at its centre: a single sample
+    // makes the character flicker as the noise field drifts under it, since one
+    // texel decides the whole cell
+    vec3 sum = vec3(0.0);
+    for (int x = 0; x < 2; x++) {
+      for (int y = 0; y < 2; y++) {
+        vec2 offset = vec2(float(x), float(y)) * 0.5 + 0.25;
+        vec2 uvSample = (cellIndex + offset) * cell / uResolution;
+        vec3 tap = texture2D(uScene, uvSample).rgb;
+        if (uSceneIsSrgb > 0.5) tap = srgbToLinear(tap);
+        sum += tap;
+      }
+    }
+    vec3 cellColor = sum * 0.25;
+
+    // Around 0.5, the middle of the lightness axis — the same pivot the tone
+    // controls use, so the two behave alike
+    float lightness = clamp(
+      (linearToOklab(cellColor).x - 0.5) * uRampContrast + 0.5,
+      0.0,
+      1.0
+    );
+
+    // Nearest glyph, then sampled within its own cell of the strip. The 0.5
+    // texel inset keeps linear filtering from reaching into the neighbour.
+    float glyph = floor(lightness * (uGlyphCount - 1.0) + 0.5);
+    vec2 inCell = fract(gl_FragCoord.xy / cell);
+    float u = (glyph + clamp(inCell.x, 0.002, 0.998)) / uGlyphCount;
+    float ink = texture2D(uGlyphs, vec2(u, 1.0 - inCell.y)).r;
+
+    vec3 color = mix(cellColor * uBackground, cellColor, ink);
+
+    vec2 noiseUv = vUv + uSeed;
+    color = linearToSrgb(color);
+    color += snoise(noiseUv * uGrainScale) * uGrainAmount;
+    color += triangularDither(gl_FragCoord.xy) / 255.0;
+
+    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+  }
+`
