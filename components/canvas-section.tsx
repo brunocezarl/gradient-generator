@@ -27,8 +27,8 @@ export function CanvasSection() {
   const activeChip = activeRatioChip(artboardId)
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-5 gap-1">
+    <div className="space-y-4">
+      <div className="grid grid-cols-5 gap-1.5">
         {ratioChips.map((chip) => {
           const isActive = activeChip === chip.id
           return (
@@ -39,10 +39,10 @@ export function CanvasSection() {
               // chosen from the list (4K back down to Full HD)
               onClick={() => !isActive && setArtboard(chip.id)}
               aria-pressed={isActive}
-              className={`h-7 rounded text-[11px] font-medium tracking-wide transition-colors ${
+              className={`h-8 rounded-md text-[11px] font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
                 isActive
                   ? "bg-white text-neutral-950"
-                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                  : "bg-neutral-800 text-neutral-300 ring-1 ring-inset ring-white/5 hover:bg-neutral-700 hover:text-white"
               }`}
             >
               {chip.label}
@@ -51,7 +51,7 @@ export function CanvasSection() {
         })}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div className="flex items-center">
           <Label className="text-xs text-neutral-400">Size</Label>
           <TooltipHelp content="The exported file inherits these dimensions. Free follows the available area — the export then uses the window's own ratio." />

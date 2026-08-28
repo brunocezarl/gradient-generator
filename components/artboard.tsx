@@ -6,8 +6,10 @@ import { getArtboard, isFreeArtboard, SAFE_AREA_INSET } from "@/lib/artboards"
 
 // Artboard: a box at the output aspect ratio, centered on a neutral backdrop.
 //
-// The backdrop is mid gray on purpose — judging color over pure black (or over
-// the art itself, as happened with the translucent panels) distorts perception.
+// The backdrop (`.artboard-backdrop` in globals.css) stays mid gray on purpose
+// — judging color over pure black (or over the art itself, as happened with the
+// translucent panels) distorts perception. The dot grid and vignette on top of
+// the gray are what give the area its "design tool" finish.
 // Safe area guides live outside the canvas, so they never reach the export.
 
 interface ArtboardProps {
@@ -61,10 +63,10 @@ export const Artboard = forwardRef<HTMLDivElement, ArtboardProps>(function Artbo
     // Padding sits on the outer element and the measurement on the inner one:
     // getBoundingClientRect returns the border box (padding included), and
     // measuring the wrong box made the artboard overflow by exactly the padding
-    <div className="relative flex-1 min-h-0 bg-neutral-800 p-4 md:p-6">
+    <div className="artboard-backdrop relative flex-1 min-h-0 p-4 md:p-8">
       <div ref={frameRef} className="relative w-full h-full flex items-center justify-center">
         <div
-          className={`relative ${free ? "w-full h-full" : "shadow-2xl ring-1 ring-black/40"}`}
+          className={`relative ${free ? "w-full h-full" : "shadow-[0_24px_64px_-16px_rgba(0,0,0,0.6)] ring-1 ring-white/10"}`}
           style={free ? undefined : { width: size?.width ?? 0, height: size?.height ?? 0 }}
         >
           {/* The ref points at the element holding only the gradient canvases:
@@ -93,7 +95,7 @@ export const Artboard = forwardRef<HTMLDivElement, ArtboardProps>(function Artbo
       </div>
 
       {!free && (
-        <span className="absolute bottom-1.5 right-2 font-mono text-[10px] text-neutral-400 pointer-events-none">
+        <span className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-neutral-300 backdrop-blur-sm pointer-events-none">
           {artboard.width}×{artboard.height}
         </span>
       )}

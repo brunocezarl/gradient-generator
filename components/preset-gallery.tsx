@@ -241,11 +241,11 @@ No presets yet. A preset stores the gradient's whole look — colors and every
           animation parameter.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           {savedPresets.map((preset) => (
             <div
               key={preset.id}
-              className="group relative rounded-md overflow-hidden border border-neutral-700 hover:border-neutral-500 transition-colors"
+              className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-white/25 transition-colors"
             >
               <button
                 type="button"
@@ -253,14 +253,14 @@ No presets yet. A preset stores the gradient's whole look — colors and every
                   applyPreset(preset.id)
                   toast({ title: "Preset applied", description: preset.name })
                 }}
-                className="w-full text-left"
+                className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                 aria-label={`Apply preset ${preset.name}`}
               >
                 {/* Shader-rendered thumbnail; the CSS gradient shows until it is
                     ready and serves as the fallback when the browser refuses
                     another WebGL context */}
                 <div
-                  className="h-16 w-full bg-cover bg-center"
+                  className="h-20 w-full bg-cover bg-center"
                   style={{
                     backgroundImage: thumbnails[preset.id]
                       ? `url(${thumbnails[preset.id]})`
@@ -270,7 +270,7 @@ No presets yet. A preset stores the gradient's whole look — colors and every
                       : snapshotToGradientCSS(preset.snapshot, colorSchemes),
                   }}
                 />
-                <div className="px-2 py-1.5 bg-neutral-900">
+                <div className="px-2.5 py-2 bg-neutral-900">
                   <p className="text-xs text-white truncate">{preset.name}</p>
                 </div>
               </button>
@@ -363,7 +363,7 @@ export function RandomHistoryStrip() {
                 description: "The settings from this result were reapplied.",
               })
             }}
-            className="h-8 w-8 rounded-md border border-neutral-700 hover:border-white hover:scale-110 transition-all"
+            className="h-8 w-8 rounded-lg ring-1 ring-inset ring-white/15 hover:ring-white/40 hover:scale-110 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             style={{ background: snapshotToGradientCSS(snapshot, colorSchemes) }}
             aria-label={`Restore roll ${index + 1}`}
             title={`Restore roll ${index + 1}`}
