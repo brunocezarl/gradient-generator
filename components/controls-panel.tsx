@@ -656,7 +656,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       </Accordion>
 
       {/* ─── Actions ───────────────────────────────────────────────────── */}
-      <div className="mt-6 space-y-3 border-t border-neutral-800/70 pt-5">
+      <div className="mt-6 space-y-3">
         <Button
           onClick={onCaptureImage}
           className="w-full h-9 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
