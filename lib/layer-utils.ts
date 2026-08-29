@@ -55,7 +55,9 @@ export function createDefaultLayer(
     visible: true,
     colorScheme: "redBlue",
     isCustomMode: false,
-    noiseScale: 2.0,
+    // Same as Shape → Noise Scale on a first visit, so turning multi-layer
+    // mode on does not jump the pattern size.
+    noiseScale: 0.6,
     flowIntensity: 0.3,
     thresholdMin: 0.3,
     thresholdMax: 0.7,

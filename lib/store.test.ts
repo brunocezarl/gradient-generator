@@ -50,6 +50,15 @@ describe("default state", () => {
   it("starts Shape complexity at 2 on a first visit", () => {
     expect(initialState.complexity).toBe(2)
   })
+
+  it("starts Shape noise scale at 0.6 on a first visit", () => {
+    expect(initialState.noiseScale).toBe(0.6)
+    expect(initialState.layers[0].noiseScale).toBe(0.6)
+  })
+
+  it("starts Grain scale at 780 on a first visit", () => {
+    expect(initialState.grainScale).toBe(780)
+  })
 })
 
 describe("resetToDefaults", () => {
@@ -64,6 +73,8 @@ describe("resetToDefaults", () => {
     const state = useGradientStore.getState()
     expect(state.speed).toBe(1.0)
     expect(state.complexity).toBe(2)
+    expect(state.noiseScale).toBe(0.6)
+    expect(state.grainScale).toBe(780)
     expect(state.flowIntensity).toBe(0.3)
   })
 

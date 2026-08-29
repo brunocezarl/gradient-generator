@@ -245,6 +245,8 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parsed).not.toBeNull()
     expect(parsed!.speed).toBe(1.0)
     expect(parsed!.complexity).toBe(2)
+    expect(parsed!.noiseScale).toBe(0.6)
+    expect(parsed!.grainScale).toBe(780)
     expect(parsed!.colorScheme).toBe("redBlue")
     expect(parsed!.stops!).toEqual([
       { color: [0.9, 0.1, 0.1], position: 0 },
