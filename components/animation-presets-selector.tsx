@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Slider } from "@/components/ui/slider"
 import { Wand2, Play, Pause, Save } from "lucide-react"
 import { useGradientStore } from "@/lib/store"
 import { animationPresets } from "@/lib/animation-presets"
@@ -226,7 +227,7 @@ export function AnimationPresetsSelector() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
+        className="w-full h-9 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
       >
         <Wand2 className="mr-2 h-4 w-4" />
         Animation Presets
@@ -270,7 +271,7 @@ export function AnimationPresetsSelector() {
                 {Object.entries(animationPresets).map(([id, preset]) => (
                   <div
                     key={id}
-                    className="bg-neutral-800 rounded-lg p-4 cursor-pointer hover:bg-neutral-700 transition-colors"
+                    className="bg-neutral-800 rounded-lg border border-white/5 p-4 cursor-pointer hover:bg-neutral-700 hover:border-white/15 transition-colors"
                     onClick={() => handleSelectPreset(id)}
                   >
                     <h3 className="font-medium text-lg mb-1">{preset.name}</h3>
@@ -308,44 +309,38 @@ export function AnimationPresetsSelector() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="preset-speed">Speed: {customPreset.speed.toFixed(1)}</Label>
-                  <Input
-                    id="preset-speed"
-                    type="range"
-                    min="0.1"
-                    max="3.0"
-                    step="0.1"
-                    value={customPreset.speed}
-                    onChange={(e) => updateCustomPreset("speed", parseFloat(e.target.value))}
-                    className="bg-neutral-800 border-neutral-700"
+                  <Label>Speed: {customPreset.speed.toFixed(1)}</Label>
+                  <Slider
+                    value={[customPreset.speed]}
+                    min={0.1}
+                    max={3.0}
+                    step={0.1}
+                    onValueChange={(value) => updateCustomPreset("speed", value[0])}
+                    thumbLabel="Preset speed"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="preset-complexity">Complexity: {customPreset.complexity}</Label>
-                  <Input
-                    id="preset-complexity"
-                    type="range"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={customPreset.complexity}
-                    onChange={(e) => updateCustomPreset("complexity", parseInt(e.target.value))}
-                    className="bg-neutral-800 border-neutral-700"
+                  <Label>Complexity: {customPreset.complexity}</Label>
+                  <Slider
+                    value={[customPreset.complexity]}
+                    min={1}
+                    max={10}
+                    step={1}
+                    onValueChange={(value) => updateCustomPreset("complexity", value[0])}
+                    thumbLabel="Preset complexity"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="preset-noiseScale">Noise Scale: {customPreset.noiseScale.toFixed(1)}</Label>
-                  <Input
-                    id="preset-noiseScale"
-                    type="range"
-                    min="0.5"
-                    max="5.0"
-                    step="0.1"
-                    value={customPreset.noiseScale}
-                    onChange={(e) => updateCustomPreset("noiseScale", parseFloat(e.target.value))}
-                    className="bg-neutral-800 border-neutral-700"
+                  <Label>Noise Scale: {customPreset.noiseScale.toFixed(1)}</Label>
+                  <Slider
+                    value={[customPreset.noiseScale]}
+                    min={0.5}
+                    max={5.0}
+                    step={0.1}
+                    onValueChange={(value) => updateCustomPreset("noiseScale", value[0])}
+                    thumbLabel="Preset noise scale"
                   />
                 </div>
 

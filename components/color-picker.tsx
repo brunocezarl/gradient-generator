@@ -130,12 +130,12 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         <Label className="text-white">{label}</Label>
         <div className="flex items-center gap-2">
           {/* OKLCH / RGB / HSL toggle */}
-          <div className="flex rounded-md overflow-hidden border border-neutral-700 text-xs">
+          <div className="flex rounded-md overflow-hidden border border-white/10 text-xs">
             {(["oklch", "rgb", "hsl"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
-                className={`px-2 py-0.5 transition-colors ${
+                className={`px-2 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
                   mode === option
                     ? "bg-neutral-600 text-white"
                     : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800"
@@ -148,7 +148,7 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
           </div>
           {/* Preview */}
           <div
-            className="w-7 h-7 rounded-full border border-neutral-600 flex-shrink-0"
+            className="w-7 h-7 rounded-full ring-1 ring-inset ring-white/20 flex-shrink-0"
             style={{ backgroundColor: hexColor }}
           />
         </div>

@@ -156,7 +156,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   )
 
   return (
-    <div className="p-3">
+    <div className="p-4">
       <Accordion
         type="multiple"
         value={openSections}
@@ -166,18 +166,18 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Effect ──────────────────────────────────────────────────── */}
         <AccordionItem value="effect">
           <AccordionTrigger>Effect</AccordionTrigger>
-          <AccordionContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-1">
+          <AccordionContent className="space-y-5">
+            <div className="grid grid-cols-3 gap-1.5">
               {(Object.entries(effects) as [GradientEffect, string][]).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => effect !== key && setEffect(key)}
                   aria-pressed={effect === key}
-                  className={`h-7 rounded text-[11px] font-medium tracking-wide transition-colors ${
+                  className={`h-8 rounded-md text-[11px] font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
                     effect === key
                       ? "bg-white text-neutral-950"
-                      : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                      : "bg-neutral-800 text-neutral-300 ring-1 ring-inset ring-white/5 hover:bg-neutral-700 hover:text-white"
                   }`}
                 >
                   {label}
@@ -309,7 +309,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Adjustments ─────────────────────────────────────────────── */}
         <AccordionItem value="adjustments">
           <AccordionTrigger>Adjustments</AccordionTrigger>
-          <AccordionContent className="space-y-4">
+          <AccordionContent className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center">
                 <Label className="text-white">
@@ -384,7 +384,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Color ───────────────────────────────────────────────────── */}
         <AccordionItem value="color">
           <AccordionTrigger>Color</AccordionTrigger>
-          <AccordionContent className="space-y-4">
+          <AccordionContent className="space-y-5">
             {/* Interpolation space for the color stops */}
             <div className="space-y-2">
               <div className="flex items-center">
@@ -417,6 +417,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
               <Switch
                 checked={isCustomMode}
                 onCheckedChange={setCustomMode}
+                aria-label="Custom Mode"
               />
             </div>
 
@@ -425,7 +426,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                 <StopsEditor />
                 <Button
                   onClick={() => setSaveDialogOpen(true)}
-                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full h-9 mt-4 bg-blue-600 hover:bg-blue-500 text-white"
                 >
                   <Save className="mr-2 h-4 w-4" />
                   Save Scheme
@@ -461,7 +462,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                     if (currentScheme) setStops(currentScheme.stops)
                     setCustomMode(true)
                   }}
-                  className="w-full bg-neutral-700 hover:bg-neutral-600 text-white"
+                  className="w-full h-9 bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600 text-white"
                 >
                   <Palette className="mr-2 h-4 w-4" />
                   Edit Colors
@@ -474,11 +475,11 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Presets ─────────────────────────────────────────────────── */}
         <AccordionItem value="presets">
           <AccordionTrigger>Presets</AccordionTrigger>
-          <AccordionContent className="space-y-4">
+          <AccordionContent className="space-y-5">
             <PresetGallery />
 
-            <div className="border-t border-neutral-800 pt-4 space-y-2">
-              <p className="text-sm text-neutral-400 mb-2">
+            <div className="border-t border-neutral-800/70 pt-5 space-y-3">
+              <p className="text-sm text-neutral-400">
                 Pick an animation preset to apply a ready-made set of parameters.
               </p>
               <AnimationPresetsSelector />
@@ -489,7 +490,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Shape ───────────────────────────────────────────────────── */}
         <AccordionItem value="shape">
           <AccordionTrigger>Shape</AccordionTrigger>
-          <AccordionContent className="space-y-4">
+          <AccordionContent className="space-y-5">
             {/* Noise scale */}
             <div className="space-y-2">
               <div className="flex items-center">
@@ -563,7 +564,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                 })
               }}
               variant="outline"
-              className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
+              className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
             >
               <Waves className="mr-2 h-4 w-4" />
               Roll Shape
@@ -574,7 +575,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Grain ───────────────────────────────────────────────────── */}
         <AccordionItem value="grain">
           <AccordionTrigger>Grain</AccordionTrigger>
-          <AccordionContent className="space-y-4">
+          <AccordionContent className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center">
                 <Label className="text-white">Amount: {grainAmount.toFixed(2)}</Label>
@@ -610,7 +611,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
         {/* ─── Motion ──────────────────────────────────────────────────── */}
         <AccordionItem value="motion">
           <AccordionTrigger>Motion</AccordionTrigger>
-          <AccordionContent className="space-y-4">
+          <AccordionContent className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center">
                 <Label className="text-white">Speed: {speed.toFixed(1)}</Label>
@@ -655,10 +656,10 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       </Accordion>
 
       {/* ─── Actions ───────────────────────────────────────────────────── */}
-      <div className="pt-4 space-y-3">
+      <div className="mt-6 space-y-3">
         <Button
           onClick={onCaptureImage}
-          className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
+          className="w-full h-9 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
         >
           <ImageIcon className="mr-2 h-4 w-4" />
           Capture Image
@@ -673,7 +674,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
             })
           }}
           variant="outline"
-          className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
+          className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
         >
           <Shuffle className="mr-2 h-4 w-4" />
           Randomize
@@ -690,7 +691,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
             })
           }}
           variant="outline"
-          className="w-full bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800"
+          className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
         >
           <RefreshCw className="mr-2 h-4 w-4" />
           Restore Defaults

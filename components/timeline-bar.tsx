@@ -81,7 +81,7 @@ export function TimelineBar() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 border-t border-neutral-800 bg-neutral-950">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5 border-t border-neutral-800/80 bg-neutral-950">
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"

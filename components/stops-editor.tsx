@@ -83,7 +83,7 @@ export function StopsEditor() {
   const blackContrast = worstContrast(colors, [0, 0, 0])
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <Label className="text-white">Color Stops</Label>
@@ -113,14 +113,16 @@ export function StopsEditor() {
         {stops.map((stop: ColorStop, index: number) => (
           <div
             key={index}
-            className={`flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors ${
-              index === activeIndex ? "bg-neutral-800" : "hover:bg-neutral-800/50"
+            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${
+              index === activeIndex
+                ? "bg-neutral-800 ring-1 ring-inset ring-white/10"
+                : "hover:bg-neutral-800/50"
             }`}
           >
             <button
               type="button"
               onClick={() => setSelected(index)}
-              className="h-6 w-6 shrink-0 rounded border border-neutral-600"
+              className="h-6 w-6 shrink-0 rounded-md ring-1 ring-inset ring-white/20 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               style={{ backgroundColor: stopToHex(stop) }}
               aria-label={`Edit stop ${index + 1} (${stopToHex(stop)})`}
               title={stopToHex(stop)}
@@ -182,7 +184,7 @@ export function StopsEditor() {
       </div>
 
       {/* Harmonies */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-2">
         <Select value={harmony} onValueChange={(value) => setHarmony(value as HarmonyKind)}>
           <SelectTrigger className="h-8 flex-1 bg-neutral-900 border-neutral-700 text-white text-xs">
             <SelectValue />
@@ -209,7 +211,7 @@ export function StopsEditor() {
       <PaletteFromImage />
 
       {/* WCAG contrast */}
-      <div className="rounded-md bg-neutral-900 px-2.5 py-2 space-y-1">
+      <div className="rounded-lg border border-white/5 bg-neutral-900/70 px-3 py-2.5 space-y-1.5">
         <div className="flex items-center">
           <Label className="text-xs text-neutral-400">Text contrast (worst case)</Label>
           <TooltipHelp content="Lowest contrast ratio between the text and the gradient colors, per WCAG 2.1. AA needs 4.5:1 for body text and 3:1 for large text." />
@@ -245,7 +247,7 @@ export function StopsEditor() {
 
       {/* Editor for the selected stop */}
       {activeStop && (
-        <div className="border-t border-neutral-800 pt-3">
+        <div className="border-t border-neutral-800/70 pt-4">
           <ColorPicker
             label={`Stop ${activeIndex + 1}`}
             color={activeStop.color}

@@ -63,8 +63,10 @@ function SortableLayerItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center p-2 rounded ${
-        isActive ? "bg-neutral-700" : "bg-neutral-900 hover:bg-neutral-800"
+      className={`flex items-center gap-1 px-2 py-2 rounded-md cursor-pointer transition-colors ${
+        isActive
+          ? "bg-white/10 ring-1 ring-inset ring-white/10"
+          : "bg-transparent hover:bg-white/5"
       }`}
       onClick={onSelect}
     >
@@ -168,7 +170,7 @@ export function LayerManager() {
             <Label className="text-white">Multi-layer Mode</Label>
             <TooltipHelp content="Turn on to build and manage several gradient layers." />
           </div>
-          <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} />
+          <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} aria-label="Multi-layer Mode" />
         </div>
       </div>
     )
@@ -184,12 +186,12 @@ export function LayerManager() {
           <Label className="text-white">Multi-layer Mode</Label>
           <TooltipHelp content="Turn off to go back to a single layer." />
         </div>
-        <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} />
+        <Switch checked={multiLayerMode} onCheckedChange={setMultiLayerMode} aria-label="Multi-layer Mode" />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Layer list with drag and drop */}
-        <div className="bg-neutral-800 rounded-md p-2">
+        <div className="rounded-lg border border-white/5 bg-neutral-900/60 p-2.5">
           <div className="flex justify-between items-center mb-2">
             <Label className="text-white">Layers</Label>
             <Button
@@ -204,7 +206,7 @@ export function LayerManager() {
             </Button>
           </div>
 
-          <ScrollArea className="h-40 pr-4">
+          <ScrollArea className="h-40 pr-2">
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}

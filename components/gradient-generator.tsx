@@ -168,7 +168,7 @@ export default function GradientGenerator() {
   return (
     <div className="flex flex-col h-screen w-full bg-neutral-950 text-white overflow-hidden">
       {/* ─── Top bar ────────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-2 px-3 py-2 border-b border-neutral-800 bg-neutral-950 shrink-0">
+      <header className="flex items-center gap-2.5 px-4 py-2.5 border-b border-neutral-800/80 bg-neutral-950 shrink-0">
         <Button
           variant="ghost"
           size="icon"
@@ -184,6 +184,11 @@ export default function GradientGenerator() {
           )}
         </Button>
 
+        {/* Brand mark: a tiny gradient orb that hints at what the tool makes */}
+        <span
+          aria-hidden
+          className="h-3.5 w-3.5 shrink-0 rounded-full bg-gradient-to-br from-indigo-400 via-fuchsia-400 to-amber-300 shadow-[0_0_8px_rgba(192,132,252,0.45)]"
+        />
         <h1 className="text-sm font-medium tracking-tight mr-2 hidden sm:block">
           Organic Gradients
         </h1>
@@ -236,7 +241,7 @@ export default function GradientGenerator() {
       {/* ─── Body: controls + artboard ─────────────────────────────────── */}
       <div className="flex flex-1 min-h-0">
         {sidebarOpen && (
-          <aside className="w-72 lg:w-80 shrink-0 border-r border-neutral-800 bg-neutral-950 overflow-y-auto">
+          <aside className="w-72 lg:w-80 shrink-0 border-r border-neutral-800/80 bg-neutral-950 overflow-y-auto overscroll-contain">
             <ControlsPanel onCaptureImage={() => captureImage()} />
           </aside>
         )}
@@ -267,7 +272,7 @@ export default function GradientGenerator() {
 
           {/* Export also in the footer on narrow screens, where the top bar runs
               out of room */}
-          <div className="sm:hidden flex gap-2 p-2 border-t border-neutral-800">
+          <div className="sm:hidden flex gap-2 p-3 border-t border-neutral-800/80">
             <ExportOptions onExport={captureImage} />
             <VideoExport containerRef={artboardRef} />
             <ShareGradient />
