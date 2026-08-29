@@ -244,6 +244,7 @@ describe("createShareableURL / parseShareableURL", () => {
     const parsed = parseShareableURL(url)
     expect(parsed).not.toBeNull()
     expect(parsed!.speed).toBe(1.0)
+    expect(parsed!.complexity).toBe(2)
     expect(parsed!.colorScheme).toBe("redBlue")
     expect(parsed!.stops!).toEqual([
       { color: [0.9, 0.1, 0.1], position: 0 },

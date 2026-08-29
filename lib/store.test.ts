@@ -46,6 +46,12 @@ const advance = (ms: number) => {
   now += ms
 }
 
+describe("default state", () => {
+  it("starts Shape complexity at 2 on a first visit", () => {
+    expect(initialState.complexity).toBe(2)
+  })
+})
+
 describe("resetToDefaults", () => {
   it("restores the default parameters", () => {
     const store = useGradientStore.getState()
@@ -57,7 +63,7 @@ describe("resetToDefaults", () => {
 
     const state = useGradientStore.getState()
     expect(state.speed).toBe(1.0)
-    expect(state.complexity).toBe(3)
+    expect(state.complexity).toBe(2)
     expect(state.flowIntensity).toBe(0.3)
   })
 

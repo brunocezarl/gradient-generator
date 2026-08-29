@@ -265,7 +265,7 @@ export function createShareableURL(state: Partial<GradientStore>): string {
   // through to the default (0 || 1.0 === 1.0 would corrupt the share)
   const shareableData: ShareableGradient = {
     speed: state.speed ?? 1.0,
-    complexity: state.complexity ?? 3,
+    complexity: state.complexity ?? 2,
     noiseScale: state.noiseScale ?? 2.0,
     colorScheme: state.colorScheme || "redBlue",
     isCustomMode: state.isCustomMode ?? false,

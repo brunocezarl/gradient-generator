@@ -395,7 +395,9 @@ type StoreActions = Pick<
 const defaultState: Omit<GradientStore, keyof StoreActions> = {
   isPlaying: true,
   speed: 1.0,
-  complexity: 3,
+  // First visit: Shape → Complexity starts at 2. Returning users keep the
+  // value already saved in localStorage.
+  complexity: 2,
   noiseScale: 2.0,
   colorScheme: "redBlue",
   menuOpen: true,
