@@ -395,10 +395,10 @@ type StoreActions = Pick<
 const defaultState: Omit<GradientStore, keyof StoreActions> = {
   isPlaying: true,
   speed: 1.0,
-  // First visit: Shape → Complexity starts at 2. Returning users keep the
-  // value already saved in localStorage.
+  // First visit: Shape → Complexity starts at 2, Noise Scale at 0.6.
+  // Returning users keep the values already saved in localStorage.
   complexity: 2,
-  noiseScale: 2.0,
+  noiseScale: 0.6,
   colorScheme: "redBlue",
   menuOpen: true,
   isCustomMode: false,
@@ -411,7 +411,9 @@ const defaultState: Omit<GradientStore, keyof StoreActions> = {
   advancedMode: false,
   flowIntensity: 0.3,
   grainAmount: 0.05,
-  grainScale: 500.0,
+  // First visit: Grain → Scale starts at 780. Returning users keep the
+  // value already saved in localStorage.
+  grainScale: 780,
   thresholdMin: 0.3,
   thresholdMax: 0.7,
   // Neutral vibrance by default: the HEX picked in the picker is exactly the
@@ -1051,7 +1053,7 @@ export const useGradientStore = create<GradientStore>()(
         if (settings.grainAmount !== undefined)
           validatedSettings.grainAmount = clampNum(settings.grainAmount, 0, 0.2, 0.05)
         if (settings.grainScale !== undefined)
-          validatedSettings.grainScale = clampNum(settings.grainScale, 50, 1500, 500)
+          validatedSettings.grainScale = clampNum(settings.grainScale, 50, 1500, defaultState.grainScale)
         if (settings.thresholdMin !== undefined || settings.thresholdMax !== undefined) {
           const tMin = clampNum(settings.thresholdMin, 0.1, 0.8, 0.3)
           const tMax = clampNum(settings.thresholdMax, tMin + 0.1, 0.9, 0.7)
@@ -1115,7 +1117,7 @@ export const useGradientStore = create<GradientStore>()(
               const stops = source?.customStops ?? legacy
               return stops ? normalizeStops(stops, defaultState.customStops) : undefined
             })(),
-            noiseScale: clampNum(layer?.noiseScale, 0.5, 5.0, 2.0),
+            noiseScale: clampNum(layer?.noiseScale, 0.5, 5.0, defaultState.noiseScale),
             flowIntensity: clampNum(layer?.flowIntensity, 0.1, 1.0, 0.3),
             thresholdMin: clampNum(layer?.thresholdMin, 0.1, 0.8, 0.3),
             thresholdMax: clampNum(layer?.thresholdMax, 0.2, 0.9, 0.7),

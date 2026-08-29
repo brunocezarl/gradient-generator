@@ -266,7 +266,7 @@ export function createShareableURL(state: Partial<GradientStore>): string {
   const shareableData: ShareableGradient = {
     speed: state.speed ?? 1.0,
     complexity: state.complexity ?? 2,
-    noiseScale: state.noiseScale ?? 2.0,
+    noiseScale: state.noiseScale ?? 0.6,
     colorScheme: state.colorScheme || "redBlue",
     isCustomMode: state.isCustomMode ?? false,
     stops: state.customStops ?? stopsFromColors([
@@ -276,7 +276,7 @@ export function createShareableURL(state: Partial<GradientStore>): string {
     ]),
     flowIntensity: state.flowIntensity ?? 0.3,
     grainAmount: state.grainAmount ?? 0.05,
-    grainScale: state.grainScale ?? 500.0,
+    grainScale: state.grainScale ?? 780,
     thresholdMin: state.thresholdMin ?? 0.3,
     thresholdMax: state.thresholdMax ?? 0.7,
     vibrance: state.vibrance ?? 0,

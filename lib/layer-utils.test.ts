@@ -8,6 +8,7 @@ describe("createDefaultLayer", () => {
     expect(layer.visible).toBe(true)
     expect(layer.opacity).toBe(1.0)
     expect(layer.blendMode).toBe("normal")
+    expect(layer.noiseScale).toBe(0.6)
     expect(layer.thresholdMin).toBeLessThan(layer.thresholdMax)
   })
 })
