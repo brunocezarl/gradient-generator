@@ -184,13 +184,8 @@ export default function GradientGenerator() {
           )}
         </Button>
 
-        {/* Brand mark: a tiny gradient orb that hints at what the tool makes */}
-        <span
-          aria-hidden
-          className="h-3.5 w-3.5 shrink-0 rounded-full bg-gradient-to-br from-indigo-400 via-fuchsia-400 to-amber-300 shadow-[0_0_8px_rgba(192,132,252,0.45)]"
-        />
         <h1 className="text-sm font-medium tracking-tight mr-2 hidden sm:block">
-          Organic Gradients
+          organic gradients
         </h1>
 
         <div className="flex-1" />
