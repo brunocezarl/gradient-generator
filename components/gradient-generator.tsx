@@ -184,33 +184,31 @@ export default function GradientGenerator() {
           )}
         </Button>
 
-        <div className="hidden sm:flex items-baseline gap-2.5 mr-2 min-w-0">
-          <h1 className="text-sm font-medium tracking-tight">
-            organic gradients
-          </h1>
-          {/* Quiet byline: name → site, mark → GitHub */}
-          <p className="flex items-center gap-1.5 text-[11px] text-neutral-500 tracking-wide">
-            <span>developed by</span>
-            <a
-              href="https://brnczr.xyz"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-neutral-400 hover:text-neutral-200 transition-colors"
-            >
-              brnczr
-            </a>
-            <a
-              href="https://github.com/brunocezarl"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-              title="GitHub"
-              className="text-neutral-500 hover:text-neutral-200 transition-colors"
-            >
-              <Github className="h-3 w-3" />
-            </a>
-          </p>
-        </div>
+        <h1 className="text-sm font-medium tracking-tight hidden sm:block">
+          organic gradients
+        </h1>
+        {/* Quiet byline: name → site, mark → GitHub */}
+        <p className="flex items-center gap-1.5 text-[11px] text-neutral-500 tracking-wide whitespace-nowrap">
+          <span>developed by</span>
+          <a
+            href="https://brnczr.xyz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-neutral-400 hover:text-neutral-200 transition-colors"
+          >
+            brnczr
+          </a>
+          <a
+            href="https://github.com/brunocezarl"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+            className="text-neutral-500 hover:text-neutral-200 transition-colors"
+          >
+            <Github className="h-3 w-3" />
+          </a>
+        </p>
 
         <div className="flex-1" />
 
