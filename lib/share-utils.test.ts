@@ -315,3 +315,9 @@ describe("createShareableURL / parseShareableURL", () => {
     expect(parseShareableURL("https://gradients.example/?g=!!!nao-e-base64!!!")).toBeNull()
   })
 })
+
+ it("preserves the selected artboard and exact animation instant", () => {
+   const decoded = parseShareableURL(createShareableURL({ artboardId: "story" }, 3.125))
+   expect(decoded?.artboardId).toBe("story")
+   expect(decoded?.playbackTime).toBe(3.125)
+ })

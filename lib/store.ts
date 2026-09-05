@@ -1,3 +1,4 @@
+import { playback } from "@/lib/playback"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { ShareableGradient } from "@/lib/share-utils"
@@ -185,6 +186,7 @@ function snapshotToState(
     loopDuration: snapshot.loopDuration,
   }
 
+  if (snapshot.multiLayerMode !== undefined) patch.multiLayerMode = snapshot.multiLayerMode
   if (snapshot.layers && snapshot.layers.length > 0) {
     const layers = cloneLayers(snapshot.layers)
     patch.layers = layers
@@ -1128,7 +1130,16 @@ export const useGradientStore = create<GradientStore>()(
           validatedSettings.activeLayerId = validatedLayers[0].id
         }
 
+        if (typeof settings.artboardId === "string") {
+          validatedSettings.artboardId = getArtboard(settings.artboardId).id
+        }
+        if (typeof settings.playbackTime === "number" && Number.isFinite(settings.playbackTime)) {
+          validatedSettings.isPlaying = false
+        }
         set(validatedSettings)
+        if (typeof settings.playbackTime === "number" && Number.isFinite(settings.playbackTime)) {
+          playback.set(Math.max(0, settings.playbackTime), get().loopDuration)
+        }
       },
 
       // ─── Apply animation preset ────────────────────────────────────────────

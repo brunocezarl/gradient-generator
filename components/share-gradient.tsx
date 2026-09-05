@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Share, Copy, Check, QrCode } from "lucide-react"
 import { useGradientStore } from "@/lib/store"
+import { playback } from "@/lib/playback"
 import { createShareableURL } from "@/lib/share-utils"
 import { useToast } from "@/components/ui/use-toast"
 import { QRCodeSVG } from "qrcode.react"
@@ -26,7 +27,9 @@ export function ShareGradient() {
   }, [])
   
   // Generate shareable URL
-  const shareableURL = createShareableURL(gradientState)
+  const [shareTime, setShareTime] = useState(0)
+  useEffect(() => { if (open) setShareTime(playback.time) }, [open])
+  const shareableURL = createShareableURL(gradientState, shareTime)
   
   // Handle copy to clipboard
   const copyToClipboard = async () => {

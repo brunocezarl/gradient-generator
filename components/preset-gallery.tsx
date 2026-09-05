@@ -19,6 +19,7 @@ import {
   StateSnapshot,
   GradientStore,
 } from "@/lib/store"
+import { curatedPresets } from "@/lib/curated-presets"
 import { stopsToCss } from "@/lib/color-stops"
 import { disposeThumbnailRenderer, renderThumbnail } from "@/lib/thumbnail"
 import { useToast } from "@/components/ui/use-toast"
@@ -372,4 +373,22 @@ export function RandomHistoryStrip() {
       </div>
     </div>
   )
+}
+
+export function CuratedLooks() {
+  const colorSchemes = useGradientStore((state) => state.colorSchemes)
+  const applySnapshot = useGradientStore((state) => state.applySnapshot)
+  const thumbnails = useSnapshotThumbnails(curatedPresets, colorSchemes)
+  return <section aria-label="Starting looks" className="mb-5">
+    <h2 className="text-sm font-medium text-white">Start with a look</h2>
+    <p className="mt-1 mb-3 text-xs text-neutral-400">A complete palette, texture and movement. Make it yours.</p>
+    <div className="grid grid-cols-2 gap-2">
+      {curatedPresets.map((preset) => <button key={preset.id}
+        className="overflow-hidden rounded-md border border-neutral-800 text-left hover:border-neutral-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        onClick={() => applySnapshot(preset.snapshot)} aria-label={`Apply ${preset.name} look`}>
+        <span className="block aspect-[2/1] bg-cover bg-center" style={{ backgroundImage: thumbnails[preset.id] ? `url(${thumbnails[preset.id]})` : snapshotToGradientCSS(preset.snapshot, colorSchemes) }} />
+        <span className="block px-2 py-2 text-xs text-neutral-200">{preset.name}</span>
+      </button>)}
+    </div>
+  </section>
 }

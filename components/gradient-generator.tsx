@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Github, Keyboard, PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import { Github, Keyboard, PanelLeftClose, PanelLeftOpen, Undo2, Redo2 } from "lucide-react"
 
 // ─── Shortcut table shown in the dialog ──────────────────────────────────────
 const SHORTCUTS = [
@@ -55,6 +55,8 @@ export default function GradientGenerator() {
   const resetToDefaults = useGradientStore((state) => state.resetToDefaults)
   const undo = useGradientStore((state) => state.undo)
   const redo = useGradientStore((state) => state.redo)
+  const canUndo = useGradientStore((state) => state.past.length > 0)
+  const canRedo = useGradientStore((state) => state.future.length > 0)
 
   const { toggleFullscreen } = useFullscreen()
 
@@ -166,13 +168,15 @@ export default function GradientGenerator() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-neutral-950 text-white overflow-hidden">
+    <div className="flex flex-col h-dvh w-full bg-neutral-950 text-white overflow-hidden">
       {/* ─── Top bar ────────────────────────────────────────────────────── */}
       <header className="flex items-center gap-2.5 px-4 py-2.5 border-b border-neutral-800/80 bg-neutral-950 shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
+          className="h-11 w-11 sm:h-8 sm:w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
+          aria-expanded={sidebarOpen}
+          aria-controls="editor-controls"
           onClick={toggleSidebar}
           title={sidebarOpen ? "Hide controls" : "Show controls"}
           aria-label={sidebarOpen ? "Hide controls" : "Show controls"}
@@ -211,10 +215,12 @@ export default function GradientGenerator() {
         </p>
 
         <div className="flex-1" />
+        <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-8 sm:w-8" aria-label="Undo" title="Undo" disabled={!canUndo} onClick={undo}><Undo2 className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-8 sm:w-8" aria-label="Redo" title="Redo" disabled={!canRedo} onClick={redo}><Redo2 className="h-4 w-4" /></Button>
 
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-2">
-            <ExportOptions onExport={captureImage} />
+            <ExportOptions onExport={captureImage} containerRef={artboardRef} />
             <VideoExport containerRef={artboardRef} />
             <ShareGradient />
           </div>
@@ -224,7 +230,7 @@ export default function GradientGenerator() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
+                className="h-11 w-11 sm:h-8 sm:w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
                 title="Keyboard shortcuts"
                 aria-label="Keyboard shortcuts"
               >
@@ -256,14 +262,14 @@ export default function GradientGenerator() {
       </header>
 
       {/* ─── Body: controls + artboard ─────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-col sm:flex-row flex-1 min-h-0">
         {sidebarOpen && (
-          <aside className="w-72 lg:w-80 shrink-0 border-r border-neutral-800/80 bg-neutral-950 overflow-y-auto overscroll-contain">
+          <aside id="editor-controls" aria-label="Gradient controls" className="order-2 sm:order-none w-full sm:w-72 lg:w-80 max-h-[42dvh] sm:max-h-none shrink-0 border-t sm:border-t-0 sm:border-r border-neutral-800/80 bg-neutral-950 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)] sm:pb-0">
             <ControlsPanel onCaptureImage={() => captureImage()} />
           </aside>
         )}
 
-        <main className="flex flex-col flex-1 min-w-0">
+        <main className="flex flex-col flex-1 min-w-0 min-h-0">
           <ErrorBoundary
             fallback={
               <div className="flex-1 flex items-center justify-center bg-neutral-900 text-white">
@@ -289,8 +295,8 @@ export default function GradientGenerator() {
 
           {/* Export also in the footer on narrow screens, where the top bar runs
               out of room */}
-          <div className="sm:hidden flex gap-2 p-3 border-t border-neutral-800/80">
-            <ExportOptions onExport={captureImage} />
+          <div className="sm:hidden flex shrink-0 gap-2 p-3 [&>button]:w-auto [&>button]:flex-1 [&>button]:min-h-11 border-t border-neutral-800/80">
+            <ExportOptions onExport={captureImage} containerRef={artboardRef} />
             <VideoExport containerRef={artboardRef} />
             <ShareGradient />
           </div>

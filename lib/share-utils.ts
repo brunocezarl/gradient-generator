@@ -10,6 +10,8 @@ export type ShareableLayer = Omit<GradientLayer, "id">
 
 // Define the shape of shareable data
 export interface ShareableGradient {
+  artboardId?: string
+  playbackTime?: number
   speed: number
   complexity: number
   noiseScale: number
@@ -92,6 +94,8 @@ type PackedLayer = {
 }
 
 type PackedGradient = {
+  a?: string
+  t?: number
   v: 2 | 3
   s: number // speed
   c: number // complexity
@@ -128,6 +132,8 @@ type PackedGradient = {
 function pack(data: ShareableGradient): PackedGradient {
   const packed: PackedGradient = {
     v: 3,
+    a: data.artboardId,
+    t: data.playbackTime,
     s: round3(data.speed),
     c: data.complexity,
     n: round3(data.noiseScale),
@@ -192,6 +198,8 @@ function pack(data: ShareableGradient): PackedGradient {
 
 function unpack(packed: PackedGradient): ShareableGradient {
   const data: ShareableGradient = {
+    artboardId: packed.a,
+    playbackTime: packed.t,
     speed: packed.s,
     complexity: packed.c,
     noiseScale: packed.n,
@@ -259,11 +267,13 @@ function unpack(packed: PackedGradient): ShareableGradient {
 }
 
 // Create a shareable URL for the current gradient settings
-export function createShareableURL(state: Partial<GradientStore>): string {
+export function createShareableURL(state: Partial<GradientStore>, playbackTime = 0): string {
   // Extract only the properties we want to share.
   // `??` rather than `||`: legitimate numeric values such as 0 must not fall
   // through to the default (0 || 1.0 === 1.0 would corrupt the share)
   const shareableData: ShareableGradient = {
+    artboardId: state.artboardId,
+    playbackTime,
     speed: state.speed ?? 1.0,
     complexity: state.complexity ?? 2,
     noiseScale: state.noiseScale ?? 0.6,
