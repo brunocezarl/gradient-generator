@@ -47,8 +47,9 @@ Ideas that came out of the codebase review and have not been built yet:
 1. **Curated preset catalog** — the animation presets only touch speed,
    complexity, noise scale and scheme; a signed set of complete looks would sell
    the tool in the first minute.
-2. **Batch export** — shipping one gradient as post, story, cover, OG and
-   wallpaper in a single action is the real delivery flow.
+2. **Batch export — shipped** — Image → Image kit produces a ZIP of square,
+   portrait, story, cover/OG and wallpaper images in PNG/JPEG/WebP, with file
+   naming, progress, cancellation and a single animation frame across sizes.
 3. **PNG with alpha and mask output** — needed to composite the gradient into
    other artwork.
 4. **Adaptive resolution scaling** with an FPS target, instead of the current

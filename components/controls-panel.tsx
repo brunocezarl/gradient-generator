@@ -23,7 +23,7 @@ import { StopsEditor } from "@/components/stops-editor"
 import { StopDots } from "@/components/gradient-swatch"
 import { TooltipHelp } from "@/components/tooltip-help"
 import { AnimationPresetsSelector } from "@/components/animation-presets-selector"
-import { PresetGallery, RandomHistoryStrip } from "@/components/preset-gallery"
+import { PresetGallery, RandomHistoryStrip, CuratedLooks } from "@/components/preset-gallery"
 import { LayerManager } from "@/components/layer-manager"
 import { useToast } from "@/components/ui/use-toast"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -34,7 +34,7 @@ interface ControlsPanelProps {
 
 // Sections open on first paint: the framing and the colors are what a session
 // starts with. Everything else is a refinement and stays folded away.
-const DEFAULT_OPEN = ["effect", "canvas", "color"]
+const DEFAULT_OPEN = ["canvas", "color"]
 
 export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -157,147 +157,13 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
 
   return (
     <div className="p-4">
+      <CuratedLooks />
       <Accordion
         type="multiple"
         value={openSections}
         onValueChange={setOpenSections}
         className="w-full"
       >
-        {/* ─── Effect ──────────────────────────────────────────────────── */}
-        <AccordionItem value="effect">
-          <AccordionTrigger>Effect</AccordionTrigger>
-          <AccordionContent className="space-y-5">
-            <div className="grid grid-cols-3 gap-1.5">
-              {(Object.entries(effects) as [GradientEffect, string][]).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => effect !== key && setEffect(key)}
-                  aria-pressed={effect === key}
-                  className={`h-8 rounded-md text-[11px] font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
-                    effect === key
-                      ? "bg-white text-neutral-950"
-                      : "bg-neutral-800 text-neutral-300 ring-1 ring-inset ring-white/5 hover:bg-neutral-700 hover:text-white"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {effect === "bloom" ? (
-              <>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label className="text-white">Threshold: {bloomThreshold.toFixed(2)}</Label>
-                    <TooltipHelp content="Where the glow starts, measured on the strongest channel in linear light: a mid tone sits near 0.22 and a saturated primary near 0.79. Lower values pull more of the gradient into the halo." />
-                  </div>
-                  <Slider
-                    value={[bloomThreshold]}
-                    min={0}
-                    max={2}
-                    step={0.02}
-                    onValueChange={(value) => setBloomThreshold(value[0])}
-                    thumbLabel="Bloom threshold"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label className="text-white">Intensity: {bloomIntensity.toFixed(2)}</Label>
-                    <TooltipHelp content="How much of the halo is added back to the image. It is summed in linear light, so raising exposure makes the same intensity glow harder." />
-                  </div>
-                  <Slider
-                    value={[bloomIntensity]}
-                    min={0}
-                    max={3}
-                    step={0.05}
-                    onValueChange={(value) => setBloomIntensity(value[0])}
-                    thumbLabel="Bloom intensity"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label className="text-white">Spread: {bloomRadius.toFixed(2)}</Label>
-                    <TooltipHelp content="How far the light travels from what emitted it. It widens the filter taps rather than adding passes, so a broad halo costs no more than a tight one." />
-                  </div>
-                  <Slider
-                    value={[bloomRadius]}
-                    min={0.5}
-                    max={3}
-                    step={0.05}
-                    onValueChange={(value) => setBloomRadius(value[0])}
-                    thumbLabel="Bloom spread"
-                  />
-                </div>
-
-                <p className="text-xs text-neutral-500">
-                  Bloom feeds on light above the threshold, so it pairs with Exposure:
-                  push exposure up and the bright end blows out into the halo.
-                </p>
-              </>
-            ) : effect === "ascii" ? (
-              <>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label className="text-white">Columns: {asciiColumns}</Label>
-                    <TooltipHelp content="Characters across the image. Density is set in columns, not in pixels, so the same setting composes the same picture on the preview and in a 4K export." />
-                  </div>
-                  <Slider
-                    value={[asciiColumns]}
-                    min={10}
-                    max={300}
-                    step={1}
-                    onValueChange={(value) => setAsciiColumns(value[0])}
-                    thumbLabel="ASCII columns"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label className="text-white">Ramp Contrast: {asciiRampContrast.toFixed(2)}×</Label>
-                    <TooltipHelp content="Stretches lightness across the character ramp before a glyph is picked. A gradient of saturated colors occupies a narrow band of lightness, so at 1.00 only the middle two or three characters ever appear." />
-                  </div>
-                  <Slider
-                    value={[asciiRampContrast]}
-                    min={0.5}
-                    max={6}
-                    step={0.1}
-                    onValueChange={(value) => setAsciiRampContrast(value[0])}
-                    thumbLabel="ASCII ramp contrast"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label className="text-white">Background: {asciiBackground.toFixed(2)}</Label>
-                    <TooltipHelp content="How much of the gradient shows through behind the characters. At 0 they sit on black and the composition is only legible through the glyphs." />
-                  </div>
-                  <Slider
-                    value={[asciiBackground]}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    onValueChange={(value) => setAsciiBackground(value[0])}
-                    thumbLabel="ASCII background"
-                  />
-                </div>
-
-                <p className="text-xs text-neutral-500">
-                  Characters are picked by perceptual lightness, so a saturated blue and
-                  a saturated red land on different glyphs instead of the same one.
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-neutral-500">
-                No chain: the gradient draws straight to the screen, and the exported
-                pixels are the colors you picked.
-              </p>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
         {/* ─── Canvas ──────────────────────────────────────────────────── */}
         <AccordionItem value="canvas">
           <AccordionTrigger>Canvas</AccordionTrigger>
@@ -572,9 +438,144 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           </AccordionContent>
         </AccordionItem>
 
+        {/* ─── Effect ──────────────────────────────────────────────────── */}
+        <AccordionItem value="effect">
+          <AccordionTrigger>Finish · Effects</AccordionTrigger>
+          <AccordionContent className="space-y-5">
+            <div className="grid grid-cols-3 gap-1.5">
+              {(Object.entries(effects) as [GradientEffect, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => effect !== key && setEffect(key)}
+                  aria-pressed={effect === key}
+                  className={`h-8 rounded-md text-[11px] font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
+                    effect === key
+                      ? "bg-white text-neutral-950"
+                      : "bg-neutral-800 text-neutral-300 ring-1 ring-inset ring-white/5 hover:bg-neutral-700 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {effect === "bloom" ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Threshold: {bloomThreshold.toFixed(2)}</Label>
+                    <TooltipHelp content="Where the glow starts, measured on the strongest channel in linear light: a mid tone sits near 0.22 and a saturated primary near 0.79. Lower values pull more of the gradient into the halo." />
+                  </div>
+                  <Slider
+                    value={[bloomThreshold]}
+                    min={0}
+                    max={2}
+                    step={0.02}
+                    onValueChange={(value) => setBloomThreshold(value[0])}
+                    thumbLabel="Bloom threshold"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Intensity: {bloomIntensity.toFixed(2)}</Label>
+                    <TooltipHelp content="How much of the halo is added back to the image. It is summed in linear light, so raising exposure makes the same intensity glow harder." />
+                  </div>
+                  <Slider
+                    value={[bloomIntensity]}
+                    min={0}
+                    max={3}
+                    step={0.05}
+                    onValueChange={(value) => setBloomIntensity(value[0])}
+                    thumbLabel="Bloom intensity"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Spread: {bloomRadius.toFixed(2)}</Label>
+                    <TooltipHelp content="How far the light travels from what emitted it. It widens the filter taps rather than adding passes, so a broad halo costs no more than a tight one." />
+                  </div>
+                  <Slider
+                    value={[bloomRadius]}
+                    min={0.5}
+                    max={3}
+                    step={0.05}
+                    onValueChange={(value) => setBloomRadius(value[0])}
+                    thumbLabel="Bloom spread"
+                  />
+                </div>
+
+                <p className="text-xs text-neutral-500">
+                  Bloom feeds on light above the threshold, so it pairs with Exposure:
+                  push exposure up and the bright end blows out into the halo.
+                </p>
+              </>
+            ) : effect === "ascii" ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Columns: {asciiColumns}</Label>
+                    <TooltipHelp content="Characters across the image. Density is set in columns, not in pixels, so the same setting composes the same picture on the preview and in a 4K export." />
+                  </div>
+                  <Slider
+                    value={[asciiColumns]}
+                    min={10}
+                    max={300}
+                    step={1}
+                    onValueChange={(value) => setAsciiColumns(value[0])}
+                    thumbLabel="ASCII columns"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Ramp Contrast: {asciiRampContrast.toFixed(2)}×</Label>
+                    <TooltipHelp content="Stretches lightness across the character ramp before a glyph is picked. A gradient of saturated colors occupies a narrow band of lightness, so at 1.00 only the middle two or three characters ever appear." />
+                  </div>
+                  <Slider
+                    value={[asciiRampContrast]}
+                    min={0.5}
+                    max={6}
+                    step={0.1}
+                    onValueChange={(value) => setAsciiRampContrast(value[0])}
+                    thumbLabel="ASCII ramp contrast"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label className="text-white">Background: {asciiBackground.toFixed(2)}</Label>
+                    <TooltipHelp content="How much of the gradient shows through behind the characters. At 0 they sit on black and the composition is only legible through the glyphs." />
+                  </div>
+                  <Slider
+                    value={[asciiBackground]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={(value) => setAsciiBackground(value[0])}
+                    thumbLabel="ASCII background"
+                  />
+                </div>
+
+                <p className="text-xs text-neutral-500">
+                  Characters are picked by perceptual lightness, so a saturated blue and
+                  a saturated red land on different glyphs instead of the same one.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-neutral-500">
+                No chain: the gradient draws straight to the screen, and the exported
+                pixels are the colors you picked.
+              </p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
         {/* ─── Grain ───────────────────────────────────────────────────── */}
         <AccordionItem value="grain">
-          <AccordionTrigger>Grain</AccordionTrigger>
+          <AccordionTrigger>Finish · Grain</AccordionTrigger>
           <AccordionContent className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center">

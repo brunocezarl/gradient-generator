@@ -1,5 +1,6 @@
 "use client"
 
+import { BatchExport } from "@/components/batch-export"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -26,6 +27,7 @@ import {
 } from "@/lib/tokens"
 
 interface ExportOptionsProps {
+  containerRef: React.RefObject<HTMLDivElement | null>
   onExport: (
     format: string,
     quality: number,
@@ -46,8 +48,10 @@ const SIZE_PRESETS: Record<string, { label: string; width?: number; height?: num
   story: { label: "Story / phone — 1080×1920", width: 1080, height: 1920 },
 }
 
-export function ExportOptions({ onExport }: ExportOptionsProps) {
+export function ExportOptions({ onExport, containerRef }: ExportOptionsProps) {
   const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState("single")
+  const [batchBusy, setBatchBusy] = useState(false)
   const [format, setFormat] = useState("png")
   const [quality, setQuality] = useState(1)
   const [scale, setScale] = useState(1)
@@ -144,13 +148,18 @@ export function ExportOptions({ onExport }: ExportOptionsProps) {
         Image
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(next) => { if (!batchBusy && !isExporting) setOpen(next) }}>
         <DialogContent className="bg-neutral-900 text-white border-neutral-700">
           <DialogHeader>
-            <DialogTitle>Export Options</DialogTitle>
+            <DialogTitle>Export images</DialogTitle>
+            <div className="flex gap-1 pt-3" role="group" aria-label="Export mode">
+              <Button variant="ghost" size="sm" aria-pressed={mode === "single"} disabled={batchBusy || isExporting} className={mode === "single" ? "bg-neutral-700" : ""} onClick={() => setMode("single")}>Single image</Button>
+              <Button variant="ghost" size="sm" aria-pressed={mode === "kit"} disabled={batchBusy || isExporting} className={mode === "kit" ? "bg-neutral-700" : ""} onClick={() => setMode("kit")}>Image kit · ZIP</Button>
+            </div>
           </DialogHeader>
 
-          <DialogBody className="space-y-4">
+          <DialogBody className={mode === "kit" ? "flex flex-col overflow-hidden" : "space-y-4"}>
+            {mode === "kit" ? <BatchExport containerRef={containerRef} onBusyChange={setBatchBusy} /> : <>
             {/* Palette tokens */}
             <div className="space-y-2">
               <Label className="text-white flex items-center gap-1">
@@ -302,9 +311,10 @@ The gradient is rendered natively at the final resolution, with the camera
                 above the GPU limit are clamped automatically.
               </p>
             </div>
+            </>}
           </DialogBody>
 
-          <DialogFooter>
+          {mode === "single" && <DialogFooter>
             <DialogClose asChild>
               <Button
                 variant="outline"
@@ -330,7 +340,7 @@ The gradient is rendered natively at the final resolution, with the camera
                 </>
               )}
             </Button>
-          </DialogFooter>
+          </DialogFooter>}
         </DialogContent>
       </Dialog>
     </>

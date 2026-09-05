@@ -19,7 +19,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       const target = e.target as HTMLElement
 
       // Ignore while focus is in a text field
-      if (INPUT_TAGS.has(target.tagName) || target.isContentEditable) return
+      if (INPUT_TAGS.has(target.tagName) || target.isContentEditable || target.closest?.('[role="dialog"]')) return
 
       const ctrl = e.ctrlKey || e.metaKey
 
