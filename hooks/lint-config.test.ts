@@ -4,7 +4,7 @@ import path from "node:path"
 import { expect, test } from "vitest"
 
 test("lint checks hooks noninteractively and reports React hook violations", () => {
-  const dir = mkdtempSync(path.join(process.cwd(), "hooks", ".lint-test-"))
+  const dir = mkdtempSync(path.join(process.cwd(), "hooks", "lint-fixture-"))
   try {
     writeFileSync(path.join(dir, "broken.tsx"), `import { useState } from "react"
 export function Broken({ enabled }: { enabled: boolean }) {
