@@ -1,8 +1,9 @@
 "use client"
 
-import { GradientStore } from "@/lib/store"
+import type { GradientStore } from "@/lib/store"
+import { colorBlendSpaces } from "@/lib/color"
 import type { GradientLayer } from "@/lib/layer-utils"
-import { stopsFromColors, type ColorStop } from "@/lib/color-stops"
+import { normalizeStops, stopsFromColors, type ColorStop } from "@/lib/color-stops"
 
 // Shareable layer: a GradientLayer without the id (ids are regenerated on import
 // so they cannot collide with layers already in the destination client)
@@ -52,6 +53,43 @@ export interface ShareableGradient {
   blendSpace?: string
   seed?: [number, number]
   loopDuration?: number
+}
+
+const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
+const own = (obj: object, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
+const validStops = (v: unknown) => Array.isArray(v) && v.length >= 2 && v.length <= 8 && v.every(
+  (s) => s && typeof s === "object" && Array.isArray(s.color) && s.color.length === 3 &&
+    s.color.every(finite) && finite(s.position)
+)
+
+/** Reject untrusted data before it reaches the store. Optional legacy fields may be absent. */
+export function isValidShareableGradient(value: unknown): value is ShareableGradient {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const d = value as Record<string, unknown>
+  if (![d.speed, d.complexity, d.noiseScale].every(finite) ||
+      typeof d.colorScheme !== "string" || typeof d.isCustomMode !== "boolean") return false
+  const numeric = ["playbackTime", "flowIntensity", "grainAmount", "grainScale", "thresholdMin", "thresholdMax", "vibrance", "exposure", "brightness", "contrast", "bloomThreshold", "bloomIntensity", "bloomRadius", "asciiColumns", "asciiBackground", "asciiRampContrast", "loopDuration"]
+  if (numeric.some(k => d[k] !== undefined && !finite(d[k]))) return false
+  if (d.artboardId !== undefined && typeof d.artboardId !== "string") return false
+  if (d.effect !== undefined && (typeof d.effect !== "string" || !["none", "bloom", "ascii"].includes(d.effect))) return false
+  if (d.blendSpace !== undefined && (typeof d.blendSpace !== "string" || !own(colorBlendSpaces, d.blendSpace))) return false
+  if (d.multiLayerMode !== undefined && typeof d.multiLayerMode !== "boolean") return false
+  if (d.seed !== undefined && (!Array.isArray(d.seed) || d.seed.length !== 2 || !d.seed.every(finite))) return false
+  if (d.stops !== undefined && !validStops(d.stops)) return false
+  const validColors = (c: unknown) => {
+    if (!c || typeof c !== "object" || Array.isArray(c)) return false
+    const colors = c as Record<string, unknown>
+    return [colors.color1, colors.color2, ...(colors.color3 === undefined ? [] : [colors.color3])].every(x => Array.isArray(x) && x.length === 3 && x.every(finite))
+  }
+  if (d.customColors !== undefined && !validColors(d.customColors)) return false
+  if (d.layers !== undefined && (!Array.isArray(d.layers) || d.layers.length === 0 || d.layers.length > 16 || !d.layers.every((l: Record<string, unknown>) =>
+    l && typeof l === "object" && [l.opacity, l.noiseScale, l.flowIntensity, l.thresholdMin, l.thresholdMax].every(finite) &&
+    typeof l.visible === "boolean" && typeof l.isCustomMode === "boolean" && typeof l.colorScheme === "string" &&
+    typeof l.blendMode === "string" && !Object.prototype.hasOwnProperty.call(Object.prototype, l.blendMode) &&
+    (l.customStops === undefined || validStops(l.customStops)) &&
+    (l.seed === undefined || (Array.isArray(l.seed) && l.seed.length === 2 && l.seed.every(finite)))
+  ))) return false
+  return d.multiLayerMode !== true || Array.isArray(d.layers)
 }
 
 // ─── Compact encoding ─────────────────────────────────────────────────────────
@@ -155,8 +193,8 @@ function pack(data: ShareableGradient): PackedGradient {
   if (data.contrast !== undefined) packed.ct = round3(data.contrast)
   // Only a chain that is actually on travels: a link to a plain gradient should
   // not carry three bloom numbers nobody will read
+  if (data.effect !== undefined) packed.ef = data.effect
   if (data.effect !== undefined && data.effect !== "none") {
-    packed.ef = data.effect
     if (data.bloomThreshold !== undefined) packed.bt = round3(data.bloomThreshold)
     if (data.bloomIntensity !== undefined) packed.bi = round3(data.bloomIntensity)
     if (data.bloomRadius !== undefined) packed.brd = round3(data.bloomRadius)
@@ -279,11 +317,11 @@ export function createShareableURL(state: Partial<GradientStore>, playbackTime =
     noiseScale: state.noiseScale ?? 0.6,
     colorScheme: state.colorScheme || "redBlue",
     isCustomMode: state.isCustomMode ?? false,
-    stops: state.customStops ?? stopsFromColors([
+    stops: normalizeStops((state.isCustomMode ? state.customStops : state.colorSchemes?.[state.colorScheme ?? "redBlue"]?.stops) ?? state.customStops, stopsFromColors([
       [0.9, 0.1, 0.1],
       [0.0, 0.0, 0.9],
       [0.5, 0.0, 0.5],
-    ]),
+    ])),
     flowIntensity: state.flowIntensity ?? 0.3,
     grainAmount: state.grainAmount ?? 0.05,
     grainScale: state.grainScale ?? 780,
@@ -305,11 +343,15 @@ export function createShareableURL(state: Partial<GradientStore>, playbackTime =
     loopDuration: state.loopDuration ?? 0,
   }
 
+  if (!state.isCustomMode && state.colorSchemes?.[state.colorScheme ?? "redBlue"]) shareableData.isCustomMode = true
+
   // Layers only go into the link when multi-layer mode is on — that
   // keeps the link shorter in the common single-layer case
   if (state.multiLayerMode && state.layers && state.layers.length > 0) {
     shareableData.multiLayerMode = true
-    shareableData.layers = state.layers.map(({ id: _id, ...layer }) => layer)
+    shareableData.layers = state.layers.map(({ id: _id, ...layer }) => ({
+      ...layer, isCustomMode: true, customStops: (layer.isCustomMode ? layer.customStops : state.colorSchemes?.[layer.colorScheme]?.stops) ?? layer.customStops ?? shareableData.stops,
+    }))
   }
 
   const encodedData = toBase64Url(JSON.stringify(pack(shareableData)))
@@ -326,12 +368,21 @@ export function parseShareableURL(url: string): ShareableGradient | null {
     const compactData = urlObj.searchParams.get("g")
     if (compactData) {
       const packed = JSON.parse(fromBase64Url(compactData)) as PackedGradient
-      return unpack(packed)
+      if (!packed || typeof packed !== "object" || Array.isArray(packed) || ![2, 3].includes(packed.v) || ![0, 1].includes(packed.cm) ||
+          (packed.ml !== undefined && ![0, 1].includes(packed.ml)) ||
+          (packed.sd !== undefined && (!Array.isArray(packed.sd) || packed.sd.length !== 2 || !packed.sd.every(finite))) ||
+          ([packed.k1, packed.k2, packed.k3].some(c => c !== undefined && (!Array.isArray(c) || c.length !== 3 || !c.every(finite)))) ||
+          (packed.ly !== undefined && (!Array.isArray(packed.ly) || packed.ly.some(l => !l || ![0, 1].includes(l.cm) || ![0, 1].includes(l.h) || (l.sd !== undefined && (!Array.isArray(l.sd) || l.sd.length !== 2 || !l.sd.every(finite))) || [l.k1, l.k2, l.k3].some(c => c !== undefined && (!Array.isArray(c) || c.length !== 3 || !c.every(finite)))))) ||
+          (packed.st !== undefined && (!Array.isArray(packed.st) || packed.st.some(s => !Array.isArray(s) || s.length !== 4 || !s.every(finite)))) ||
+          (packed.ly?.some(l => l.st !== undefined && (!Array.isArray(l.st) || l.st.some(s => !Array.isArray(s) || s.length !== 4 || !s.every(finite)))))) return null
+      const result = unpack(packed)
+      return isValidShareableGradient(result) ? result : null
     }
 
     const legacyData = urlObj.searchParams.get("gradient")
     if (legacyData) {
-      return JSON.parse(decodeURIComponent(legacyData)) as ShareableGradient
+      const result: unknown = JSON.parse(legacyData)
+      return isValidShareableGradient(result) ? result : null
     }
 
     return null

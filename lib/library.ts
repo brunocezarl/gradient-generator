@@ -58,7 +58,7 @@ export function parseLibrary(json: string): ParsedLibrary {
   if (file.format !== LIBRARY_FORMAT) {
     throw new Error("Invalid file: not a Gradient Generator library")
   }
-  if (typeof file.version !== "number" || file.version > LIBRARY_VERSION) {
+  if (file.version !== LIBRARY_VERSION) {
     throw new Error(
       `Library written by a newer version (v${file.version}) — update the app`
     )
@@ -74,6 +74,10 @@ export function parseLibrary(json: string): ParsedLibrary {
       )
     : []
 
+  if (presets.some(preset => !validSnapshot((preset as GradientPreset).snapshot))) {
+    throw new Error("Invalid library: incomplete preset snapshot")
+  }
+
   const colorSchemes =
     file.colorSchemes && typeof file.colorSchemes === "object"
       ? (file.colorSchemes as Record<string, unknown>)
@@ -84,4 +88,12 @@ export function parseLibrary(json: string): ParsedLibrary {
   }
 
   return { presets, colorSchemes }
+}
+
+export function validSnapshot(snapshot: unknown): boolean {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return false
+  const s = snapshot as Record<string, unknown>
+  return ["speed", "complexity", "noiseScale", "flowIntensity", "grainAmount", "grainScale", "thresholdMin", "thresholdMax"].every(k => typeof s[k] === "number" && Number.isFinite(s[k])) &&
+    typeof s.colorScheme === "string" && typeof s.isCustomMode === "boolean" &&
+    (s.layers === undefined || (Array.isArray(s.layers) && s.layers.length > 0 && s.layers.length <= 16 && s.layers.every(l => l && typeof l === "object" && typeof l.id === "string" && typeof l.colorScheme === "string" && typeof l.isCustomMode === "boolean" && typeof l.visible === "boolean" && typeof l.blendMode === "string" && [l.opacity, l.noiseScale, l.flowIntensity, l.thresholdMin, l.thresholdMax].every(v => typeof v === "number" && Number.isFinite(v)))))
 }
