@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // (the zustand/persist middleware needs window.localStorage; without a DOM it
 // silently disables itself and useGradientStore.persist does not exist)
+import { createShareableURL, parseShareableURL } from "@/lib/share-utils"
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import {
   useGradientStore,
@@ -251,7 +252,7 @@ describe("importSettings", () => {
     expect(state.thresholdMax).toBeCloseTo(0.6)
   })
 
-  it("leaves missing advanced parameters untouched (v1 links)", () => {
+  it("defaults missing advanced parameters (v1 links)", () => {
     useGradientStore.getState().setFlowIntensity(0.8)
     useGradientStore.getState().importSettings({
       speed: 1,
@@ -262,7 +263,7 @@ describe("importSettings", () => {
       customColors: { color1: [0, 0, 0], color2: [1, 1, 1] },
     })
 
-    expect(useGradientStore.getState().flowIntensity).toBe(0.8)
+    expect(useGradientStore.getState().flowIntensity).toBe(0.3)
   })
 
   it("imports layers with regenerated ids and a validated blend mode", () => {
@@ -1434,3 +1435,39 @@ describe("ascii settings", () => {
     expect(useGradientStore.getState().asciiRampContrast).toBe(6)
   })
 })
+
+describe("untrusted scene regression", () => {
+  it("rejects incomplete library snapshots without mutation", () => {
+    const before = useGradientStore.getState().savedPresets
+    const json = JSON.stringify({ format: "gradient-generator-library", version: 1, presets: [{ name: "Incomplete", snapshot: {} }] })
+    expect(() => useGradientStore.getState().importLibrary(json)).toThrow()
+    expect(useGradientStore.getState().savedPresets).toBe(before)
+  })
+
+  it("rejects invalid settings before mutating state", () => {
+    const before = useGradientStore.getState()
+    before.importSettings({ speed: NaN, complexity: 2, noiseScale: 1, colorScheme: "redBlue", isCustomMode: false })
+    expect(useGradientStore.getState()).toBe(before)
+  })
+})
+
+  it("recreates resolved custom schemes and resets a dirty recipient", () => {
+    const stops = [{ color: [0, 1, 0] as [number, number, number], position: 0 }, { color: [1, 1, 0] as [number, number, number], position: 1 }]
+    const sender = useGradientStore.getState()
+    const layer = { ...sender.layers[0], colorScheme: "mine", isCustomMode: false, seed: [4, 5] as [number, number] }
+    const url = createShareableURL({ ...sender, colorScheme: "mine", colorSchemes: { ...sender.colorSchemes, mine: { stops } }, isCustomMode: false, multiLayerMode: true, layers: [layer], seed: [7, 8], effect: "none" })
+    useGradientStore.setState({ effect: "ascii", colorSchemes: initialState.colorSchemes, multiLayerMode: false })
+    useGradientStore.getState().importSettings(parseShareableURL(url)!)
+    const received = useGradientStore.getState()
+    expect(resolveActiveStops(received)).toEqual(stops)
+    expect(received.layers[0].customStops).toEqual(stops)
+    expect(received.layers[0].isCustomMode).toBe(true)
+    expect(received.layers[0].seed).toEqual([4, 5])
+    expect(received.seed).toEqual([7, 8])
+    expect(received.effect).toBe("none")
+    const single = createShareableURL({ ...sender, multiLayerMode: false, effect: "none" })
+    useGradientStore.setState({ effect: "ascii", multiLayerMode: true })
+    useGradientStore.getState().importSettings(parseShareableURL(single)!)
+    expect(useGradientStore.getState().multiLayerMode).toBe(false)
+    expect(useGradientStore.getState().effect).toBe("none")
+  })

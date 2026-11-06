@@ -62,7 +62,7 @@ describe("createShareableURL / parseShareableURL", () => {
     // Three numbers nobody will read are three numbers of URL — a link to a
     // plain gradient should not carry the settings of a chain that is off
     expect(without.length).toBeLessThan(withEffect.length)
-    expect(parseShareableURL(without)!.effect).toBeUndefined()
+    expect(parseShareableURL(without)!.effect).toBe("none")
     expect(parseShareableURL(without)!.bloomIntensity).toBeUndefined()
   })
 
@@ -321,3 +321,11 @@ describe("createShareableURL / parseShareableURL", () => {
    expect(decoded?.artboardId).toBe("story")
    expect(decoded?.playbackTime).toBe(3.125)
  })
+
+describe("share validation", () => {
+  it("rejects missing fields and unknown compact versions", () => {
+    const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=/g, "")
+    expect(parseShareableURL(`https://example.test/?g=${encode({})}`)).toBeNull()
+    expect(parseShareableURL(`https://example.test/?g=${encode({v: 99, s: 1, c: 2, n: 1, cs: "redBlue", cm: 0})}`)).toBeNull()
+  })
+})

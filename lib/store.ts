@@ -1,7 +1,7 @@
 import { playback } from "@/lib/playback"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import { ShareableGradient } from "@/lib/share-utils"
+import { isValidShareableGradient, type ShareableGradient } from "@/lib/share-utils"
 import { AnimationPreset, animationPresets } from "@/lib/animation-presets"
 import {
   GradientLayer,
@@ -13,7 +13,7 @@ import {
 import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
 import { defaultArtboardId, getArtboard } from "@/lib/artboards"
 import { oklchToSrgb, randomPalette } from "@/lib/oklch"
-import { parseLibrary, serializeLibrary } from "@/lib/library"
+import { validSnapshot, parseLibrary, serializeLibrary } from "@/lib/library"
 import {
   cloneStops,
   insertStop,
@@ -513,7 +513,7 @@ export function resolveActiveStops(
 ): ColorStop[] {
   if (state.isCustomMode) return state.customStops
   const scheme =
-    state.colorSchemes[state.colorScheme] ??
+    (Object.prototype.hasOwnProperty.call(state.colorSchemes, state.colorScheme) ? state.colorSchemes[state.colorScheme] : undefined) ??
     state.colorSchemes.redBlue ??
     defaultState.colorSchemes.redBlue
   return scheme.stops
@@ -549,24 +549,38 @@ function migrateScheme(scheme: unknown): ColorScheme | undefined {
   return typeof source.name === "string" ? { stops, name: source.name } : { stops }
 }
 
-function migrateLayer(layer: unknown): unknown {
-  if (!layer || typeof layer !== "object") return layer
-  const source = layer as Record<string, unknown>
-  const legacy = legacyColorsToStops(source.customColors as never)
-  const stops = source.customStops ?? legacy ?? undefined
-
-  const migrated: Record<string, unknown> = {
-    ...source,
-    seed: migrateSeed(source.seed),
+function migrateLayer(layer: unknown): GradientLayer {
+  const source = layer && typeof layer === "object" && !Array.isArray(layer)
+    ? layer as Record<string, unknown> : {}
+  const defaults = createDefaultLayer(typeof source.id === "string" ? source.id : generateLayerId())
+  const number = (key: keyof GradientLayer, min: number, max: number) => {
+    const value = source[key]
+    return typeof value === "number" && Number.isFinite(value)
+      ? Math.min(max, Math.max(min, value)) : defaults[key] as number
   }
-  delete migrated.customColors
-  if (stops) migrated.customStops = normalizeStops(stops, legacy ?? [])
-  return migrated
+  const thresholdMin = number("thresholdMin", 0.1, 0.8)
+  const legacy = legacyColorsToStops(source.customColors as never)
+  return {
+    ...defaults,
+    opacity: number("opacity", 0, 1),
+    noiseScale: number("noiseScale", 0.5, 5),
+    flowIntensity: number("flowIntensity", 0.1, 1),
+    thresholdMin,
+    thresholdMax: Math.max(number("thresholdMax", 0.2, 0.9), thresholdMin + 0.1),
+    visible: typeof source.visible === "boolean" ? source.visible : defaults.visible,
+    isCustomMode: typeof source.isCustomMode === "boolean" ? source.isCustomMode : defaults.isCustomMode,
+    colorScheme: typeof source.colorScheme === "string" ? source.colorScheme : defaults.colorScheme,
+    blendMode: typeof source.blendMode === "string" && Object.prototype.hasOwnProperty.call(blendModes, source.blendMode)
+      ? source.blendMode : defaults.blendMode,
+    seed: migrateSeed(source.seed),
+    ...(source.customStops !== undefined || legacy || source.isCustomMode === true
+      ? { customStops: normalizeStops(source.customStops ?? legacy, defaultState.customStops) } : {}),
+  }
 }
 
 function migrateSnapshot(snapshot: unknown): unknown {
   if (!snapshot || typeof snapshot !== "object") return snapshot
-  const source = snapshot as Record<string, unknown>
+  const source = normalizePersistedState({ ...(snapshot as Record<string, unknown>), savedPresets: undefined, randomHistory: undefined }) as Record<string, unknown>
   const legacy = legacyColorsToStops(source.customColors as never)
   const customStops = normalizeStops(
     source.customStops ?? legacy,
@@ -580,7 +594,7 @@ function migrateSnapshot(snapshot: unknown): unknown {
       typeof source.brightness === "number" ? source.brightness : defaultState.brightness,
     contrast: typeof source.contrast === "number" ? source.contrast : defaultState.contrast,
     effect:
-      typeof source.effect === "string" && source.effect in effects
+      typeof source.effect === "string" && Object.prototype.hasOwnProperty.call(effects, source.effect)
         ? source.effect
         : defaultState.effect,
     bloomThreshold:
@@ -604,7 +618,7 @@ function migrateSnapshot(snapshot: unknown): unknown {
         ? source.asciiRampContrast
         : defaultState.asciiRampContrast,
     blendSpace:
-      typeof source.blendSpace === "string" && source.blendSpace in colorBlendSpaces
+      typeof source.blendSpace === "string" && Object.prototype.hasOwnProperty.call(colorBlendSpaces, source.blendSpace)
         ? source.blendSpace
         : defaultState.blendSpace,
     seed: migrateSeed(source.seed),
@@ -625,12 +639,31 @@ function migrateSnapshot(snapshot: unknown): unknown {
 export function normalizePersistedState(persisted: unknown): unknown {
   if (!persisted || typeof persisted !== "object") return persisted
   const state = { ...(persisted as Record<string, unknown>) }
+  // Hydration may be partial; only repair numeric fields that were actually stored.
+  const ranges: Record<string, [number, number]> = {
+    speed: [0.1, 3], complexity: [1, 10], noiseScale: [0.5, 5],
+    flowIntensity: [0.1, 1], grainAmount: [0, 0.2], grainScale: [50, 1500],
+    thresholdMin: [0.1, 0.8], thresholdMax: [0.2, 0.9], vibrance: [-1, 1],
+    exposure: [-2, 2], brightness: [-0.3, 0.3], contrast: [0.5, 2],
+    bloomThreshold: [0, 3], bloomIntensity: [0, 3], bloomRadius: [0.5, 3],
+    asciiColumns: [10, 300], asciiBackground: [0, 1], asciiRampContrast: [0.5, 6], loopDuration: [0, 120],
+  }
+  for (const [key, [min, max]] of Object.entries(ranges)) {
+    if (key in state) {
+      const value = state[key]
+      state[key] = typeof value === "number" && Number.isFinite(value)
+        ? Math.min(max, Math.max(min, value)) : defaultState[key as keyof typeof defaultState]
+    }
+  }
+  if (typeof state.thresholdMin === "number" && typeof state.thresholdMax === "number")
+    state.thresholdMax = Math.max(state.thresholdMax, state.thresholdMin + 0.1)
+
 
   if (typeof state.vibrance !== "number") state.vibrance = defaultState.vibrance
   if (typeof state.exposure !== "number") state.exposure = defaultState.exposure
   if (typeof state.brightness !== "number") state.brightness = defaultState.brightness
   if (typeof state.contrast !== "number") state.contrast = defaultState.contrast
-  if (typeof state.effect !== "string" || !(state.effect in effects)) {
+  if (typeof state.effect !== "string" || !(Object.prototype.hasOwnProperty.call(effects, state.effect))) {
     state.effect = defaultState.effect
   }
   if (typeof state.bloomThreshold !== "number") {
@@ -647,7 +680,7 @@ export function normalizePersistedState(persisted: unknown): unknown {
   if (typeof state.asciiRampContrast !== "number") {
     state.asciiRampContrast = defaultState.asciiRampContrast
   }
-  if (typeof state.blendSpace !== "string" || !(state.blendSpace in colorBlendSpaces)) {
+  if (typeof state.blendSpace !== "string" || !(Object.prototype.hasOwnProperty.call(colorBlendSpaces, state.blendSpace))) {
     state.blendSpace = defaultState.blendSpace
   }
   if (typeof state.loopDuration !== "number" || !Number.isFinite(state.loopDuration)) {
@@ -670,6 +703,7 @@ export function normalizePersistedState(persisted: unknown): unknown {
     state.colorSchemes = Object.fromEntries(
       Object.entries(state.colorSchemes as Record<string, unknown>).flatMap(
         ([key, scheme]) => {
+          if (["__proto__", "constructor", "prototype"].includes(key)) return []
           const migrated = migrateScheme(scheme)
           return migrated ? [[key, migrated]] : []
         }
@@ -677,10 +711,16 @@ export function normalizePersistedState(persisted: unknown): unknown {
     )
   }
 
-  if (Array.isArray(state.layers)) state.layers = state.layers.map(migrateLayer)
+  if ("layers" in state) {
+    const layers = Array.isArray(state.layers) && state.layers.length > 0
+      ? state.layers.map(migrateLayer) : defaultState.layers.map(migrateLayer)
+    state.layers = layers
+    if (!layers.some(layer => layer.id === state.activeLayerId)) state.activeLayerId = layers[0].id
+  }
+  if ("multiLayerMode" in state && typeof state.multiLayerMode !== "boolean") state.multiLayerMode = false
 
   if (Array.isArray(state.savedPresets)) {
-    state.savedPresets = state.savedPresets.map((preset) =>
+    state.savedPresets = state.savedPresets.filter((preset) => preset && typeof preset === "object" && validSnapshot((preset as Record<string, unknown>).snapshot)).map((preset) =>
       preset && typeof preset === "object"
         ? { ...preset, snapshot: migrateSnapshot((preset as Record<string, unknown>).snapshot) }
         : preset
@@ -688,7 +728,7 @@ export function normalizePersistedState(persisted: unknown): unknown {
   }
 
   if (Array.isArray(state.randomHistory)) {
-    state.randomHistory = state.randomHistory.map(migrateSnapshot)
+    state.randomHistory = state.randomHistory.filter(validSnapshot).map(migrateSnapshot)
   }
 
   return state
@@ -761,8 +801,9 @@ export const useGradientStore = create<GradientStore>()(
       // ─── Full presets and randomizer history ─────────────────────────────
 
       applySnapshot: (snapshot) => {
+        if (!validSnapshot(snapshot)) return
         get().pushHistory()
-        set(snapshotToState(snapshot, get().activeLayerId))
+        set(snapshotToState(migrateSnapshot(snapshot) as StateSnapshot, get().activeLayerId))
       },
 
       saveCurrentPreset: (name) =>
@@ -794,6 +835,9 @@ export const useGradientStore = create<GradientStore>()(
       importLibrary: (json) => {
         const { presets, colorSchemes } = parseLibrary(json)
 
+        if (presets.some(preset => !validSnapshot((preset as GradientPreset).snapshot))) {
+          throw new Error("Invalid library: incomplete preset snapshot")
+        }
         const importedPresets = presets.map((preset) => {
           const source = preset as GradientPreset
           return {
@@ -806,6 +850,7 @@ export const useGradientStore = create<GradientStore>()(
 
         const importedSchemes = Object.fromEntries(
           Object.entries(colorSchemes).flatMap(([key, scheme]) => {
+            if (["__proto__", "constructor", "prototype"].includes(key)) return []
             const migrated = migrateScheme(scheme)
             return migrated ? [[key, migrated]] : []
           })
@@ -1020,10 +1065,11 @@ export const useGradientStore = create<GradientStore>()(
       // ─── Import settings ───────────────────────────────────────────────────
 
       importSettings: (settings: ShareableGradient) => {
+        if (!isValidShareableGradient(settings)) return
         // Shared URLs can reference a scheme that does not exist in this client
         // (e.g. another user's custom scheme)
         const colorScheme =
-          settings.colorScheme in get().colorSchemes ? settings.colorScheme : "redBlue"
+          Object.prototype.hasOwnProperty.call(get().colorSchemes, settings.colorScheme) ? settings.colorScheme : "redBlue"
 
         const clampNum = (n: unknown, min: number, max: number, fallback: number) =>
           typeof n === "number" && Number.isFinite(n)
@@ -1036,6 +1082,16 @@ export const useGradientStore = create<GradientStore>()(
             : [0, 0]
 
         const validatedSettings: Partial<GradientStore> = {
+          flowIntensity: defaultState.flowIntensity, grainAmount: defaultState.grainAmount,
+          grainScale: defaultState.grainScale, thresholdMin: defaultState.thresholdMin,
+          thresholdMax: defaultState.thresholdMax, vibrance: defaultState.vibrance,
+          exposure: defaultState.exposure, brightness: defaultState.brightness, contrast: defaultState.contrast,
+          effect: defaultState.effect, bloomThreshold: defaultState.bloomThreshold,
+          bloomIntensity: defaultState.bloomIntensity, bloomRadius: defaultState.bloomRadius,
+          asciiColumns: defaultState.asciiColumns, asciiBackground: defaultState.asciiBackground,
+          asciiRampContrast: defaultState.asciiRampContrast, blendSpace: defaultState.blendSpace,
+          seed: [...defaultState.seed], loopDuration: defaultState.loopDuration,
+          multiLayerMode: false, artboardId: defaultArtboardId,
           speed: Math.min(Math.max(settings.speed, 0.1), 3.0),
           complexity: Math.min(Math.max(Math.round(settings.complexity), 1), 10),
           noiseScale: Math.min(Math.max(settings.noiseScale, 0.5), 5.0),
@@ -1072,7 +1128,7 @@ export const useGradientStore = create<GradientStore>()(
           validatedSettings.contrast = clampNum(settings.contrast, 0.5, 2, 1)
         if (settings.effect !== undefined)
           validatedSettings.effect =
-            settings.effect in effects ? (settings.effect as GradientEffect) : "none"
+            Object.prototype.hasOwnProperty.call(effects, settings.effect) ? (settings.effect as GradientEffect) : "none"
         if (settings.bloomThreshold !== undefined)
           validatedSettings.bloomThreshold = clampNum(settings.bloomThreshold, 0, 3, 0.8)
         if (settings.bloomIntensity !== undefined)
@@ -1089,7 +1145,7 @@ export const useGradientStore = create<GradientStore>()(
           validatedSettings.asciiRampContrast = clampNum(settings.asciiRampContrast, 0.5, 6, 2.5)
         if (settings.blendSpace !== undefined)
           validatedSettings.blendSpace =
-            settings.blendSpace in colorBlendSpaces
+            Object.prototype.hasOwnProperty.call(colorBlendSpaces, settings.blendSpace)
               ? (settings.blendSpace as ColorBlendSpace)
               : "oklab"
         if (settings.seed !== undefined)
@@ -1103,12 +1159,12 @@ export const useGradientStore = create<GradientStore>()(
           const validatedLayers: GradientLayer[] = settings.layers.map((layer, index) => ({
             id: `${generateLayerId()}_${index}`,
             opacity: clampNum(layer?.opacity, 0, 1, 1),
-            blendMode: typeof layer?.blendMode === "string" && layer.blendMode in blendModes
+            blendMode: typeof layer?.blendMode === "string" && Object.prototype.hasOwnProperty.call(blendModes, layer.blendMode)
               ? layer.blendMode
               : "normal",
             visible: layer?.visible !== false,
             colorScheme:
-              typeof layer?.colorScheme === "string" && layer.colorScheme in get().colorSchemes
+              typeof layer?.colorScheme === "string" && Object.prototype.hasOwnProperty.call(get().colorSchemes, layer.colorScheme)
                 ? layer.colorScheme
                 : "redBlue",
             isCustomMode: Boolean(layer?.isCustomMode),
@@ -1122,7 +1178,7 @@ export const useGradientStore = create<GradientStore>()(
             noiseScale: clampNum(layer?.noiseScale, 0.5, 5.0, defaultState.noiseScale),
             flowIntensity: clampNum(layer?.flowIntensity, 0.1, 1.0, 0.3),
             thresholdMin: clampNum(layer?.thresholdMin, 0.1, 0.8, 0.3),
-            thresholdMax: clampNum(layer?.thresholdMax, 0.2, 0.9, 0.7),
+            thresholdMax: Math.max(clampNum(layer?.thresholdMax, 0.2, 0.9, 0.7), clampNum(layer?.thresholdMin, 0.1, 0.8, 0.3) + 0.1),
             seed: validateSeed(layer?.seed),
           }))
           validatedSettings.multiLayerMode = true
