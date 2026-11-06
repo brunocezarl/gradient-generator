@@ -82,7 +82,7 @@ export function isValidShareableGradient(value: unknown): value is ShareableGrad
     return [colors.color1, colors.color2, ...(colors.color3 === undefined ? [] : [colors.color3])].every(x => Array.isArray(x) && x.length === 3 && x.every(finite))
   }
   if (d.customColors !== undefined && !validColors(d.customColors)) return false
-  if (d.layers !== undefined && (!Array.isArray(d.layers) || d.layers.length === 0 || d.layers.length > 16 || !d.layers.every((l: Record<string, unknown>) =>
+  if (d.layers !== undefined && (!Array.isArray(d.layers) || d.layers.length === 0 || !d.layers.every((l: Record<string, unknown>) =>
     l && typeof l === "object" && [l.opacity, l.noiseScale, l.flowIntensity, l.thresholdMin, l.thresholdMax].every(finite) &&
     typeof l.visible === "boolean" && typeof l.isCustomMode === "boolean" && typeof l.colorScheme === "string" &&
     typeof l.blendMode === "string" && !Object.prototype.hasOwnProperty.call(Object.prototype, l.blendMode) &&

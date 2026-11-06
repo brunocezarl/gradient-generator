@@ -1,3 +1,4 @@
+import { isValidShareableGradient } from "@/lib/share-utils"
 import type { ColorScheme, GradientPreset } from "@/lib/store"
 
 // Portable library: presets and color schemes in a single file.
@@ -94,6 +95,6 @@ export function validSnapshot(snapshot: unknown): boolean {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return false
   const s = snapshot as Record<string, unknown>
   return ["speed", "complexity", "noiseScale", "flowIntensity", "grainAmount", "grainScale", "thresholdMin", "thresholdMax"].every(k => typeof s[k] === "number" && Number.isFinite(s[k])) &&
-    typeof s.colorScheme === "string" && typeof s.isCustomMode === "boolean" &&
-    (s.layers === undefined || (Array.isArray(s.layers) && s.layers.length > 0 && s.layers.length <= 16 && s.layers.every(l => l && typeof l === "object" && typeof l.id === "string" && typeof l.colorScheme === "string" && typeof l.isCustomMode === "boolean" && typeof l.visible === "boolean" && typeof l.blendMode === "string" && [l.opacity, l.noiseScale, l.flowIntensity, l.thresholdMin, l.thresholdMax].every(v => typeof v === "number" && Number.isFinite(v)))))
+    isValidShareableGradient({ ...s, stops: s.customStops, layers: Array.isArray(s.layers) && s.layers.length === 0 && s.multiLayerMode !== true ? undefined : s.layers }) &&
+    (s.layers === undefined || (Array.isArray(s.layers) && s.layers.every(l => l && typeof l === "object" && typeof l.id === "string" && typeof l.colorScheme === "string" && typeof l.isCustomMode === "boolean" && typeof l.visible === "boolean" && typeof l.blendMode === "string" && [l.opacity, l.noiseScale, l.flowIntensity, l.thresholdMin, l.thresholdMax].every(v => typeof v === "number" && Number.isFinite(v)))))
 }

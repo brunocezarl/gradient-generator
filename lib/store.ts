@@ -549,19 +549,33 @@ function migrateScheme(scheme: unknown): ColorScheme | undefined {
   return typeof source.name === "string" ? { stops, name: source.name } : { stops }
 }
 
-function migrateLayer(layer: unknown): unknown {
-  if (!layer || typeof layer !== "object") return layer
-  const source = layer as Record<string, unknown>
-  const legacy = legacyColorsToStops(source.customColors as never)
-  const stops = source.customStops ?? legacy ?? undefined
-
-  const migrated: Record<string, unknown> = {
-    ...source,
-    seed: migrateSeed(source.seed),
+function migrateLayer(layer: unknown): GradientLayer {
+  const source = layer && typeof layer === "object" && !Array.isArray(layer)
+    ? layer as Record<string, unknown> : {}
+  const defaults = createDefaultLayer(typeof source.id === "string" ? source.id : generateLayerId())
+  const number = (key: keyof GradientLayer, min: number, max: number) => {
+    const value = source[key]
+    return typeof value === "number" && Number.isFinite(value)
+      ? Math.min(max, Math.max(min, value)) : defaults[key] as number
   }
-  delete migrated.customColors
-  if (stops) migrated.customStops = normalizeStops(stops, legacy ?? [])
-  return migrated
+  const thresholdMin = number("thresholdMin", 0.1, 0.8)
+  const legacy = legacyColorsToStops(source.customColors as never)
+  return {
+    ...defaults,
+    opacity: number("opacity", 0, 1),
+    noiseScale: number("noiseScale", 0.5, 5),
+    flowIntensity: number("flowIntensity", 0.1, 1),
+    thresholdMin,
+    thresholdMax: Math.max(number("thresholdMax", 0.2, 0.9), thresholdMin + 0.1),
+    visible: typeof source.visible === "boolean" ? source.visible : defaults.visible,
+    isCustomMode: typeof source.isCustomMode === "boolean" ? source.isCustomMode : defaults.isCustomMode,
+    colorScheme: typeof source.colorScheme === "string" ? source.colorScheme : defaults.colorScheme,
+    blendMode: typeof source.blendMode === "string" && Object.prototype.hasOwnProperty.call(blendModes, source.blendMode)
+      ? source.blendMode : defaults.blendMode,
+    seed: migrateSeed(source.seed),
+    ...(source.customStops !== undefined || legacy || source.isCustomMode === true
+      ? { customStops: normalizeStops(source.customStops ?? legacy, defaultState.customStops) } : {}),
+  }
 }
 
 function migrateSnapshot(snapshot: unknown): unknown {
@@ -697,7 +711,13 @@ export function normalizePersistedState(persisted: unknown): unknown {
     )
   }
 
-  if (Array.isArray(state.layers)) state.layers = state.layers.map(migrateLayer)
+  if ("layers" in state) {
+    const layers = Array.isArray(state.layers) && state.layers.length > 0
+      ? state.layers.map(migrateLayer) : defaultState.layers.map(migrateLayer)
+    state.layers = layers
+    if (!layers.some(layer => layer.id === state.activeLayerId)) state.activeLayerId = layers[0].id
+  }
+  if ("multiLayerMode" in state && typeof state.multiLayerMode !== "boolean") state.multiLayerMode = false
 
   if (Array.isArray(state.savedPresets)) {
     state.savedPresets = state.savedPresets.filter((preset) => preset && typeof preset === "object" && validSnapshot((preset as Record<string, unknown>).snapshot)).map((preset) =>
@@ -781,8 +801,9 @@ export const useGradientStore = create<GradientStore>()(
       // ─── Full presets and randomizer history ─────────────────────────────
 
       applySnapshot: (snapshot) => {
+        if (!validSnapshot(snapshot)) return
         get().pushHistory()
-        set(snapshotToState(snapshot, get().activeLayerId))
+        set(snapshotToState(migrateSnapshot(snapshot) as StateSnapshot, get().activeLayerId))
       },
 
       saveCurrentPreset: (name) =>
