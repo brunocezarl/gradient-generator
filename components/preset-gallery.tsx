@@ -238,7 +238,7 @@ export function PresetGallery() {
 
       {savedPresets.length === 0 ? (
         <p className="text-xs text-neutral-500">
-No presets yet. A preset stores the gradient's whole look — colors and every
+No presets yet. A preset stores the gradient&apos;s whole look — colors and every
           animation parameter.
         </p>
       ) : (
