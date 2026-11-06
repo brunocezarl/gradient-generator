@@ -92,7 +92,7 @@ Other scripts:
 ```bash
 npm run build      # production build (includes type checking)
 npm run start      # serve the production build
-npm run lint       # lint
+npm run lint       # noninteractive Next.js ESLint checks (also run in CI)
 npm test           # unit tests (Vitest)
 ```
 
