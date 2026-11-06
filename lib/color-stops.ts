@@ -1,4 +1,4 @@
-import { srgbTripletToLinear, linearTripletToSrgb, type RgbTriplet } from "@/lib/color"
+import { srgbTripletToLinear, linearTripletToSrgb, type ColorBlendSpace, type RgbTriplet } from "@/lib/color"
 import { linearToOklab, oklabToLinear } from "@/lib/oklch"
 import { MAX_COLOR_STOPS } from "@/lib/shaders/organic-gradient"
 
@@ -79,15 +79,18 @@ export function sortStops(stops: readonly ColorStop[]): ColorStop[] {
   return [...stops].sort((a, b) => a.position - b.position)
 }
 
-/** Interpolates in Oklab: the middle between two stops does not darken */
-export function mixStopColors(a: RgbTriplet, b: RgbTriplet, t: number): RgbTriplet {
-  const labA = linearToOklab(srgbTripletToLinear(a))
-  const labB = linearToOklab(srgbTripletToLinear(b))
-  const mixed = oklabToLinear([
-    labA[0] + (labB[0] - labA[0]) * t,
-    labA[1] + (labB[1] - labA[1]) * t,
-    labA[2] + (labB[2] - labA[2]) * t,
-  ])
+/** Interpolates in the selected gradient blend space. */
+export function mixStopColors(a: RgbTriplet, b: RgbTriplet, t: number, blendSpace: ColorBlendSpace = "oklab"): RgbTriplet {
+  const linearA = srgbTripletToLinear(a)
+  const linearB = srgbTripletToLinear(b)
+  const start = blendSpace === "oklab" ? linearToOklab(linearA) : linearA
+  const end = blendSpace === "oklab" ? linearToOklab(linearB) : linearB
+  const interpolated: RgbTriplet = [
+    start[0] + (end[0] - start[0]) * t,
+    start[1] + (end[1] - start[1]) * t,
+    start[2] + (end[2] - start[2]) * t,
+  ]
+  const mixed = blendSpace === "oklab" ? oklabToLinear(interpolated) : interpolated
   const srgb = linearTripletToSrgb(mixed)
   return [clamp01(srgb[0]), clamp01(srgb[1]), clamp01(srgb[2])]
 }
@@ -97,7 +100,7 @@ export function mixStopColors(a: RgbTriplet, b: RgbTriplet, t: number): RgbTripl
  * was already there — the new stop does not change how the gradient looks, it
  * just gives control over that point.
  */
-export function insertStop(stops: readonly ColorStop[]): ColorStop[] {
+export function insertStop(stops: readonly ColorStop[], blendSpace: ColorBlendSpace = "oklab"): ColorStop[] {
   if (stops.length >= MAX_STOPS) return stops.map((stop) => ({ ...stop }))
   const sorted = sortStops(stops)
 
@@ -115,7 +118,7 @@ export function insertStop(stops: readonly ColorStop[]): ColorStop[] {
   const after = sorted[gapIndex + 1] ?? sorted[gapIndex]
   const position = (before.position + after.position) / 2
   const color =
-    before === after ? [...before.color] : mixStopColors(before.color, after.color, 0.5)
+    before === after ? [...before.color] : mixStopColors(before.color, after.color, 0.5, blendSpace)
 
   return sortStops([...sorted, { color: color as RgbTriplet, position }])
 }
