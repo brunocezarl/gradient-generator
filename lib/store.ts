@@ -958,7 +958,7 @@ export const useGradientStore = create<GradientStore>()(
 
       addStop: () => {
         get().pushHistory()
-        set((state) => ({ customStops: insertStop(state.customStops) }))
+        set((state) => ({ customStops: insertStop(state.customStops, state.blendSpace) }))
       },
 
       removeStop: (index) => {
