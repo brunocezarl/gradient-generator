@@ -163,7 +163,7 @@ export function LayerManager() {
 
   if (!multiLayerMode) {
     return (
-      <div className="mt-4 pt-4 border-t border-neutral-800">
+      <div>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Layers className="h-4 w-4 mr-2 text-neutral-400" />
@@ -179,7 +179,7 @@ export function LayerManager() {
   const activeLayer = layers.find((layer) => layer.id === activeLayerId) || layers[0]
 
   return (
-    <div className="mt-4 pt-4 border-t border-neutral-800">
+    <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Layers className="h-4 w-4 mr-2 text-neutral-400" />

@@ -23,6 +23,7 @@ import { curatedPresets } from "@/lib/curated-presets"
 import { stopsToCss } from "@/lib/color-stops"
 import { disposeThumbnailRenderer, renderThumbnail } from "@/lib/thumbnail"
 import { useToast } from "@/components/ui/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 // CSS gradient of a snapshot's stops, in the same interpolation space as the
 // render. Used as an instant preview while the shader-rendered thumbnail is not
@@ -167,6 +168,35 @@ export function PresetGallery() {
     }
   }
 
+  // Deleting is one click with no confirmation, so the toast carries the way
+  // back: the preset returns to the position it was removed from
+  const handleDelete = (id: string) => {
+    const index = savedPresets.findIndex((preset) => preset.id === id)
+    if (index === -1) return
+    const removed = savedPresets[index]
+    deletePreset(id)
+    toast({
+      title: "Preset removed",
+      description: removed.name,
+      action: (
+        <ToastAction
+          altText={`Restore preset ${removed.name}`}
+          className="border-neutral-600 text-white hover:bg-neutral-800"
+          onClick={() =>
+            useGradientStore.setState((state) => {
+              if (state.savedPresets.some((preset) => preset.id === removed.id)) return state
+              const next = [...state.savedPresets]
+              next.splice(Math.min(index, next.length), 0, removed)
+              return { savedPresets: next }
+            })
+          }
+        >
+          Undo
+        </ToastAction>
+      ),
+    })
+  }
+
   const handleSave = () => {
     const name = presetName.trim()
     if (!name) {
@@ -237,7 +267,7 @@ export function PresetGallery() {
       />
 
       {savedPresets.length === 0 ? (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-400">
 No presets yet. A preset stores the gradient&apos;s whole look — colors and every
           animation parameter.
         </p>
@@ -280,10 +310,9 @@ No presets yet. A preset stores the gradient&apos;s whole look — colors and ev
                 size="icon"
                 onClick={(e) => {
                   e.stopPropagation()
-                  deletePreset(preset.id)
-                  toast({ title: "Preset removed", description: preset.name })
+                  handleDelete(preset.id)
                 }}
-                className="absolute top-1 right-1 h-6 w-6 bg-black/60 text-neutral-300 hover:text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 h-6 w-6 bg-black/60 text-neutral-300 hover:text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
                 aria-label={`Remove preset ${preset.name}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />

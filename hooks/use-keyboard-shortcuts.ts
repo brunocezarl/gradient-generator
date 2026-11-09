@@ -13,6 +13,11 @@ type ShortcutHandlers = {
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"])
 
+// Controls that Space already activates when focused. Taking the key away from
+// them would leave keyboard users unable to press a button or flip a switch.
+const SPACE_ACTIVATED =
+  'button, a[href], summary, [role="button"], [role="switch"], [role="slider"], [role="combobox"], [role="tab"], [role="checkbox"], [role="option"], [role="menuitem"]'
+
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -35,10 +40,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         return
       }
 
-      if (ctrl) return // Ignorar outros atalhos com Ctrl
+      if (ctrl) return // Leave every other Ctrl/Cmd combination to the browser
 
       switch (e.key) {
         case " ":
+          if (target.closest?.(SPACE_ACTIVATED)) return
           e.preventDefault()
           handlers.onPlayPause()
           break

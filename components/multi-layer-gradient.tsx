@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo } from "react"
+import { Fragment, useCallback, useEffect, useMemo } from "react"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
 import { useShallow } from "zustand/react/shallow"
@@ -228,10 +228,12 @@ function LayeredComposition({
 
   return (
     <>
-      {visibleLayers.map((layer, index) =>
-        createPortal(
+      {/* The key belongs on the list item itself — the portal — not on the
+          element rendered inside it */}
+      {visibleLayers.map((layer, index) => (
+        <Fragment key={layer.id}>
+        {createPortal(
           <OrganicGradientShader
-            key={layer.id}
             complexity={globals.complexity}
             grainAmount={globals.grainAmount}
             grainScale={globals.grainScale}
@@ -249,8 +251,9 @@ function LayeredComposition({
             seed={layer.seed}
           />,
           layerScenes[index]
-        )
-      )}
+        )}
+        </Fragment>
+      ))}
     </>
   )
 }

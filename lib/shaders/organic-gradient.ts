@@ -275,8 +275,17 @@ ${ditherChunk}
         ? vec2(cos(theta * i), sin(theta * i)) * (0.024 * i * uLoopDuration)
         : vec2(time * i * 0.3);
 
+      // How far the flow may push this octave. One fixed distance on screen is
+      // a nudge to a broad octave and several whole cells to a fine one, where
+      // it stops bending the shapes and scatters them into per-pixel static —
+      // static that also depends on the output resolution, so an export would
+      // not match the preview. Once an octave packs more than one cell per
+      // unit of uv the reach shrinks with its frequency, keeping the push the
+      // same fraction of a cell; broader octaves are left exactly as they were.
+      float reach = 0.2 / max(i * uNoiseScale, 1.0);
+
       // Animate the coordinates along the flow
-      vec2 animatedUV = noiseUv + flow * (modulation * 0.2);
+      vec2 animatedUV = noiseUv + flow * (modulation * reach);
 
       // Higher frequencies weigh less
       noise += snoise(animatedUV * i * uNoiseScale + phase) * (1.0 / i);

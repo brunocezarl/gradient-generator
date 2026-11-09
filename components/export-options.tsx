@@ -142,10 +142,10 @@ export function ExportOptions({ onExport, containerRef }: ExportOptionsProps) {
         onClick={() => setOpen(true)}
         aria-label="Export Image"
         size="sm"
-        className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
+        className="h-11 w-11 px-0 sm:h-8 sm:w-auto sm:px-3 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
-        <ImageIcon className="mr-2 h-4 w-4" />
-        Image
+        <ImageIcon className="h-4 w-4" />
+        <span className="hidden sm:inline">Image</span>
       </Button>
 
       <Dialog open={open} onOpenChange={(next) => { if (!batchBusy && !isExporting) setOpen(next) }}>

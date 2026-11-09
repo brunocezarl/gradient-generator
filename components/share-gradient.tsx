@@ -38,7 +38,7 @@ export function ShareGradient() {
       setCopied(true)
       
       toast({
-        title: "Link copiado!",
+        title: "Link copied",
         description: "The link is on your clipboard.",
       })
       
@@ -47,7 +47,7 @@ export function ShareGradient() {
     } catch (error) {
       console.error("Failed to copy:", error)
       toast({
-        title: "Erro ao copiar",
+        title: "Could not copy",
         description: "Could not copy the link. Select it and copy manually.",
         variant: "destructive",
       })
@@ -65,8 +65,8 @@ export function ShareGradient() {
         })
         
         toast({
-          title: "Compartilhado com sucesso!",
-          description: "O gradiente foi compartilhado.",
+          title: "Shared",
+          description: "The gradient link was shared.",
         })
       } catch (error) {
         console.error("Error sharing:", error)
@@ -80,11 +80,12 @@ export function ShareGradient() {
     <>
       <Button
         onClick={() => setOpen(true)}
+        aria-label="Share"
         size="sm"
-        className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
+        className="h-11 w-11 px-0 sm:h-8 sm:w-auto sm:px-3 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
-        <Share className="mr-2 h-4 w-4" />
-        Share
+        <Share className="h-4 w-4" />
+        <span className="hidden sm:inline">Share</span>
       </Button>
       
       <Dialog open={open} onOpenChange={setOpen}>
