@@ -67,6 +67,46 @@ describe("gradient shader linear output", () => {
   })
 })
 
+describe("gradient shader flow", () => {
+  // The reach is a single GLSL expression in plain arithmetic, so it runs here
+  // exactly as the shader has it instead of being matched as a string
+  const source = organicGradientFragmentShader.match(/float reach = ([^;]+);/)?.[1] ?? ""
+  const reach = new Function("i", "uNoiseScale", "max", `return ${source}`) as (
+    i: number,
+    uNoiseScale: number,
+    max: typeof Math.max
+  ) => number
+  // The same push, measured in cells of the octave being bent
+  const cells = (octave: number, scale: number) =>
+    reach(octave, scale, Math.max) * octave * scale
+
+  it("declares the reach of the flow", () => {
+    expect(source).not.toBe("")
+  })
+
+  it("never pushes an octave further than a fraction of its own cell", () => {
+    // A fixed distance on screen is several whole cells to a fine octave — 45
+    // times further at octave 10 and noise scale 4.5 than at one cell per unit
+    // — and there it stopped bending the shapes and scattered them into
+    // per-pixel static, which also changes with the output resolution
+    for (let octave = 1; octave <= 10; octave++) {
+      for (const scale of [0.5, 0.6, 1, 2.5, 4.5, 5]) {
+        expect(cells(octave, scale)).toBeLessThanOrEqual(0.2 + 1e-9)
+      }
+    }
+  })
+
+  it("leaves the broad octaves with the reach they always had", () => {
+    // Up to one cell per unit of uv the fixed distance was already a nudge
+    expect(reach(1, 0.5, Math.max)).toBe(0.2)
+    expect(reach(1, 1, Math.max)).toBe(0.2)
+  })
+
+  it("displaces the coordinates by that reach", () => {
+    expect(organicGradientFragmentShader).toContain("flow * (modulation * reach)")
+  })
+})
+
 describe("createGradientUniforms", () => {
   // The uniform list used to be written out by hand in two places, and a uniform
   // added to the shader but missed in one of them threw only once something
