@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Slider } from "@/components/ui/slider"
 import {
   Select,
   SelectContent,
@@ -32,7 +31,7 @@ import {
   type HarmonyKind,
 } from "@/lib/oklch"
 import { ColorPicker } from "@/components/color-picker"
-import { GradientSwatch } from "@/components/gradient-swatch"
+import { StopsBar } from "@/components/stops-bar"
 import { PaletteFromImage } from "@/components/palette-from-image"
 import { TooltipHelp } from "@/components/tooltip-help"
 
@@ -87,7 +86,7 @@ export function StopsEditor() {
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <Label className="text-white">Color Stops</Label>
-          <TooltipHelp content="From 2 to 8 stops, each with its own position along the gradient. Click a stop to edit its color." />
+          <TooltipHelp content="From 2 to 8 stops, each with its own position along the gradient. Drag a handle on the bar to move a stop; click a stop to edit its color." />
         </div>
         <Button
           variant="ghost"
@@ -106,7 +105,13 @@ export function StopsEditor() {
         </Button>
       </div>
 
-      <GradientSwatch stops={stops} blendSpace={blendSpace} className="h-6 w-full" />
+      <StopsBar
+        stops={stops}
+        blendSpace={blendSpace}
+        selected={activeIndex}
+        onSelect={setSelected}
+        onMove={setStopPosition}
+      />
 
       {/* Stop list */}
       <div className="space-y-1.5">
@@ -127,22 +132,12 @@ export function StopsEditor() {
               aria-label={`Edit stop ${index + 1} (${stopToHex(stop)})`}
               title={stopToHex(stop)}
             />
-            <span className="font-mono text-[10px] text-neutral-400 w-12 shrink-0">
+            <span className="font-mono text-[11px] text-neutral-400 shrink-0">
               {stopToHex(stop)}
             </span>
-            <Slider
-              value={[stop.position * 100]}
-              min={0}
-              max={100}
-              step={1}
-              onValueChange={(value) => {
-                setSelected(index)
-                setStopPosition(index, value[0] / 100)
-              }}
-              className="h-2"
-              thumbLabel={`Stop ${index + 1} position`}
-            />
-            <div className="flex items-center shrink-0">
+            {/* Position is dragged on the bar above; the field is for typing an
+                exact value */}
+            <div className="ml-auto flex items-center shrink-0">
               <Input
                 value={
                   draft?.index === index ? draft.value : String(Math.round(stop.position * 100))
@@ -162,7 +157,7 @@ export function StopsEditor() {
                 className="h-6 w-10 px-1 bg-neutral-900 border-neutral-700 text-right font-mono text-[10px] text-neutral-300"
                 aria-label={`Stop ${index + 1} position in percent`}
               />
-              <span className="font-mono text-[10px] text-neutral-500 pl-0.5">%</span>
+              <span className="font-mono text-[10px] text-neutral-400 pl-0.5">%</span>
             </div>
             <Button
               variant="ghost"

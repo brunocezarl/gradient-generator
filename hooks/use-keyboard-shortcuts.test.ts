@@ -40,6 +40,21 @@ describe("useKeyboardShortcuts", () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
+  it("space is left to a focused control instead of toggling playback", () => {
+    renderHook(() => useKeyboardShortcuts(handlers))
+    const button = document.createElement("button")
+    const toggle = document.createElement("span")
+    toggle.setAttribute("role", "switch")
+    document.body.append(button, toggle)
+
+    const onButton = press(" ", {}, button)
+    press(" ", {}, toggle)
+
+    expect(handlers.onPlayPause).not.toHaveBeenCalled()
+    // Not prevented: the browser still has to activate the control
+    expect(onButton.defaultPrevented).toBe(false)
+  })
+
   it("r/f/s trigger reset, full screen and save (uppercase too)", () => {
     renderHook(() => useKeyboardShortcuts(handlers))
     press("r")

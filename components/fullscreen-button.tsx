@@ -32,7 +32,7 @@ export function FullscreenButton({ targetRef }: FullscreenButtonProps) {
             variant="outline"
             size="icon"
             onClick={handleToggle}
-            aria-label={isFullscreen ? "Sair da tela cheia" : "Modo tela cheia"}
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
             className="bg-black/50 border-neutral-700 hover:bg-black/70 text-white"
           >
             {isFullscreen ? (
@@ -43,7 +43,7 @@ export function FullscreenButton({ targetRef }: FullscreenButtonProps) {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="right">
-          <p>{isFullscreen ? "Sair da tela cheia" : "Modo tela cheia"}</p>
+          <p>{isFullscreen ? "Exit full screen" : "Full screen"}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

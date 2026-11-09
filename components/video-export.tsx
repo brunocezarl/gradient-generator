@@ -189,10 +189,10 @@ export function VideoExport({ containerRef }: VideoExportProps) {
         aria-label="Export Video"
         size="sm"
         disabled={unsupported}
-        className="w-full sm:w-auto h-8 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
+        className="h-11 w-11 px-0 sm:h-8 sm:w-auto sm:px-3 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800"
       >
-        <VideoIcon className="mr-2 h-4 w-4" />
-        Video
+        <VideoIcon className="h-4 w-4" />
+        <span className="hidden sm:inline">Video</span>
       </Button>
 
       <Dialog open={open} onOpenChange={(next) => !isRecording && setOpen(next)}>
@@ -219,7 +219,7 @@ export function VideoExport({ containerRef }: VideoExportProps) {
                   Rendering frame {Math.round(progress * plan.frameCount)} of{" "}
                   {plan.frameCount}
                 </p>
-                <p className="text-xs text-neutral-500 text-center">
+                <p className="text-xs text-neutral-400 text-center">
   Each frame is drawn at an exact instant of the animation: recording can take
                   longer than the video lasts, without dropping a single frame.
                 </p>

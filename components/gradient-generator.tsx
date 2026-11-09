@@ -170,7 +170,7 @@ export default function GradientGenerator() {
   return (
     <div className="flex flex-col h-dvh w-full bg-neutral-950 text-white overflow-hidden">
       {/* ─── Top bar ────────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-2.5 px-4 py-2.5 border-b border-neutral-800/80 bg-neutral-950 shrink-0">
+      <header className="flex items-center gap-1 sm:gap-2.5 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-neutral-800/80 bg-neutral-950 shrink-0">
         <Button
           variant="ghost"
           size="icon"
@@ -191,8 +191,9 @@ export default function GradientGenerator() {
         <h1 className="text-sm font-medium tracking-tight hidden sm:block">
           organic gradients
         </h1>
-        {/* Quiet byline: name → site, mark → GitHub */}
-        <p className="flex items-center gap-1.5 text-[11px] text-neutral-500 tracking-wide whitespace-nowrap">
+        {/* Quiet byline: name → site, mark → GitHub. Dropped on phones, where
+            the bar is spent on the actions */}
+        <p className="hidden sm:flex items-center gap-1.5 text-[11px] text-neutral-400 tracking-wide whitespace-nowrap">
           <span>developed by</span>
           <a
             href="https://brnczr.xyz"
@@ -218,19 +219,19 @@ export default function GradientGenerator() {
         <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-8 sm:w-8" aria-label="Undo" title="Undo" disabled={!canUndo} onClick={undo}><Undo2 className="h-4 w-4" /></Button>
         <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-8 sm:w-8" aria-label="Redo" title="Redo" disabled={!canRedo} onClick={redo}><Redo2 className="h-4 w-4" /></Button>
 
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-2">
-            <ExportOptions onExport={captureImage} containerRef={artboardRef} />
-            <VideoExport containerRef={artboardRef} />
-            <ShareGradient />
-          </div>
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* One instance at every width: on phones the three collapse to icon
+              buttons instead of moving into a second bar under the canvas */}
+          <ExportOptions onExport={captureImage} containerRef={artboardRef} />
+          <VideoExport containerRef={artboardRef} />
+          <ShareGradient />
 
           <Dialog>
             <DialogTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-11 w-11 sm:h-8 sm:w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
+                className="hidden sm:inline-flex h-8 w-8 text-neutral-300 hover:text-white hover:bg-neutral-800"
                 title="Keyboard shortcuts"
                 aria-label="Keyboard shortcuts"
               >
@@ -265,7 +266,7 @@ export default function GradientGenerator() {
       <div className="flex flex-col sm:flex-row flex-1 min-h-0">
         {sidebarOpen && (
           <aside id="editor-controls" aria-label="Gradient controls" className="order-2 sm:order-none w-full sm:w-72 lg:w-80 max-h-[42dvh] sm:max-h-none shrink-0 border-t sm:border-t-0 sm:border-r border-neutral-800/80 bg-neutral-950 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)] sm:pb-0">
-            <ControlsPanel onCaptureImage={() => captureImage()} />
+            <ControlsPanel />
           </aside>
         )}
 
@@ -293,13 +294,6 @@ export default function GradientGenerator() {
 
           <TimelineBar />
 
-          {/* Export also in the footer on narrow screens, where the top bar runs
-              out of room */}
-          <div className="sm:hidden flex shrink-0 gap-2 p-3 [&>button]:w-auto [&>button]:flex-1 [&>button]:min-h-11 border-t border-neutral-800/80">
-            <ExportOptions onExport={captureImage} containerRef={artboardRef} />
-            <VideoExport containerRef={artboardRef} />
-            <ShareGradient />
-          </div>
         </main>
       </div>
     </div>

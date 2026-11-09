@@ -15,6 +15,16 @@ interface ColorPickerProps {
 
 type Mode = "rgb" | "hsl" | "oklch"
 
+// A track background sampled along one channel while the other two stay put:
+// each position on the slider shows the color that dragging there would give.
+function ramp(steps: number, colorAt: (t: number) => string): string {
+  const stops = Array.from({ length: steps + 1 }, (_, i) => colorAt(i / steps))
+  return `linear-gradient(to right, ${stops.join(", ")})`
+}
+
+const srgbCss = (color: readonly number[]) =>
+  `rgb(${color.map((channel) => Math.round(channel * 255)).join(" ")})`
+
 export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
   const toR = () => Math.round(color[0] * 255)
   const toG = () => Math.round(color[1] * 255)
@@ -123,6 +133,23 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
 
   const hexColor = rgbToHex(r, g, b)
 
+  const chromaCeiling = Math.max(maxChroma(oklch.l, oklch.h), 0.01)
+  const tracks = {
+    oklchL: ramp(10, (t) => srgbCss(oklchToSrgb({ ...oklch, l: t }))),
+    oklchC: ramp(6, (t) => srgbCss(oklchToSrgb({ ...oklch, c: t * chromaCeiling }))),
+    // A gray has no hue to show: the ramp borrows a little chroma so the
+    // slider still reads as a hue wheel instead of a flat bar
+    oklchH: ramp(24, (t) =>
+      srgbCss(oklchToSrgb({ ...oklch, c: Math.max(oklch.c, 0.06), h: t * 360 }))
+    ),
+    r: ramp(1, (t) => `rgb(${Math.round(t * 255)} ${g} ${b})`),
+    g: ramp(1, (t) => `rgb(${r} ${Math.round(t * 255)} ${b})`),
+    b: ramp(1, (t) => `rgb(${r} ${g} ${Math.round(t * 255)})`),
+    hslH: ramp(12, (t) => `hsl(${t * 360} ${Math.max(hsl[1], 20)}% ${hsl[2]}%)`),
+    hslS: ramp(2, (t) => `hsl(${hsl[0]} ${t * 100}% ${hsl[2]}%)`),
+    hslL: ramp(4, (t) => `hsl(${hsl[0]} ${hsl[1]}% ${t * 100}%)`),
+  }
+
   return (
     <div className="space-y-3">
       {/* Header: label + preview + mode toggle */}
@@ -181,7 +208,8 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               max={100}
               step={1}
               onValueChange={(val) => handleOklchChange(val[0] / 100, oklch.c, oklch.h)}
-              className="h-2"
+              className="h-4"
+              trackBackground={tracks.oklchL}
               thumbLabel={`${label}: lightness`}
             />
           </div>
@@ -195,10 +223,11 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               min={0}
               // Real chroma ceiling for this lightness and hue: above it the color
               // does not exist in sRGB and the slider would be lying
-              max={Math.max(maxChroma(oklch.l, oklch.h), 0.01)}
+              max={chromaCeiling}
               step={0.002}
               onValueChange={(val) => handleOklchChange(oklch.l, val[0], oklch.h)}
-              className="h-2"
+              className="h-4"
+              trackBackground={tracks.oklchC}
               thumbLabel={`${label}: chroma`}
             />
           </div>
@@ -213,7 +242,8 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               max={360}
               step={1}
               onValueChange={(val) => handleOklchChange(oklch.l, oklch.c, val[0])}
-              className="h-2"
+              className="h-4"
+              trackBackground={tracks.oklchH}
               thumbLabel={`${label}: hue`}
             />
           </div>
@@ -225,11 +255,11 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
         <div className="space-y-3">
           {(
             [
-              { label: "R", value: r, onChange: (v: number) => handleRgbChange(v, g, b), color: "rgb(220,50,50)" },
-              { label: "G", value: g, onChange: (v: number) => handleRgbChange(r, v, b), color: "rgb(50,200,50)" },
-              { label: "B", value: b, onChange: (v: number) => handleRgbChange(r, g, v), color: "rgb(50,100,220)" },
+              { label: "R", name: "red", value: r, onChange: (v: number) => handleRgbChange(v, g, b), track: tracks.r },
+              { label: "G", name: "green", value: g, onChange: (v: number) => handleRgbChange(r, v, b), track: tracks.g },
+              { label: "B", name: "blue", value: b, onChange: (v: number) => handleRgbChange(r, g, v), track: tracks.b },
             ] as const
-          ).map(({ label: ch, value, onChange: onCh }) => (
+          ).map(({ label: ch, name, value, onChange: onCh, track }) => (
             <div key={ch} className="space-y-1">
               <div className="flex justify-between">
                 <Label className="text-xs text-neutral-400">{ch}</Label>
@@ -241,7 +271,9 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
                 max={255}
                 step={1}
                 onValueChange={(val) => onCh(val[0])}
-                className="h-2"
+                className="h-4"
+                trackBackground={track}
+                thumbLabel={`${label}: ${name}`}
               />
             </div>
           ))}
@@ -262,7 +294,9 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               max={360}
               step={1}
               onValueChange={(val) => handleHslChange(val[0], hsl[1], hsl[2])}
-              className="h-2"
+              className="h-4"
+              trackBackground={tracks.hslH}
+              thumbLabel={`${label}: hue`}
             />
           </div>
           <div className="space-y-1">
@@ -276,7 +310,9 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               max={100}
               step={1}
               onValueChange={(val) => handleHslChange(hsl[0], val[0], hsl[2])}
-              className="h-2"
+              className="h-4"
+              trackBackground={tracks.hslS}
+              thumbLabel={`${label}: saturation`}
             />
           </div>
           <div className="space-y-1">
@@ -290,7 +326,9 @@ export function ColorPicker({ label, color, onChange }: ColorPickerProps) {
               max={100}
               step={1}
               onValueChange={(val) => handleHslChange(hsl[0], hsl[1], val[0])}
-              className="h-2"
+              className="h-4"
+              trackBackground={tracks.hslL}
+              thumbLabel={`${label}: lightness`}
             />
           </div>
         </div>

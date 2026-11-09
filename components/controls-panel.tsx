@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ImageIcon, RefreshCw, Save, Palette, Shuffle, Waves } from "lucide-react"
+import { RefreshCw, Save, Palette, Shuffle, Waves } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 import { colorBlendSpaces, type ColorBlendSpace } from "@/lib/color"
 import { Label } from "@/components/ui/label"
@@ -28,15 +28,13 @@ import { LayerManager } from "@/components/layer-manager"
 import { useToast } from "@/components/ui/use-toast"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
-interface ControlsPanelProps {
-  onCaptureImage: () => void
-}
-
-// Sections open on first paint: the framing and the colors are what a session
-// starts with. Everything else is a refinement and stays folded away.
+// Sections follow the order a gradient is made in: frame it, color it, shape
+// it, set it moving, finish it, then grade the result. Layers and the saved
+// library close the list. Framing and colors are what a session starts with,
+// so those two open on first paint.
 const DEFAULT_OPEN = ["canvas", "color"]
 
-export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
+export function ControlsPanel() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [schemeName, setSchemeName] = useState("")
   const [openSections, setOpenSections] = useState<string[]>(DEFAULT_OPEN)
@@ -70,7 +68,6 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
     asciiBackground,
     asciiRampContrast,
     blendSpace,
-    multiLayerMode,
     setSpeed,
     setComplexity,
     setNoiseScale,
@@ -124,7 +121,6 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
       asciiBackground: state.asciiBackground,
       asciiRampContrast: state.asciiRampContrast,
       blendSpace: state.blendSpace,
-      multiLayerMode: state.multiLayerMode,
       setSpeed: state.setSpeed,
       setComplexity: state.setComplexity,
       setNoiseScale: state.setNoiseScale,
@@ -158,6 +154,20 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
   return (
     <div className="p-4">
       <CuratedLooks />
+
+      {/* Randomize sits with the starting looks: both answer "give me something
+          to start from", and it used to be buried under every section */}
+      <div className="mb-5 space-y-3">
+        <Button
+          onClick={() => randomize()}
+          variant="outline"
+          className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
+        >
+          <Shuffle className="mr-2 h-4 w-4" />
+          Randomize
+        </Button>
+        <RandomHistoryStrip />
+      </div>
       <Accordion
         type="multiple"
         value={openSections}
@@ -169,81 +179,6 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           <AccordionTrigger>Canvas</AccordionTrigger>
           <AccordionContent>
             <CanvasSection />
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* ─── Adjustments ─────────────────────────────────────────────── */}
-        <AccordionItem value="adjustments">
-          <AccordionTrigger>Adjustments</AccordionTrigger>
-          <AccordionContent className="space-y-5">
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Label className="text-white">
-                  Exposure: {exposure > 0 ? "+" : ""}{exposure.toFixed(2)} EV
-                </Label>
-                <TooltipHelp content="Light, in stops: +1 is exactly twice as much. It multiplies in linear space, the way a camera does, so it can push colors past what the screen can show and clip them." />
-              </div>
-              <Slider
-                value={[exposure]}
-                min={-2}
-                max={2}
-                step={0.05}
-                onValueChange={(value) => setExposure(value[0])}
-                thumbLabel="Exposure"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Label className="text-white">
-                  Brightness: {brightness > 0 ? "+" : ""}{brightness.toFixed(2)}
-                </Label>
-                <TooltipHelp content="Moves Oklab lightness. Unlike scaling the RGB channels, it leaves hue and chroma untouched — a red brightened here stays that red instead of drifting to orange." />
-              </div>
-              <Slider
-                value={[brightness]}
-                min={-0.3}
-                max={0.3}
-                step={0.01}
-                onValueChange={(value) => setBrightness(value[0])}
-                thumbLabel="Brightness"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Label className="text-white">Contrast: {contrast.toFixed(2)}×</Label>
-                <TooltipHelp content="Opens and closes the lightness range around its perceptual middle. Below 1.00 the gradient flattens toward mid gray; above it the light and dark ends pull apart." />
-              </div>
-              <Slider
-                value={[contrast]}
-                min={0.5}
-                max={2}
-                step={0.05}
-                onValueChange={(value) => setContrast(value[0])}
-                thumbLabel="Contrast"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Label className="text-white">Vibrance: {vibrance.toFixed(2)}</Label>
-                <TooltipHelp content="Pushes colors away from the gray of equal lightness. At 0.00 the gradient delivers exactly the colors you picked — high values saturate and can clip channels." />
-              </div>
-              <Slider
-                value={[vibrance]}
-                min={-0.5}
-                max={1.0}
-                step={0.05}
-                onValueChange={(value) => setVibrance(value[0])}
-                thumbLabel="Vibrance"
-              />
-            </div>
-
-            <p className="text-xs text-neutral-500">
-              All four are neutral by default. Left alone, the pipeline hands back
-              exactly the colors you picked.
-            </p>
           </AccordionContent>
         </AccordionItem>
 
@@ -338,21 +273,6 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           </AccordionContent>
         </AccordionItem>
 
-        {/* ─── Presets ─────────────────────────────────────────────────── */}
-        <AccordionItem value="presets">
-          <AccordionTrigger>Presets</AccordionTrigger>
-          <AccordionContent className="space-y-5">
-            <PresetGallery />
-
-            <div className="border-t border-neutral-800/70 pt-5 space-y-3">
-              <p className="text-sm text-neutral-400">
-                Pick an animation preset to apply a ready-made set of parameters.
-              </p>
-              <AnimationPresetsSelector />
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
         {/* ─── Shape ───────────────────────────────────────────────────── */}
         <AccordionItem value="shape">
           <AccordionTrigger>Shape</AccordionTrigger>
@@ -422,19 +342,49 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
             </div>
 
             <Button
-              onClick={() => {
-                shuffleSeed()
-                toast({
-                  title: "New shape",
-                  description: "Same colors and parameters, a different noise drawing."
-                })
-              }}
+              onClick={shuffleSeed}
               variant="outline"
               className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
             >
               <Waves className="mr-2 h-4 w-4" />
               Roll Shape
             </Button>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* ─── Motion ──────────────────────────────────────────────────── */}
+        <AccordionItem value="motion">
+          <AccordionTrigger>Motion</AccordionTrigger>
+          <AccordionContent className="space-y-5">
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label className="text-white">Speed: {speed.toFixed(1)}</Label>
+                <TooltipHelp content="How fast the gradient animates. Higher values move faster." />
+              </div>
+              <Slider
+                value={[speed]}
+                min={0.1}
+                max={3.0}
+                step={0.1}
+                onValueChange={(value) => setSpeed(value[0])}
+                thumbLabel="Animation speed"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label className="text-white">Flow Intensity: {flowIntensity.toFixed(2)}</Label>
+                <TooltipHelp content="How strongly the flow field distorts the gradient. Higher values move more." />
+              </div>
+              <Slider
+                value={[flowIntensity]}
+                min={0.1}
+                max={1.0}
+                step={0.01}
+                onValueChange={(value) => setFlowIntensity(value[0])}
+                thumbLabel="Flow intensity"
+              />
+            </div>
           </AccordionContent>
         </AccordionItem>
 
@@ -507,7 +457,7 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                   />
                 </div>
 
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-neutral-400">
                   Bloom feeds on light above the threshold, so it pairs with Exposure:
                   push exposure up and the bright end blows out into the halo.
                 </p>
@@ -559,13 +509,13 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
                   />
                 </div>
 
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-neutral-400">
                   Characters are picked by perceptual lightness, so a saturated blue and
                   a saturated red land on different glyphs instead of the same one.
                 </p>
               </>
             ) : (
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-neutral-400">
                 No chain: the gradient draws straight to the screen, and the exported
                 pixels are the colors you picked.
               </p>
@@ -609,80 +559,110 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
           </AccordionContent>
         </AccordionItem>
 
-        {/* ─── Motion ──────────────────────────────────────────────────── */}
-        <AccordionItem value="motion">
-          <AccordionTrigger>Motion</AccordionTrigger>
+        {/* ─── Adjustments ─────────────────────────────────────────────── */}
+        <AccordionItem value="adjustments">
+          <AccordionTrigger>Adjustments</AccordionTrigger>
           <AccordionContent className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center">
-                <Label className="text-white">Speed: {speed.toFixed(1)}</Label>
-                <TooltipHelp content="How fast the gradient animates. Higher values move faster." />
+                <Label className="text-white">
+                  Exposure: {exposure > 0 ? "+" : ""}{exposure.toFixed(2)} EV
+                </Label>
+                <TooltipHelp content="Light, in stops: +1 is exactly twice as much. It multiplies in linear space, the way a camera does, so it can push colors past what the screen can show and clip them." />
               </div>
               <Slider
-                value={[speed]}
-                min={0.1}
-                max={3.0}
-                step={0.1}
-                onValueChange={(value) => setSpeed(value[0])}
-                thumbLabel="Animation speed"
+                value={[exposure]}
+                min={-2}
+                max={2}
+                step={0.05}
+                onValueChange={(value) => setExposure(value[0])}
+                thumbLabel="Exposure"
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center">
-                <Label className="text-white">Flow Intensity: {flowIntensity.toFixed(2)}</Label>
-                <TooltipHelp content="How strongly the flow field distorts the gradient. Higher values move more." />
+                <Label className="text-white">
+                  Brightness: {brightness > 0 ? "+" : ""}{brightness.toFixed(2)}
+                </Label>
+                <TooltipHelp content="Moves Oklab lightness. Unlike scaling the RGB channels, it leaves hue and chroma untouched — a red brightened here stays that red instead of drifting to orange." />
               </div>
               <Slider
-                value={[flowIntensity]}
-                min={0.1}
-                max={1.0}
+                value={[brightness]}
+                min={-0.3}
+                max={0.3}
                 step={0.01}
-                onValueChange={(value) => setFlowIntensity(value[0])}
-                thumbLabel="Flow intensity"
+                onValueChange={(value) => setBrightness(value[0])}
+                thumbLabel="Brightness"
               />
             </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label className="text-white">Contrast: {contrast.toFixed(2)}×</Label>
+                <TooltipHelp content="Opens and closes the lightness range around its perceptual middle. Below 1.00 the gradient flattens toward mid gray; above it the light and dark ends pull apart." />
+              </div>
+              <Slider
+                value={[contrast]}
+                min={0.5}
+                max={2}
+                step={0.05}
+                onValueChange={(value) => setContrast(value[0])}
+                thumbLabel="Contrast"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label className="text-white">Vibrance: {vibrance.toFixed(2)}</Label>
+                <TooltipHelp content="Pushes colors away from the gray of equal lightness. At 0.00 the gradient delivers exactly the colors you picked — high values saturate and can clip channels." />
+              </div>
+              <Slider
+                value={[vibrance]}
+                min={-0.5}
+                max={1.0}
+                step={0.05}
+                onValueChange={(value) => setVibrance(value[0])}
+                thumbLabel="Vibrance"
+              />
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              All four are neutral by default. Left alone, the pipeline hands back
+              exactly the colors you picked.
+            </p>
           </AccordionContent>
         </AccordionItem>
 
         {/* ─── Layers ──────────────────────────────────────────────────── */}
-        {multiLayerMode && (
-          <AccordionItem value="layers">
-            <AccordionTrigger>Layers</AccordionTrigger>
-            <AccordionContent>
-              <LayerManager />
-            </AccordionContent>
-          </AccordionItem>
-        )}
+        {/* Always rendered: the switch that turns layers on lives inside it, so
+            hiding the section while the mode is off left no way in */}
+        <AccordionItem value="layers">
+          <AccordionTrigger>Layers</AccordionTrigger>
+          <AccordionContent>
+            <LayerManager />
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* ─── Presets ─────────────────────────────────────────────────── */}
+        <AccordionItem value="presets">
+          <AccordionTrigger>Presets</AccordionTrigger>
+          <AccordionContent className="space-y-5">
+            <PresetGallery />
+
+            <div className="border-t border-neutral-800/70 pt-5 space-y-3">
+              <p className="text-sm text-neutral-400">
+                Pick an animation preset to apply a ready-made set of parameters.
+              </p>
+              <AnimationPresetsSelector />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
 
-      {/* ─── Actions ───────────────────────────────────────────────────── */}
-      <div className="mt-6 space-y-3">
-        <Button
-          onClick={onCaptureImage}
-          className="w-full h-9 bg-neutral-900 text-white border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
-        >
-          <ImageIcon className="mr-2 h-4 w-4" />
-          Capture Image
-        </Button>
-
-        <Button
-          onClick={() => {
-            randomize()
-            toast({
-              title: "Randomized",
-              description: "Colors, shape and parameters rolled at random."
-            })
-          }}
-          variant="outline"
-          className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
-        >
-          <Shuffle className="mr-2 h-4 w-4" />
-          Randomize
-        </Button>
-
-        <RandomHistoryStrip />
-
+      {/* Reset is the one action left at the foot of the panel: it is the exit,
+          not a step of the work, so it stays out of the way and reads quieter */}
+      <div className="mt-6">
         <Button
           onClick={() => {
             resetToDefaults()
@@ -691,8 +671,8 @@ export function ControlsPanel({ onCaptureImage }: ControlsPanelProps) {
               description: "Every setting is back to its default value."
             })
           }}
-          variant="outline"
-          className="w-full h-9 bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600"
+          variant="ghost"
+          className="w-full h-9 text-neutral-400 hover:text-white hover:bg-neutral-900"
         >
           <RefreshCw className="mr-2 h-4 w-4" />
           Restore Defaults
