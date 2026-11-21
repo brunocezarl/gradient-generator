@@ -2,23 +2,15 @@
 
 import { useState, useEffect } from "react"
 
-export function useWebGLSupport(): boolean {
-  const [isSupported, setIsSupported] = useState(true)
+export function useWebGLSupport(): boolean | null {
+  const [isSupported, setIsSupported] = useState<boolean | null>(null)
 
   useEffect(() => {
     try {
-      // Try to create a WebGL context
       const canvas = document.createElement("canvas")
-      const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl")
-      
-      // If we couldn't get a WebGL context, WebGL isn't supported
-      if (!gl) {
-        setIsSupported(false)
-        return
-      }
-      
-      // Clean up
-      canvas.remove()
+      const gl = canvas.getContext("webgl2")
+      setIsSupported(gl !== null)
+      gl?.getExtension("WEBGL_lose_context")?.loseContext()
     } catch (e) {
       console.error("Error checking WebGL support:", e)
       setIsSupported(false)

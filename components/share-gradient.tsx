@@ -13,6 +13,9 @@ import { createShareableURL } from "@/lib/share-utils"
 import { useToast } from "@/components/ui/use-toast"
 import { QRCodeSVG } from "qrcode.react"
 
+// The serialized URL is ASCII. A version 40 QR at level L holds 2953 bytes.
+const MAX_QR_URL_LENGTH = 2953
+
 export function ShareGradient() {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -138,12 +141,23 @@ export function ShareGradient() {
             </TabsContent>
             
             <TabsContent value="qrcode" className="mt-4 space-y-4">
-              <div className="flex justify-center p-4 bg-white rounded-md">
-                <QRCodeSVG value={shareableURL} size={200} />
-              </div>
-              <p className="text-sm text-neutral-400 text-center">
-                Scan the QR code with your device camera to open this gradient.
-              </p>
+              {shareableURL.length <= MAX_QR_URL_LENGTH ? (
+                <>
+                  <div className="flex justify-center p-4 bg-white rounded-md">
+                    <QRCodeSVG value={shareableURL} level="L" size={200} />
+                  </div>
+                  <p className="text-sm text-neutral-400 text-center">
+                    Scan the QR code with your device camera to open this gradient.
+                  </p>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-neutral-300">
+                    This gradient’s link is too long for a QR code.
+                  </p>
+                  <Button onClick={() => setActiveTab("link")}>Use share link</Button>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
           

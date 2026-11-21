@@ -66,6 +66,7 @@ function LayeredComposition({
 }) {
   const gl = useThree((state) => state.gl)
   const camera = useThree((state) => state.camera)
+  const invalidate = useThree((state) => state.invalidate)
 
   // Draw order: bottom to top. layers[0] is the topmost layer in the UI.
   const visibleLayers = useMemo(
@@ -129,8 +130,17 @@ function LayeredComposition({
   )
 
   const renderComposition = useCallback(() => {
-    if (layerScenes.length === 0) return
-
+    if (layerScenes.length === 0) {
+      const previousTarget = gl.getRenderTarget()
+      const previousColor = gl.getClearColor(new THREE.Color())
+      const previousAlpha = gl.getClearAlpha()
+      gl.setRenderTarget(null)
+      gl.setClearColor(0x000000, 1)
+      gl.clear(true, false, false)
+      gl.setClearColor(previousColor, previousAlpha)
+      gl.setRenderTarget(previousTarget)
+      return
+    }
     const size = gl.getDrawingBufferSize(new THREE.Vector2())
     const width = Math.max(1, Math.floor(size.x))
     const height = Math.max(1, Math.floor(size.y))
@@ -216,10 +226,11 @@ function LayeredComposition({
 
   // Image and video export draw through here, so they get the full composition
   // instead of a single pass
-  useEffect(
-    () => registerFrameRenderer(gl.domElement, renderComposition),
-    [gl, renderComposition]
-  )
+  useEffect(() => {
+    // A paused canvas needs a frame even when the last layer has unmounted.
+    invalidate()
+    return registerFrameRenderer(gl.domElement, renderComposition)
+  }, [gl, invalidate, renderComposition])
 
   const layerStops = (layer: GradientLayer): ColorStop[] => {
     if (layer.isCustomMode && layer.customStops) return layer.customStops

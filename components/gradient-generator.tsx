@@ -14,7 +14,7 @@ import { Artboard } from "@/components/artboard"
 import { TimelineBar } from "@/components/timeline-bar"
 import { useWebGLSupport } from "@/hooks/use-webgl-support"
 import { useGradientStore } from "@/lib/store"
-import { exportCompositeImage } from "@/lib/capture"
+import { exportCompositeImage, getCaptureContext, imageExportSize } from "@/lib/capture"
 import { getArtboard, isFreeArtboard } from "@/lib/artboards"
 import { useToast } from "@/components/ui/use-toast"
 import { useFullscreen } from "@/hooks/use-fullscreen"
@@ -97,22 +97,20 @@ export default function GradientGenerator() {
         if (format === "jpeg") mimeType = "image/jpeg"
         if (format === "webp") mimeType = "image/webp"
 
-        // With no explicit dimensions the artboard decides: the file comes out at
-        // the size the preview is showing
+        // Scale the current artboard. Explicit output presets have their own size.
         const artboard = getArtboard(useGradientStore.getState().artboardId)
-        const target =
-          size ??
-          (isFreeArtboard(artboard)
-            ? undefined
-            : { width: artboard.width, height: artboard.height })
+        const target = imageExportSize(
+          isFreeArtboard(artboard) ? canvas : artboard,
+          scale,
+          size,
+          getCaptureContext(canvas)?.gl.capabilities.maxTextureSize ?? 8192,
+        )
 
         // Re-renders each layer natively at the final resolution (no upscaling)
         // and composes with opacity/blend modes; uses a Blob instead of a dataURL
         // so large files (4K/8K) do not blow up memory
         const blob = await exportCompositeImage(artboardRef.current, {
-          scale,
-          width: target?.width,
-          height: target?.height,
+          ...target,
           mimeType,
           quality,
         })
@@ -163,6 +161,7 @@ export default function GradientGenerator() {
     },
   })
 
+  if (isWebGLSupported === null) return null
   if (!isWebGLSupported) {
     return <WebGLNotSupported />
   }

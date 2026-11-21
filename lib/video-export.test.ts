@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest"
-import { planVideoExport } from "./video-export"
+import { planVideoExport, videoExportSize } from "./video-export"
+
+describe("videoExportSize", () => {
+  it("aligns both AVC dimensions after clamping, including narrow artboards", () => {
+    expect(videoExportSize(641, 523, "mp4", 4096)).toEqual({ width: 640, height: 522 })
+    expect(videoExportSize(5400, 1080, "mp4", 4096)).toEqual({ width: 4096, height: 818 })
+    expect(videoExportSize(1, 9, "mp4", 4096)).toEqual({ width: 2, height: 8 })
+  })
+
+  it("preserves odd dimensions for WebM", () => {
+    expect(videoExportSize(641, 523, "webm", 4096)).toEqual({ width: 641, height: 523 })
+  })
+})
 
 describe("planVideoExport — free animation", () => {
   it("derives the frame count from duration and FPS", () => {

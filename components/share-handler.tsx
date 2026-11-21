@@ -21,7 +21,10 @@ export default function ShareHandler() {
 
         if (sharedSettings) {
           importSettings(sharedSettings)
-
+          const url = new URL(window.location.href)
+          url.searchParams.delete("g")
+          url.searchParams.delete("gradient")
+          window.history.replaceState(null, "", url)
         }
       } catch (error) {
         console.error("Error processing shared gradient:", error)

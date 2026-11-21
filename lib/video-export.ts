@@ -1,6 +1,6 @@
 "use client"
 
-import { overrideRenderSize, renderFrameAtTime } from "@/lib/capture"
+import { clampToMaxSize, overrideRenderSize, renderFrameAtTime } from "@/lib/capture"
 
 // Deterministic video export.
 //
@@ -15,6 +15,16 @@ import { overrideRenderSize, renderFrameAtTime } from "@/lib/capture"
 // just takes longer.
 
 export type VideoFormat = "mp4" | "webm"
+
+export function videoExportSize(width: number, height: number, format: VideoFormat, maxSize: number) {
+  const size = clampToMaxSize(width, height, maxSize)
+  if (format === "webm") return size
+  // AVC requires both dimensions to be even, including after the GPU size limit.
+  return {
+    width: Math.max(2, size.width - size.width % 2),
+    height: Math.max(2, size.height - size.height % 2),
+  }
+}
 
 export interface VideoExportPlan {
   /** How many frames to render */

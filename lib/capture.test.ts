@@ -4,6 +4,7 @@ import * as THREE from "three"
 import {
   cssBlendToComposite,
   clampToMaxSize,
+  imageExportSize,
   recommendBitrateMbps,
   registerCaptureContext,
   unregisterCaptureContext,
@@ -31,6 +32,20 @@ describe("cssBlendToComposite", () => {
     expect(cssBlendToComposite("plus-lighter")).toBe("source-over")
     expect(cssBlendToComposite("")).toBe("source-over")
     expect(cssBlendToComposite(undefined)).toBe("source-over")
+  })
+})
+
+describe("imageExportSize", () => {
+  const fullHD = { width: 1920, height: 1080 }
+
+  it("applies the scale to the current artboard and respects the GPU limit", () => {
+    expect(imageExportSize(fullHD, 2, undefined, 8192)).toEqual({ width: 3840, height: 2160 })
+    expect(imageExportSize(fullHD, 8, undefined, 4096)).toEqual({ width: 4096, height: 2304 })
+  })
+
+  it("keeps an explicit preset size when a previous scale is still selected", () => {
+    const story = { width: 1080, height: 1920 }
+    expect(imageExportSize(fullHD, 2, story, 8192)).toEqual(story)
   })
 })
 
