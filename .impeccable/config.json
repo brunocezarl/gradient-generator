@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "components/share-handler.tsx"
+        ],
+        "createdAt": "2026-11-21T01:56:19.020Z",
+        "reason": "Revisão do agente: a borda superior e o raio circular desenham o arco de carregamento que gira durante a importação da cena."
+      }
+    ]
+  }
+}
