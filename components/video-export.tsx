@@ -26,12 +26,13 @@ import { useToast } from "@/components/ui/use-toast"
 import { useShallow } from "zustand/react/shallow"
 import { useGradientStore } from "@/lib/store"
 import { getArtboard, isFreeArtboard } from "@/lib/artboards"
-import { clampToMaxSize, recommendBitrateMbps } from "@/lib/capture"
+import { getCaptureContext, recommendBitrateMbps } from "@/lib/capture"
 import {
   exportVideo,
   isWebCodecsAvailable,
   planVideoExport,
   supportedVideoFormats,
+  videoExportSize,
   type VideoFormat,
 } from "@/lib/video-export"
 
@@ -92,12 +93,14 @@ export function VideoExport({ containerRef }: VideoExportProps) {
     const canvas = containerRef.current?.querySelector("canvas")
     const artboard = getArtboard(artboardId)
     const free = isFreeArtboard(artboard)
+    const gpuLimit = canvas && getCaptureContext(canvas)?.gl.capabilities.maxTextureSize
+    const maxSize = Math.min(4096, gpuLimit ?? 4096)
 
     if (resolution === "artboard") {
       const raw = free
         ? { width: canvas?.width ?? 1920, height: canvas?.height ?? 1080 }
         : { width: artboard.width, height: artboard.height }
-      return clampToMaxSize(raw.width, raw.height, 4096)
+      return videoExportSize(raw.width, raw.height, format, maxSize)
     }
 
     const targetHeight = Number(resolution)
@@ -106,10 +109,10 @@ export function VideoExport({ containerRef }: VideoExportProps) {
       : artboard.width / artboard.height
     // Even width: required by several encoders
     const width = Math.round((targetHeight * aspect) / 2) * 2
-    return clampToMaxSize(width, targetHeight, 4096)
+    return videoExportSize(width, targetHeight, format, maxSize)
     // `open` is a dependency so the canvas gets re-measured when the dialog opens
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolution, artboardId, containerRef, open])
+  }, [resolution, artboardId, containerRef, format, open])
 
   const bitrate = recommendBitrateMbps(size.width, size.height, fps, "high")
   const unsupported = availableFormats !== null && availableFormats.length === 0

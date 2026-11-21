@@ -130,6 +130,17 @@ export function clampToMaxSize(
   }
 }
 
+export function imageExportSize(
+  artboard: { width: number; height: number },
+  scale: number,
+  preset: { width: number; height: number } | undefined,
+  maxSize: number,
+) {
+  const width = preset?.width ?? Math.round(artboard.width * scale)
+  const height = preset?.height ?? Math.round(artboard.height * scale)
+  return clampToMaxSize(Math.max(1, width), Math.max(1, height), maxSize)
+}
+
 // Recommended video bitrate (Mbps): organic-noise gradients are high entropy and
 // need more bits per pixel than ordinary footage
 export function recommendBitrateMbps(
